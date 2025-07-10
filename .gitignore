@@ -21,7 +21,6 @@ dist/
 
 # Maven
 target/
-dist/
 
 # JetBrains IDE
 .idea/
@@ -47,4 +46,29 @@ Thumbs.db
 *.flv
 *.mov
 *.wmv
+.flattened-pom.xml
 
+# Eclipse
+.classpath
+.project
+.settings/
+
+# Intellij
+*.iml
+*.iws
+.mvn
+
+# Mac
+*.swp*
+
+# Maven
+log/
+.factorypath
+
+# run time files
+output/
+bin/
+
+# Others
+/shelf/
+/workspace.xml

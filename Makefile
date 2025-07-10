@@ -14,12 +14,8 @@
 # this of course means that SNAPSHOT releases are flaky since we dont have tags to make them
 # predictable
 
-export version := $(shell git describe --tag --abbrev=0 2> /dev/null)
+export version := $(shell cat chenile-process-management-version.txt)
 .DEFAULT_GOAL := help
-ifndef version
-	override version = 0.0.1-SNAPSHOT
-endif
-
 
 ## build: Build the executable with the version extracted from GIT
 .PHONY: build
@@ -31,21 +27,20 @@ build:
 test-script:
 	scripts/curl-scripts.sh
 	
-## deploy: Deploys the executable with the version extracted from GIT
+## prepare-deploy: Prepares the jars for deployment into Maven central. Set passphrase variable to secrets
+.PHONY: prepare-deploy
+prepare-deploy:
+	mvn  -B -DskipTests -Drevision=$(version) -DperformRelease=true -Dgpg.passphrase="${passphrase}" install
+
+## deploy: Deploys the  chenile jars into Sonatype Maven central. Set passphrase to the correct secret key
 .PHONY: deploy
 deploy:
-	mvn -Drevision=$(version) deploy
-
+	mvn  -B -DskipTests -Drevision=$(version) -DperformRelease=true -Dgpg.passphrase="${passphrase}" deploy
 
 ## clean: Clean all previous builds
 .PHONY: clean
 clean:
 	mvn -Drevision=$(version) clean
-
-## run: Run the executable using the spring-boot plugin
-.PHONY: run
-run: 
-	mvn -Drevision=$(version) spring-boot:run
 
 # check-tag: checks if the tag name has been passed as a parameter to the "make" command
 # This is internally used by the other goals and should not be invoked by the end user. Hence it 
