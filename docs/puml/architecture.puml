@@ -1,0 +1,44 @@
+@startuml
+'https://plantuml.com/component-diagram
+
+cloud "VYMO"{
+
+frame "First Trigger" {
+  [File watcher] as watcher
+  queue "init-q"
+  [scheduler]
+  circle http
+}
+
+node "Orchestrator" {
+  file "process definitions"
+  [First Trigger] -> [Process State Machine]
+  [Process State Machine] --> [Worker Starter]
+}
+
+node "reporter"{
+    [Reporter]
+}
+
+database "Process DB" {
+    [Process Table]
+}
+
+    queue "client-q"
+
+    frame "autoscaling-group"{
+        process worker
+     }
+
+}
+
+
+
+[Process State Machine] -up-> [Process Table]
+[Reporter] <-- [Process Table]
+[Worker Starter] -> "client-q"
+worker -> [Process State Machine] : http
+"client-q" -up->  worker : KEDA
+actor "Ops"
+Ops ----> Reporter
+@enduml

@@ -1,0 +1,12 @@
+@startjson
+{
+  "playbook" : [
+    { "rule-engine + action executor":
+      {"start":  1,"end":  10000}
+    },
+    { "rule-engine + action executor":
+          {"start":  10001,"end":  20000}
+     }
+  ]
+}
+@endjson

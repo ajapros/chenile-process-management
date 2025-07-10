@@ -1,0 +1,18 @@
+@startjson
+{
+  "feed1" : [
+    { "file1": [
+      {"chunk1":  {"start":  1,"end":  100}},
+      {"chunk2":  {"start":  101,"end":  200}}
+
+    ]
+    },
+    { "file2": [
+          {"chunk3":  {"start":  1,"end":  1000}},
+          {"chunk4":  {"start":  1001,"end":  2000}}
+        ]
+    }
+
+  ]
+}
+@endjson

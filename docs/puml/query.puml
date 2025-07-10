@@ -1,0 +1,13 @@
+@startjson
+{
+  "query" : [
+    { "sub-query1":
+      {"start":  1,"end":  10000}
+    },
+    { "sub-query2":
+          {"start":  10001,"end":  20000}
+     }
+
+  ]
+}
+@endjson

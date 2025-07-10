@@ -1,0 +1,24 @@
+stateDiagram-v2
+    state FINALIZER_PENDING
+    state CREATED
+    state areThereErrors <<choice>>
+    state PROCESSING
+    state areAllSubProcessesDone <<choice>>
+    state PROCESSED
+    state PROCESSED_WITH_ERRORS
+    FINALIZER_PENDING --> areThereErrors : finalize
+    [*] --> CREATED
+    CREATED --> PROCESSING : startProcessing
+    areThereErrors --> PROCESSED : no
+    areThereErrors --> PROCESSED_WITH_ERRORS : yes
+    PROCESSING --> PROCESSED_WITH_ERRORS : doneWithErrors
+    PROCESSING --> PROCESSED : doneSuccessfully
+    PROCESSING --> areAllSubProcessesDone : subProcessDoneSuccessfully
+    PROCESSING --> areAllSubProcessesDone : subProcessDoneWithErrors
+    PROCESSING --> PROCESSING
+    areAllSubProcessesDone --> PROCESSING : no
+    areAllSubProcessesDone --> FINALIZER_PENDING : yes
+    PROCESSED --> [*]
+    PROCESSED_WITH_ERRORS --> [*]
+
+
