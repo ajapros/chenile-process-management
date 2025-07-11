@@ -1,9 +1,6 @@
 package org.chenile.orchestrator.process.model;
 
 public class Constants {
-    public static final String SPLITTER = "splitter";
-    public static final String AGGREGATOR = "aggregator";
-    public static final String EXECUTOR = "executor";
     public static final String SPLIT_PENDING_STATE = "SPLIT_PENDING";
     public static final String SUB_PROCESSES_PENDING_STATE = "SUB_PROCESSES_PENDING";
     public static final String AGGREGATION_PENDING_STATE = "AGGREGATION_PENDING";

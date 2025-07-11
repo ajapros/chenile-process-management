@@ -1,15 +1,18 @@
 package org.chenile.orchestrator.process.service.defs;
 
+import org.chenile.orchestrator.process.WorkerStarter;
 import org.chenile.orchestrator.process.config.model.ProcessDef;
 import org.chenile.orchestrator.process.model.Constants;
 import org.chenile.orchestrator.process.model.Process;
+import org.chenile.orchestrator.process.model.WorkerType;
+import org.hibernate.jdbc.Work;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.Map;
 
 /**
- * This class calls a post save hook that can be explicitly
- * configured for each state
+ * This class handles specific things that need to be done to kick-start the
+ * WorkerStarter with the correct arguments.
  */
 public class PostSaveHook {
     @Autowired  ProcessConfigurator processConfigurator;
@@ -20,47 +23,30 @@ public class PostSaveHook {
     WorkerStarter workerStarter;
 
     public void execute(Process process) {
+        if(workerStarter == null) return;
         String processType = process.processType;
         String currentState = process.getCurrentState().getStateId();
         ProcessDef processDef = processConfigurator.processes.processMap.get(processType);
-        // extract the action to call post this state. That action will
-        // ultimately send the event that leads this state machine to the next state
+        if(processDef == null) return;
+        Map<String,String> params = null;
+        WorkerType workerType ;
+        // Execute the correct type of worker that will lead to the next state transition
         switch(currentState){
             case Constants.SPLIT_PENDING_STATE:
-                processSplit(process,processDef);
+                workerType = WorkerType.SPLITTER;
+                params = processDef.splitterConfig;
                 break;
             case Constants.AGGREGATION_PENDING_STATE:
-                processAggregation(process,processDef);
+                workerType = WorkerType.AGGREGATOR;
+                params = processDef.aggregatorConfig;
                 break;
             case Constants.EXECUTING_STATE:
-                processExecutor(process,processDef);
+                params = processDef.executorConfig;
+                workerType = WorkerType.EXECUTOR;
                 break;
+            default:
+                return;
         }
+        workerStarter.start(process,params,workerType);
     }
-
-    private void processExecutor(Process process, ProcessDef processDef) {
-        Map<String,String> params = null;
-        if(processDef != null)
-            params = processDef.executorConfig;
-        if (workerStarter != null)
-            workerStarter.start(process,params,Constants.EXECUTOR);
-    }
-
-    private void processAggregation(Process process, ProcessDef processDef) {
-        Map<String,String> params = null;
-        if(processDef != null)
-            params = processDef.aggregatorConfig;
-        if (workerStarter != null)
-            workerStarter.start(process,params,Constants.AGGREGATOR);
-    }
-
-    private void processSplit(Process process, ProcessDef processDef) {
-        Map<String,String> params = null;
-        if(processDef != null)
-            params = processDef.splitterConfig;
-        if (workerStarter != null)
-            workerStarter.start(process,params,Constants.SPLITTER);
-    }
-
-
 }

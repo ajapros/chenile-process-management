@@ -1,10 +1,8 @@
 package org.chenile.orchestrator.process.feedtest;
 
-import org.chenile.orchestrator.process.model.Constants;
+import org.chenile.orchestrator.process.model.*;
+import org.chenile.orchestrator.process.WorkerStarter;
 import org.chenile.orchestrator.process.model.Process;
-import org.chenile.orchestrator.process.model.StartProcessingPayload;
-import org.chenile.orchestrator.process.model.SubProcessPayload;
-import org.chenile.orchestrator.process.service.defs.WorkerStarter;
 import org.chenile.workflow.api.StateEntityService;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -15,7 +13,7 @@ public class FileChunker implements WorkerStarter {
     @Autowired
     StateEntityService<Process> processManager ;
     @Override
-    public void start(Process process,Map<String, String> execDef,String workerType) {
+    public void start(Process process, Map<String, String> execDef, WorkerType workerType) {
         StartProcessingPayload payload = new StartProcessingPayload();
         payload.subProcesses = new ArrayList<>();
         SubProcessPayload p = new SubProcessPayload();
