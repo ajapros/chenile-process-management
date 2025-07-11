@@ -6,6 +6,7 @@
 	<modules>
 		<module>process-api</module>
 		<module>process-service</module>
+		<module>process-delegate</module>
 	</modules>
 	<parent>
 		<groupId>org.chenile</groupId>
