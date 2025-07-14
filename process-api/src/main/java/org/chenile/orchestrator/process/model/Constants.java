@@ -9,6 +9,7 @@ public class Constants {
     public static final String PROCESSED_WITH_ERRORS_STATE = "PROCESSED_WITH_ERRORS";
     public static final String SPLIT_DONE = "splitDone";
     public static final String DONE_EVENT = "doneSuccessfully";
+    public static final String STATUS_UPDATE_EVENT = "statusUpdate";
     public static final String DONE_WITH_ERRORS_EVENT = "doneWithErrors";
     public static final String SUB_PROCESS_DONE_EVENT = "subProcessDoneSuccessfully";
     public static final String SUB_PROCESS_DONE_WITH_ERRORS_EVENT = "subProcessDoneWithErrors";
