@@ -17,6 +17,6 @@ import cucumber.api.junit.Cucumber;
         plugin = {"pretty"}
         )
 @ActiveProfiles("unittest")
-public class CukesRestTest1 {
+public class CukesRestTest {
 
 }
