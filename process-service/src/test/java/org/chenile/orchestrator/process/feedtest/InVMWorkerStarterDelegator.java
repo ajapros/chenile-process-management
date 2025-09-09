@@ -12,7 +12,7 @@ import java.util.Map;
  * Starts a process within the same JVM by using a component that has been
  * defined within the Spring Bean factory. This delegates to the correct component name<br/>
  * The name of the bean is determined by convention.
- * The bean is supposed to implement the ProcessStarter interface as well.
+ * The bean is supposed to implement the {@link WorkerStarter} interface as well.
  */
 public class InVMWorkerStarterDelegator implements WorkerStarter {
     @Autowired

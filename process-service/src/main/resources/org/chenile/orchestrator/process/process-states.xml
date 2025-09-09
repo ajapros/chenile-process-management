@@ -6,6 +6,7 @@
 		<on eventId="isNotLeaf" newStateId="SPLIT_PENDING"/>
 	</if>
 	<manual-state id='SPLIT_PENDING'>
+			<on eventId="splitInProcess"/>
 			<on eventId="splitDone" newStateId='SUB_PROCESSES_PENDING'/>
 	</manual-state>
 	<manual-state id="EXECUTING">

@@ -10,7 +10,7 @@
 	</modules>
 	<parent>
 		<groupId>org.chenile</groupId>
-		<version>2.0.30</version>
+		<version>2.0.39</version>
 		<artifactId>chenile-parent</artifactId>
 	</parent>
 

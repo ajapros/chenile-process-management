@@ -150,6 +150,12 @@ public class ProcessConfiguration {
     }
 
     @Bean
+    SplitDoneAction
+    processSplitInProcess(){
+        return new SplitDoneAction();
+    }
+
+    @Bean
     SubProcessDoneWithErrorsAction
             processSubProcessDoneWithErrors(){
         return new SubProcessDoneWithErrorsAction();

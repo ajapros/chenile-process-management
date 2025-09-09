@@ -15,6 +15,7 @@ import java.util.List;
 public class ProcessManagerClientImpl implements ProcessManagerClient {
 
     private final RestTemplate restTemplate;
+    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${process.manager.base-url}")
     String baseUrl;
@@ -24,9 +25,13 @@ public class ProcessManagerClientImpl implements ProcessManagerClient {
     }
 
     @Override
+    public Process splitInProcess(String id, StartProcessingPayload payload) {
+        return process(id, Constants.SPLIT_IN_PROCESS, payload);
+    }
+
+    @Override
     public Process splitDone(String id, StartProcessingPayload payload) {
         return process(id, Constants.SPLIT_DONE, payload);
-
     }
 
     @Override
@@ -55,8 +60,6 @@ public class ProcessManagerClientImpl implements ProcessManagerClient {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setAccept(List.of(MediaType.APPLICATION_JSON));
-
-        ObjectMapper objectMapper = new ObjectMapper();
 
         try {
             String jsonPayload = objectMapper.writeValueAsString(payload);
