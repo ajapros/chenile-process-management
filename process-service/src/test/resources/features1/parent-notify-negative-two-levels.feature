@@ -1,7 +1,7 @@
 Feature: Two Level Negative test - Grandchild is intimated
 Scenario: Create a new Process
 Given that "flowName" equals "PROCESS_FLOW"
-And that "initialState" equals "SPLIT_PENDING"
+And that "initialState" equals "AWAITING_SUBPROCESS_COMPLETION"
 When I POST a REST request to URL "/process" with payload
 """json
 {
@@ -22,39 +22,39 @@ And the REST response key "mutatedEntity.id" is "${id}"
 And the REST response key "mutatedEntity.currentState.stateId" is "${currentState}"
 
  Scenario: Send the splitDone event to the Process with comments
- Given that "comment" equals "Comment for splitDone"
- And that "event" equals "splitDone"
+ Given that "comment" equals "Comment for splitSucceeded"
+ And that "event" equals "splitSucceeded"
   And that "childId" equals "child5"
 When I PATCH a REST request to URL "/process/${id}/${event}" with payload
 """json
 {
     "comment": "${comment}",
     "subProcesses": [
-      {"args": "filename=f1", "childId":  "${childId}", "processType":  "file"}
+      {"args": "filename=f1", "workerSuppliedId":  "${childId}", "processType":  "file"}
     ]
 }
 """
 Then the REST response contains key "mutatedEntity"
 And the REST response key "mutatedEntity.id" is "${id}"
-And the REST response key "mutatedEntity.currentState.stateId" is "SUB_PROCESSES_PENDING"
+And the REST response key "mutatedEntity.currentState.stateId" is "AWAITING_SUBPROCESS_COMPLETION"
 And store "$.payload.mutatedEntity.currentState.stateId" from response to "finalState"
 
- Scenario: Send the splitDone event to the child process
-  Given that "comment" equals "Comment for splitDone for child"
-  And that "event" equals "splitDone"
+ Scenario: Send the splitSucceeded event to the child process
+  Given that "comment" equals "Comment for splitSucceeded for child"
+  And that "event" equals "splitSucceeded"
   And that "grandChildId" equals "grandChild2"
   When I PATCH a REST request to URL "/process/${childId}/${event}" with payload
 """json
 {
     "comment": "${comment}",
     "subProcesses": [
-      {"args": "filename=f1", "childId":  "${grandChildId}", "processType":  "chunk",
+      {"args": "filename=f1", "workerSuppliedId":  "${grandChildId}", "processType":  "chunk",
       "leaf":  true}
     ]
 }
 """
   Then the REST response contains key "mutatedEntity"
-  And the REST response key "mutatedEntity.currentState.stateId" is "SUB_PROCESSES_PENDING"
+  And the REST response key "mutatedEntity.currentState.stateId" is "AWAITING_SUBPROCESS_COMPLETION"
 
 
  Scenario: Send the doneWithErrors event to the grand child
@@ -64,7 +64,7 @@ When I PATCH a REST request to URL "/process/${grandChildId}/${event}" with payl
 """json
 {
     "comment": "${comment}",
-    "errors": [ "error1","error2"]
+    "validationErrors": [ "error1","error2"]
 }
 """
 Then the REST response contains key "mutatedEntity"
@@ -76,8 +76,8 @@ And the REST response key "mutatedEntity.currentState.stateId" is "PROCESSED_WIT
   And the REST response key "mutatedEntity.currentState.stateId" is "AGGREGATION_PENDING"
 
 Scenario: Send the aggregationDone event to the Process Child with comments
- Given that "comment" equals "Comment for aggregationDone"
- And that "event" equals "aggregationDone"
+ Given that "comment" equals "Comment for aggregationSucceeded"
+ And that "event" equals "aggregationSucceeded"
  When I PATCH a REST request to URL "/process/${childId}/${event}" with payload
 """json
 {
@@ -94,8 +94,8 @@ Scenario: Send the aggregationDone event to the Process Child with comments
  And the REST response key "mutatedEntity.currentState.stateId" is "AGGREGATION_PENDING"
 
 Scenario: Send the aggregationDone event to the Parent with comments
- Given that "comment" equals "Comment for aggregationDone"
- And that "event" equals "aggregationDone"
+ Given that "comment" equals "Comment for aggregationSucceeded"
+ And that "event" equals "aggregationSucceeded"
  When I PATCH a REST request to URL "/process/${id}/${event}" with payload
 """json
 {

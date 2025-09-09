@@ -29,11 +29,11 @@ public class TestFeeds {
     public void testWith1File() throws Exception {
         FeedSplitter.numFiles = 1;
         Process process = new Process();
-        process.processType = "feed";
+        process.setProcessType("feed");
         process.id = "FEED1";
         processManager.create(process);
         Process feedProcess = processManager.retrieve(process.id).getMutatedEntity();
-        Assert.assertEquals("PROCESSED",feedProcess.getCurrentState().getStateId());
+        Assert.assertEquals("AWAITING_SUBPROCESS_COMPLETION",feedProcess.getCurrentState().getStateId());
         String fileId = process.id + "FILE1";
         Process fileProcess = processManager.retrieve(fileId).getMutatedEntity();
         Assert.assertEquals("PROCESSED",fileProcess.getCurrentState().getStateId());
@@ -46,19 +46,19 @@ public class TestFeeds {
     public void testWith2Files() throws Exception {
         FeedSplitter.numFiles = 2;
         Process process = new Process();
-        process.processType = "feed";
+        process.setProcessType("feed");
         process.id = "FEED2";
         processManager.create(process);
         // Test if file1 is updated for the feed.
         Process feedProcess = processManager.retrieve(process.id).getMutatedEntity();
-        Assert.assertEquals("PROCESSED",feedProcess.getCurrentState().getStateId());
+        Assert.assertEquals("AWAITING_SUBPROCESS_COMPLETION",feedProcess.getCurrentState().getStateId());
         String fileId = process.id + "FILE1";
         // Make sure that the required args are passed for the sub process as well
         String expectedArgs = """
                 { "filename" : "file1" }
                 """;
         Process fileProcess = processManager.retrieve(fileId).getMutatedEntity();
-        Assert.assertEquals(expectedArgs,fileProcess.args);
+        Assert.assertEquals(expectedArgs,fileProcess.getArgs());
         Assert.assertEquals("PROCESSED",fileProcess.getCurrentState().getStateId());
         Process chunkProcess = processManager.retrieve(fileId + "CHUNK1").getMutatedEntity();
         Assert.assertEquals("PROCESSED",chunkProcess.getCurrentState().getStateId());
@@ -68,7 +68,7 @@ public class TestFeeds {
         expectedArgs = """
                 { "filename" : "file2" }
                 """;
-        Assert.assertEquals(expectedArgs,fileProcess.args);
+        Assert.assertEquals(expectedArgs,fileProcess.getArgs());
         Assert.assertEquals("PROCESSED",fileProcess.getCurrentState().getStateId());
         chunkProcess = processManager.retrieve(fileId + "CHUNK1").getMutatedEntity();
         Assert.assertEquals("PROCESSED",chunkProcess.getCurrentState().getStateId());

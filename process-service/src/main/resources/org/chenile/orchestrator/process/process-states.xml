@@ -1,35 +1,79 @@
 <!-- Implements the Splitter aggregator pattern. -->
 <states>
-<flow id='PROCESS_FLOW' default="true">
-	<if id='isThisLeafNode' condition="leaf" then="isLeaf" else="isNotLeaf" initialState="true">
-		<on eventId="isLeaf" newStateId="EXECUTING"/>
-		<on eventId="isNotLeaf" newStateId="SPLIT_PENDING"/>
-	</if>
-	<manual-state id='SPLIT_PENDING'>
-			<on eventId="splitDone" newStateId='SUB_PROCESSES_PENDING'/>
-	</manual-state>
-	<manual-state id="EXECUTING">
-		<on eventId="statusUpdate"/>
-		<on eventId="doneSuccessfully" newStateId="PROCESSED"/>
-		<on eventId="doneWithErrors" newStateId="PROCESSED_WITH_ERRORS"/>
-	</manual-state>
-	<manual-state id='SUB_PROCESSES_PENDING'>
-			<on eventId="subProcessDoneSuccessfully" newStateId='areAllSubProcessesDone'/>
-			<on eventId="subProcessDoneWithErrors" newStateId='areAllSubProcessesDone'/>
-	</manual-state>
-	<if id='areAllSubProcessesDone' condition="numSubProcesses == numCompletedSubProcesses" then="yes" else="no">
-			<on eventId="yes" newStateId='AGGREGATION_PENDING'/>
-			<on eventId="no" newStateId="SUB_PROCESSES_PENDING"/>
-	</if>
-	<manual-state id="AGGREGATION_PENDING">
-		<on eventId="aggregationDone" newStateId="areThereErrors"/>
-	</manual-state>
-	<if id='areThereErrors' condition="errors.size() > 0" then="yes" else="no">
-			<on eventId="yes" newStateId='PROCESSED_WITH_ERRORS'/>
-			<on eventId="no" newStateId="PROCESSED"/>
-	</if>
-	<manual-state id="PROCESSED"/>
-	<manual-state id="PROCESSED_WITH_ERRORS"/>
-</flow>
+    <flow id='PROCESS_FLOW' default="true">
+        <if id='isThisLeafNode' condition="leaf" then="isLeaf" else="isNotLeaf" initialState="true">
+            <on eventId="isLeaf" newStateId="INITIALIZING_EXECUTION"/>
+            <on eventId="isNotLeaf" newStateId="INITIALIZING_SPLIT"/>
+        </if>
+        <manual-state id='INITIALIZING_SPLIT'>
+            <on eventId="splitStarted" newStateId="SPLIT_PENDING"/>
+            <on eventId="splitInitializationFailed" newStateId="PROCESSED_WITH_ERRORS"/>
+            <!-- The race condition path: handle completion events if they arrive early -->
+            <on eventId="splitCompleted" newStateId="SPLIT_PENDING"/>
+            <on eventId="splitFailed" newStateId="PROCESSED_WITH_ERRORS"/>
+        </manual-state>
+
+        <manual-state id="SPLIT_PENDING">
+            <on eventId="addSubProcesses" />
+            <on eventId="splitCompleted" />
+            <on eventId="splitFailed" />
+            <!-- Event for the sequential use case: A completed child requests the parent to start the next phase. -->
+            <on eventId="triggerSuccessor" />
+            <on eventId="triggerSuccessorFailed" />
+            <on eventId="subProcessCompleted" newStateId="areAllChildrenAccountedFor"/>
+            <on eventId="subProcessFailed" newStateId="areAllChildrenAccountedFor"/>
+        </manual-state>
+
+        <if id='areAllChildrenAccountedFor'
+            condition="isSplitComplete and numSubProcesses == numCompletedSubProcesses"
+            then="yes" else="no">
+            <on eventId="yes" newStateId='INITIALIZING_AGGREGATION'/>
+            <on eventId="no" newStateId="SPLIT_PENDING"/>
+        </if>
+
+        <manual-state id="INITIALIZING_EXECUTION">
+            <on eventId="executionStarted" newStateId="EXECUTING"/>
+            <on eventId="executionInitializationFailed" newStateId="PROCESSED_WITH_ERRORS"/>
+            <!-- The race condition path -->
+            <on eventId="executionCompleted" newStateId="areThereErrors"/>
+            <on eventId="executionFailed" newStateId="FAILED"/>
+        </manual-state>
+
+        <manual-state id="EXECUTING">
+            <on eventId="statusUpdate"/>
+            <on eventId="executionCompleted" newStateId="areThereErrors"/>
+            <on eventId="executionFailed" newStateId="FAILED"/>
+        </manual-state>
+
+        <manual-state id="INITIALIZING_AGGREGATION">
+            <on eventId="aggregationStarted" newStateId="AGGREGATION_PENDING"/>
+            <on eventId="aggregationInitializationFailed" newStateId="PROCESSED_WITH_ERRORS"/>
+            <!-- The race condition path -->
+            <on eventId="aggregationCompleted" newStateId="shouldTriggerSuccessor"/>
+            <on eventId="aggregationFailed" newStateId="FAILED"/>
+        </manual-state>
+
+        <manual-state id="AGGREGATION_PENDING">
+            <on eventId="aggregationCompleted" newStateId="shouldTriggerSuccessor"/>
+            <on eventId="aggregationFailed" newStateId="PROCESSED_WITH_ERRORS"/>
+
+        </manual-state>
+        <if id="shouldTriggerSuccessor" condition="hasSuccessor()" then="yes" else="no">
+            <on eventId="yes" newStateId="INITIALIZING_SUCCESSOR"/>
+            <on eventId="no" newStateId="areThereErrors"/>
+        </if>
+        <manual-state id="INITIALIZING_SUCCESSOR">
+            <on eventId="successorCreated" newStateId="areThereErrors"/>
+            <on eventId="successorFailed" newStateId="PROCESSED_WITH_ERRORS"/>
+        </manual-state>
+        <if id='areThereErrors' condition="errors.size() > 0" then="yes" else="no">
+            <on eventId="yes" newStateId='PROCESSED_WITH_ERRORS'/>
+            <on eventId="no" newStateId="PROCESSED"/>
+        </if>
+        <manual-state id="PROCESSED"/>
+        <manual-state id="PROCESSED_WITH_ERRORS"/>
+    </flow>
 </states>
+
+
 

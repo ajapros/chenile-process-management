@@ -5,5 +5,5 @@ import org.chenile.orchestrator.process.model.WorkerType;
 
 import java.util.Map;
 public interface WorkerStarter {
-    public void start(Process process, Map<String,String> execDef, WorkerType workerType);
+    void start(Process process, Map<String, String> execDef, WorkerType workerType);
 }

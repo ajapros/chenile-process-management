@@ -17,14 +17,24 @@ import java.util.Map;
  * This also provides additional information to start a worker.
  */
 public class ProcessConfigurator {
-    public Processes processes = new Processes();
+    private Processes processes = new Processes();
 
     public void read(String file){
         try(InputStream stream = getClass().getClassLoader().getResourceAsStream(file)){
+            if (stream == null) {
+                throw new ConfigurationException(1201, "File not found: " + file);
+            }
             processes = new ObjectMapper().readValue(stream, Processes.class);
         }catch(IOException e){
             throw new ConfigurationException(1200,"File name " + file + " cannot be processed. "+
                     " Error = " + e.getMessage());
         }
+    }
+
+    public ProcessDef getProcessDef(String processType) {
+        if (processes == null) {
+            return null;
+        }
+        return processes.getProcess(processType);
     }
 }

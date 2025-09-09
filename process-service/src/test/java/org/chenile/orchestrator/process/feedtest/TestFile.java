@@ -25,16 +25,17 @@ public class TestFile {
     public void setUp(){
 
     }
+
     @Test
     @Order(1)
     public void test1() throws Exception {
         Process process = new Process();
-        process.processType = "file";
-        process.id = "file-process1";
+        process.setProcessType("file");
+        process.setId("file-process1");
         process = processManager.create(process).getMutatedEntity();
         System.err.println("Current state of file is " + process.getCurrentState().getStateId());
-        Process chunkProcess = processManager.retrieve(process.id + "CHUNK1").getMutatedEntity();
-        Process fileProcess = processManager.retrieve(process.id).getMutatedEntity();
+        Process chunkProcess = processManager.retrieve(process.getId() + "CHUNK1").getMutatedEntity();
+        Process fileProcess = processManager.retrieve(process.getId()).getMutatedEntity();
         Assert.assertEquals("PROCESSED",fileProcess.getCurrentState().getStateId());
     }
 }

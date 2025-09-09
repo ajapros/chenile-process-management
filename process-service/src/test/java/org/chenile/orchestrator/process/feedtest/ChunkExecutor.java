@@ -1,7 +1,7 @@
 package org.chenile.orchestrator.process.feedtest;
 
 import org.chenile.orchestrator.process.model.Constants;
-import org.chenile.orchestrator.process.model.DoneSuccessfullyPayload;
+import org.chenile.orchestrator.process.model.payload.DoneSuccessfullyPayload;
 import org.chenile.orchestrator.process.model.Process;
 import org.chenile.orchestrator.process.WorkerStarter;
 import org.chenile.orchestrator.process.model.WorkerType;
@@ -19,6 +19,6 @@ public class ChunkExecutor implements WorkerStarter {
         // Assert if the executor args are passed from def.json to this method
         Assert.assertEquals("executor_value",execDef.get("executor_key"));
         DoneSuccessfullyPayload payload = new DoneSuccessfullyPayload();
-        processManager.processById(process.getId(), Constants.DONE_EVENT,payload);
+        processManager.processById(process.getId(), Constants.Events.EXECUTION_COMPLETED_EVENT,payload);
     }
 }

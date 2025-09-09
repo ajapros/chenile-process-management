@@ -1,9 +1,25 @@
 package org.chenile.orchestrator.process.configuration;
 
+import org.chenile.orchestrator.process.model.payload.successor.SuccessorCreatedPayload;
+import org.chenile.orchestrator.process.model.payload.successor.SuccessorFailedPayload;
+import org.chenile.orchestrator.process.service.cmds.aggregation.AggregationFailedAction;
+import org.chenile.orchestrator.process.service.cmds.aggregation.AggregationCompletedAction;
+import org.chenile.orchestrator.process.service.cmds.common.SubProcessCompletedAction;
+import org.chenile.orchestrator.process.service.cmds.common.SubProcessFailedAction;
+import org.chenile.orchestrator.process.service.cmds.execution.ExecutionCompletedAction;
+import org.chenile.orchestrator.process.service.cmds.execution.ExecutionFailedAction;
+import org.chenile.orchestrator.process.service.cmds.execution.StatusUpdateAction;
+import org.chenile.orchestrator.process.service.cmds.splitting.AddSubProcessesAction;
+import org.chenile.orchestrator.process.service.cmds.splitting.SplitCompletedAction;
+import org.chenile.orchestrator.process.service.cmds.splitting.SplitFailedAction;
+import org.chenile.orchestrator.process.service.cmds.successor.SuccessorCreatedAction;
+import org.chenile.orchestrator.process.service.cmds.successor.SuccessorFailedAction;
+import org.chenile.orchestrator.process.service.cmds.successor.TriggerSuccessorAction;
 import org.chenile.orchestrator.process.service.defs.PostSaveHook;
 import org.chenile.orchestrator.process.service.defs.ProcessConfigurator;
 import org.chenile.orchestrator.process.model.Process;
 import org.chenile.orchestrator.process.service.entry.NotifyParent;
+import org.chenile.orchestrator.process.service.entry.NotifySuccessor;
 import org.chenile.orchestrator.process.service.entry.ProcessEntryAction;
 import org.chenile.orchestrator.process.service.cmds.*;
 import org.chenile.orchestrator.process.service.impl.ProcessManager;
@@ -27,98 +43,102 @@ import org.chenile.workflow.api.WorkflowRegistry;
 
 
 /**
- Process related workflow configurations in Spring
-*/
+ * Process related workflow configurations in Spring
+ */
 @Configuration
 public class ProcessConfiguration {
-	private static final String FLOW_DEFINITION_FILE = "org/chenile/orchestrator/process/process-states.xml";
-	public static final String PREFIX_FOR_PROPERTIES = "Process";
+    private static final String FLOW_DEFINITION_FILE = "org/chenile/orchestrator/process/process-states.xml";
+    public static final String PREFIX_FOR_PROPERTIES = "Process";
     public static final String PREFIX_FOR_RESOLVER = "process";
 
-    @Bean BeanFactoryAdapter processBeanFactoryAdapter() {
-		return new SpringBeanFactoryAdapter();
-	}
-	
-	@Bean STMFlowStoreImpl processFlowStore(
-            @Qualifier("processBeanFactoryAdapter") BeanFactoryAdapter fileBeanFactoryAdapter
-            )throws Exception{
-		STMFlowStoreImpl stmFlowStore = new STMFlowStoreImpl();
-		stmFlowStore.setBeanFactory(fileBeanFactoryAdapter);
-		return stmFlowStore;
-	}
-	
-	@Bean @Autowired STM<Process> processEntityStm(@Qualifier("processFlowStore") STMFlowStoreImpl stmFlowStore) throws Exception{
-		STMImpl<Process> stm = new STMImpl<>();
-		stm.setStmFlowStore(stmFlowStore);
-		return stm;
-	}
-	
-	@Bean @Autowired STMActionsInfoProvider processActionsInfoProvider(@Qualifier("processFlowStore") STMFlowStoreImpl stmFlowStore) {
-		STMActionsInfoProvider provider =  new STMActionsInfoProvider(stmFlowStore);
-        WorkflowRegistry.addSTMActionsInfoProvider("process",provider);
+    @Bean
+    BeanFactoryAdapter processBeanFactoryAdapter() {
+        return new SpringBeanFactoryAdapter();
+    }
+
+    @Bean
+    STMFlowStoreImpl processFlowStore(@Qualifier("processBeanFactoryAdapter") BeanFactoryAdapter fileBeanFactoryAdapter) throws Exception {
+        STMFlowStoreImpl stmFlowStore = new STMFlowStoreImpl();
+        stmFlowStore.setBeanFactory(fileBeanFactoryAdapter);
+        return stmFlowStore;
+    }
+
+    @Bean
+    @Autowired
+    STM<Process> processEntityStm(@Qualifier("processFlowStore") STMFlowStoreImpl stmFlowStore) throws Exception {
+        STMImpl<Process> stm = new STMImpl<>();
+        stm.setStmFlowStore(stmFlowStore);
+        return stm;
+    }
+
+    @Bean
+    @Autowired
+    STMActionsInfoProvider processActionsInfoProvider(@Qualifier("processFlowStore") STMFlowStoreImpl stmFlowStore) {
+        STMActionsInfoProvider provider = new STMActionsInfoProvider(stmFlowStore);
+        WorkflowRegistry.addSTMActionsInfoProvider("process", provider);
         return provider;
-	}
-	
-	@Bean EntityStore<Process> processEntityStore() {
-		return new ProcessEntityStore();
-	}
-	
-	@Bean @Autowired StateEntityServiceImpl<Process> _processStateEntityService_(
-			@Qualifier("processEntityStm") STM<Process> stm,
-			@Qualifier("processActionsInfoProvider") STMActionsInfoProvider fileInfoProvider,
-			@Qualifier("processEntityStore") EntityStore<Process> entityStore){
-		return new ProcessManager(stm, fileInfoProvider, entityStore);
-	}
-	
-	// Now we start constructing the STM Components 
-	
-	@Bean @Autowired
-    ProcessEntryAction processEntryAction(@Qualifier("processEntityStore") EntityStore<Process> entityStore,
-                                          @Qualifier("processActionsInfoProvider") STMActionsInfoProvider fileInfoProvider,
-                                          @Qualifier("processFlowStore") STMFlowStoreImpl stmFlowStore){
-        ProcessEntryAction entryAction =  new ProcessEntryAction(entityStore,fileInfoProvider);
+    }
+
+    @Bean
+    EntityStore<Process> processEntityStore() {
+        return new ProcessEntityStore();
+    }
+
+    @Bean
+    @Autowired
+    StateEntityServiceImpl<Process> _processStateEntityService_(@Qualifier("processEntityStm") STM<Process> stm, @Qualifier("processActionsInfoProvider") STMActionsInfoProvider fileInfoProvider, @Qualifier("processEntityStore") EntityStore<Process> entityStore) {
+        return new ProcessManager(stm, fileInfoProvider, entityStore);
+    }
+
+    // Now we start constructing the STM Components
+
+    @Bean
+    @Autowired
+    ProcessEntryAction processEntryAction(@Qualifier("processEntityStore") EntityStore<Process> entityStore, @Qualifier("processActionsInfoProvider") STMActionsInfoProvider fileInfoProvider, @Qualifier("processFlowStore") STMFlowStoreImpl stmFlowStore) {
+        ProcessEntryAction entryAction = new ProcessEntryAction(entityStore, fileInfoProvider);
         stmFlowStore.setEntryAction(entryAction);
         return entryAction;
-	}
-	
-	@Bean GenericExitAction<Process> processExitAction(@Qualifier("processFlowStore") STMFlowStoreImpl stmFlowStore){
+    }
+
+    @Bean
+    GenericExitAction<Process> processExitAction(@Qualifier("processFlowStore") STMFlowStoreImpl stmFlowStore) {
         GenericExitAction<Process> exitAction = new GenericExitAction<Process>();
         stmFlowStore.setExitAction(exitAction);
         return exitAction;
-	}
-
-	@Bean
-	XmlFlowReader processFlowReader(@Qualifier("processFlowStore") STMFlowStoreImpl flowStore) throws Exception {
-		XmlFlowReader flowReader = new XmlFlowReader(flowStore);
-		flowReader.setFilename(FLOW_DEFINITION_FILE);
-		return flowReader;
-	}
-	
-
-	@Bean
-    ProcessHealthChecker processHealthChecker(){
-    	return new ProcessHealthChecker();
     }
 
-    @Bean STMTransitionAction<Process> defaultfileSTMTransitionAction() {
+    @Bean
+    XmlFlowReader processFlowReader(@Qualifier("processFlowStore") STMFlowStoreImpl flowStore) throws Exception {
+        XmlFlowReader flowReader = new XmlFlowReader(flowStore);
+        flowReader.setFilename(FLOW_DEFINITION_FILE);
+        return flowReader;
+    }
+
+
+    @Bean
+    ProcessHealthChecker processHealthChecker() {
+        return new ProcessHealthChecker();
+    }
+
+    @Bean
+    STMTransitionAction<Process> defaultfileSTMTransitionAction() {
         return new DefaultSTMTransitionAction<MinimalPayload>();
     }
 
     @Bean
-    STMTransitionActionResolver processTransitionActionResolver(
-    @Qualifier("defaultfileSTMTransitionAction") STMTransitionAction<Process> defaultSTMTransitionAction){
-        return new STMTransitionActionResolver(PREFIX_FOR_RESOLVER,defaultSTMTransitionAction);
+    STMTransitionActionResolver processTransitionActionResolver(@Qualifier("defaultfileSTMTransitionAction") STMTransitionAction<Process> defaultSTMTransitionAction) {
+        return new STMTransitionActionResolver(PREFIX_FOR_RESOLVER, defaultSTMTransitionAction);
     }
 
-    @Bean @Autowired StmBodyTypeSelector processBodyTypeSelector(
-    @Qualifier("processActionsInfoProvider") STMActionsInfoProvider fileInfoProvider,
-    @Qualifier("processTransitionActionResolver") STMTransitionActionResolver stmTransitionActionResolver) {
-        return new StmBodyTypeSelector(fileInfoProvider,stmTransitionActionResolver);
+    @Bean
+    @Autowired
+    StmBodyTypeSelector processBodyTypeSelector(@Qualifier("processActionsInfoProvider") STMActionsInfoProvider fileInfoProvider, @Qualifier("processTransitionActionResolver") STMTransitionActionResolver stmTransitionActionResolver) {
+        return new StmBodyTypeSelector(fileInfoProvider, stmTransitionActionResolver);
     }
 
-    @Bean @Autowired STMTransitionAction<Process> processBaseTransitionAction(
-        @Qualifier("processTransitionActionResolver") STMTransitionActionResolver stmTransitionActionResolver,
-        @Qualifier("processFlowStore") STMFlowStoreImpl stmFlowStore){
+    @Bean
+    @Autowired
+    STMTransitionAction<Process> processBaseTransitionAction(@Qualifier("processTransitionActionResolver") STMTransitionActionResolver stmTransitionActionResolver, @Qualifier("processFlowStore") STMFlowStoreImpl stmFlowStore) {
         BaseTransitionAction<Process> baseTransitionAction = new BaseTransitionAction<>(stmTransitionActionResolver);
         stmFlowStore.setDefaultTransitionAction(baseTransitionAction);
         return baseTransitionAction;
@@ -132,62 +152,37 @@ public class ProcessConfiguration {
     // This will ensure that these are detected automatically by the Workflow system.
     // The payload types will be detected as well so that there is no need to introduce an <event-information/>
     // segment in src/main/resources/com/mycompany/file/process-states.xml
-    
-    @Bean
-    SubProcessDoneSuccessfullyAction
-            processSubProcessDoneSuccessfully(){
-        return new SubProcessDoneSuccessfullyAction();
-    }
-    @Bean
-    DoneSuccessfullyAction
-    processDoneSuccessfully(){
-        return new DoneSuccessfullyAction();
-    }
-    @Bean
-    SplitDoneAction
-            processSplitDone(){
-        return new SplitDoneAction();
-    }
+
 
     @Bean
-    SubProcessDoneWithErrorsAction
-            processSubProcessDoneWithErrors(){
-        return new SubProcessDoneWithErrorsAction();
-    }
-    @Bean
-    DoneWithErrorsAction
-    processDoneWithErrors(){
-        return new DoneWithErrorsAction();
-    }
-    @Bean
-    StatusUpdateAction
-    processStatusUpdate(){
-        return new StatusUpdateAction();
-    }
-    @Bean ConfigProviderImpl processConfigProvider() {
+    ConfigProviderImpl processConfigProvider() {
         return new ConfigProviderImpl();
     }
 
     @Bean
-    NotifyParent notifyParent(@Qualifier("_processStateEntityService_") StateEntityService<Process> stateEntityService){
+    NotifyParent notifyParent(@Qualifier("_processStateEntityService_") StateEntityService<Process> stateEntityService) {
         return new NotifyParent(stateEntityService);
     }
 
-    @Bean ConfigBasedEnablementStrategy processConfigBasedEnablementStrategy(
-        @Qualifier("processConfigProvider") ConfigProvider configProvider,
-        @Qualifier("processFlowStore") STMFlowStoreImpl stmFlowStore) {
-        ConfigBasedEnablementStrategy enablementStrategy = new ConfigBasedEnablementStrategy(configProvider,PREFIX_FOR_PROPERTIES);
+    @Bean
+    public NotifySuccessor notifySuccessor(@Qualifier("_processStateEntityService_") StateEntityService<Process> stateEntityService) {
+        return new NotifySuccessor(stateEntityService);
+    }
+
+    @Bean
+    ConfigBasedEnablementStrategy processConfigBasedEnablementStrategy(@Qualifier("processConfigProvider") ConfigProvider configProvider, @Qualifier("processFlowStore") STMFlowStoreImpl stmFlowStore) {
+        ConfigBasedEnablementStrategy enablementStrategy = new ConfigBasedEnablementStrategy(configProvider, PREFIX_FOR_PROPERTIES);
         stmFlowStore.setEnablementStrategy(enablementStrategy);
         return enablementStrategy;
     }
 
     @Bean
-    ProcessConfigurator processConfigurator() throws Exception{
-       return new ProcessConfigurator();
+    ProcessConfigurator processConfigurator() throws Exception {
+        return new ProcessConfigurator();
     }
 
     @Bean
-    PostSaveHook postSaveHook(){
+    PostSaveHook postSaveHook() {
         return new PostSaveHook();
     }
 

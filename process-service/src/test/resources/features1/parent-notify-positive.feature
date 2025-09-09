@@ -1,7 +1,7 @@
 Feature: Positive test - Child is intimated - Child intimates parent
 Scenario: Create a new Process
 Given that "flowName" equals "PROCESS_FLOW"
-And that "initialState" equals "SPLIT_PENDING"
+And that "initialState" equals "AWAITING_SUBPROCESS_COMPLETION"
 When I POST a REST request to URL "/process" with payload
 """json
 {
@@ -21,22 +21,22 @@ Then the REST response contains key "mutatedEntity"
 And the REST response key "mutatedEntity.id" is "${id}"
 And the REST response key "mutatedEntity.currentState.stateId" is "${currentState}"
 
- Scenario: Send the splitDone event to the Process with comments
- Given that "comment" equals "Comment for splitDone"
- And that "event" equals "splitDone"
+ Scenario: Send the splitSucceeded event to the Process with comments
+ Given that "comment" equals "Comment for splitSucceeded"
+ And that "event" equals "splitSucceeded"
   And that "childId" equals "child1"
 When I PATCH a REST request to URL "/process/${id}/${event}" with payload
 """json
 {
     "comment": "${comment}",
     "subProcesses": [
-      {"args": "filename=f1", "childId":  "${childId}", "processType":  "file", "leaf": true}
+      {"args": "filename=f1", "workerSuppliedId":  "${childId}", "processType":  "file", "leaf": true}
     ]
 }
 """
 Then the REST response contains key "mutatedEntity"
 And the REST response key "mutatedEntity.id" is "${id}"
-And the REST response key "mutatedEntity.currentState.stateId" is "SUB_PROCESSES_PENDING"
+And the REST response key "mutatedEntity.currentState.stateId" is "AWAITING_SUBPROCESS_COMPLETION"
 And store "$.payload.mutatedEntity.currentState.stateId" from response to "finalState"
 
 
@@ -58,9 +58,9 @@ And the REST response key "mutatedEntity.currentState.stateId" is "PROCESSED"
   And the REST response key "mutatedEntity.id" is "${id}"
   And the REST response key "mutatedEntity.currentState.stateId" is "AGGREGATION_PENDING"
 
- Scenario: Send the aggregationDone event to the Parent with comments
-  Given that "comment" equals "Comment for aggregationDone"
-  And that "event" equals "aggregationDone"
+ Scenario: Send the aggregationSucceeded event to the Parent with comments
+  Given that "comment" equals "Comment for aggregationSucceeded"
+  And that "event" equals "aggregationSucceeded"
   When I PATCH a REST request to URL "/process/${id}/${event}" with payload
 """json
 {

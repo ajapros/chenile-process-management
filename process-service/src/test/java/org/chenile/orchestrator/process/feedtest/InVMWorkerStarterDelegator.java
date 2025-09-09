@@ -19,7 +19,7 @@ public class InVMWorkerStarterDelegator implements WorkerStarter {
     ApplicationContext applicationContext;
     @Override
     public void start(Process process, Map<String, String> execDef, WorkerType workerType) {
-        String componentName = process.processType + camelCase(workerType);
+        String componentName = process.getProcessType() + camelCase(workerType);
         try {
             WorkerStarter workerStarter = (WorkerStarter) applicationContext.getBean(componentName);
             workerStarter.start(process, execDef,workerType);

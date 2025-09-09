@@ -28,10 +28,12 @@ public class ProcessManager extends StateEntityServiceImpl<Process> {
         return super.create(process);
     }
 
-    private void makeProcessLeafIfConfigured(Process process){
-        if(process.leaf || process.processType == null) return;
-        ProcessDef processDef = processConfigurator.processes.processMap.get(process.processType);
+    private void makeProcessLeafIfConfigured(Process process) {
+        if (process == null || process.isLeaf() || process.getProcessType() == null) return;
+
+        ProcessDef processDef = processConfigurator.getProcessDef(process.getProcessType());
         if (processDef == null) return;
-        process.leaf = processDef.leaf;
+
+        process.setLeaf(processDef.isLeaf());
     }
 }

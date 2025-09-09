@@ -27,7 +27,7 @@ public class TestChunks {
    @Test @Order(1)
     public void test1() throws Exception {
         Process process = new Process();
-        process.processType = "chunk";
+        process.setProcessType("chunk");
         processManager.create(process);
         Process process1 = processManager.retrieve(process.id).getMutatedEntity();
        Assert.assertEquals("PROCESSED",process1.getCurrentState().getStateId());

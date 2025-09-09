@@ -14,6 +14,6 @@ public class FileAggregator implements WorkerStarter {
     StateEntityService<Process> processManager ;
     @Override
     public void start(Process process, Map<String, String> execDef, WorkerType workerType) {
-        processManager.processById(process.getId(), Constants.AGGREGATION_DONE,null);
+        processManager.processById(process.getId(), Constants.Events.AGGREGATION_COMPLETED_EVENT,null);
     }
 }
