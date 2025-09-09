@@ -5,7 +5,9 @@ import org.chenile.orchestrator.process.config.model.ProcessDef;
 import org.chenile.orchestrator.process.model.Constants;
 import org.chenile.orchestrator.process.model.Process;
 import org.chenile.orchestrator.process.model.WorkerType;
-import org.hibernate.jdbc.Work;
+import org.chenile.workflow.api.StateEntityService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.Map;
@@ -15,7 +17,10 @@ import java.util.Map;
  * WorkerStarter with the correct arguments.
  */
 public class PostSaveHook {
+    Logger logger = LoggerFactory.getLogger(PostSaveHook.class);
     @Autowired  ProcessConfigurator processConfigurator;
+    @Autowired
+    StateEntityService<Process> processService;
 
     public void setWorkerStarter(WorkerStarter workerStarter) {
         this.workerStarter = workerStarter;
@@ -23,11 +28,12 @@ public class PostSaveHook {
     WorkerStarter workerStarter;
 
     public void execute(Process process) {
-        if(workerStarter == null) return;
         String processType = process.processType;
         String currentState = process.getCurrentState().getStateId();
         ProcessDef processDef = processConfigurator.processes.processMap.get(processType);
         if(processDef == null) return;
+        startSuccessors(processDef);
+        if(workerStarter == null) return;
         Map<String,String> params = null;
         WorkerType workerType ;
         // Execute the correct type of worker that will lead to the next state transition
@@ -48,5 +54,20 @@ public class PostSaveHook {
                 return;
         }
         workerStarter.start(process,params,workerType);
+    }
+
+    private void startSuccessors(ProcessDef processDef) {
+        for (String successor: processDef.successors) {
+            Process process = new Process();
+            process.processType = successor;
+            ProcessDef successorProcessDef = processConfigurator.processes.processMap.get(successor);
+            if (successorProcessDef == null){
+                logger.warn("Not starting successor " + successor + " since it ProcessDef not configured");
+                continue;
+            }
+            process.leaf = successorProcessDef.leaf;
+            process.args = successorProcessDef.args;
+            processService.create(process);
+        }
     }
 }

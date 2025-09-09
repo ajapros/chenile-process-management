@@ -151,7 +151,7 @@ public class ProcessConfiguration {
 
     @Bean
     SplitDoneAction
-    processSplitInProcess(){
+    processSplitPartiallyDone(){
         return new SplitDoneAction();
     }
 

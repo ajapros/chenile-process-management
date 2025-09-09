@@ -15,7 +15,7 @@ And the REST response key "mutatedEntity.currentState.stateId" is "${initialStat
 And store "$.payload.mutatedEntity.currentState.stateId" from response to "currentState"
 And the REST response key "mutatedEntity.description" is "Description"
 
-Scenario: Retrieve the file that just got created
+Scenario: Retrieve the chunk that just got created
 When I GET a REST request to URL "/process/${id}"
 Then the REST response contains key "mutatedEntity"
 And the REST response key "mutatedEntity.id" is "${id}"

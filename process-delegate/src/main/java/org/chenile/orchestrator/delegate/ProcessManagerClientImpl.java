@@ -25,8 +25,8 @@ public class ProcessManagerClientImpl implements ProcessManagerClient {
     }
 
     @Override
-    public Process splitInProcess(String id, StartProcessingPayload payload) {
-        return process(id, Constants.SPLIT_IN_PROCESS, payload);
+    public Process splitPartiallyDone(String id, StartProcessingPayload payload) {
+        return process(id, Constants.SPLIT_PARTIALLY_DONE, payload);
     }
 
     @Override
@@ -52,6 +52,16 @@ public class ProcessManagerClientImpl implements ProcessManagerClient {
     @Override
     public Process doneWithErrors(String id, DoneWithErrorsPayload payload) {
         return process(id, Constants.DONE_WITH_ERRORS_EVENT, payload);
+    }
+
+    @Override
+    public Process splitDoneWithErrors(String id, DoneWithErrorsPayload payload) {
+        return process(id, Constants.SPLIT_DONE_WITH_ERRORS, payload);
+    }
+
+    @Override
+    public Process aggregationDoneWithErrors(String id, DoneWithErrorsPayload payload) {
+        return process(id, Constants.AGGREGATION_DONE_WITH_ERRORS, payload);
     }
 
     private Process process(String id, String event, Object payload) {

@@ -6,29 +6,43 @@
 		<on eventId="isNotLeaf" newStateId="SPLIT_PENDING"/>
 	</if>
 	<manual-state id='SPLIT_PENDING'>
-			<on eventId="splitInProcess"/>
+			<on eventId="splitPartiallyDone" newStateId="SPLIT_PARTIALLY_DONE"/>
 			<on eventId="splitDone" newStateId='SUB_PROCESSES_PENDING'/>
+			<on eventId="splitDoneWithErrors" newStateId='PROCESSED_WITH_ERRORS'/>
 	</manual-state>
+
+	<manual-state id='SPLIT_PARTIALLY_DONE'>
+		<on eventId="splitPartiallyDone"/>
+		<on eventId="splitDone" newStateId='SUB_PROCESSES_PENDING'/>
+		<on eventId="splitDoneWithErrors" newStateId='PROCESSED_WITH_ERRORS'/>
+	</manual-state>
+
 	<manual-state id="EXECUTING">
 		<on eventId="statusUpdate"/>
 		<on eventId="doneSuccessfully" newStateId="PROCESSED"/>
 		<on eventId="doneWithErrors" newStateId="PROCESSED_WITH_ERRORS"/>
 	</manual-state>
+
 	<manual-state id='SUB_PROCESSES_PENDING'>
 			<on eventId="subProcessDoneSuccessfully" newStateId='areAllSubProcessesDone'/>
 			<on eventId="subProcessDoneWithErrors" newStateId='areAllSubProcessesDone'/>
 	</manual-state>
+
 	<if id='areAllSubProcessesDone' condition="numSubProcesses == numCompletedSubProcesses" then="yes" else="no">
 			<on eventId="yes" newStateId='AGGREGATION_PENDING'/>
 			<on eventId="no" newStateId="SUB_PROCESSES_PENDING"/>
 	</if>
+
 	<manual-state id="AGGREGATION_PENDING">
 		<on eventId="aggregationDone" newStateId="areThereErrors"/>
+		<on eventId="aggregationDoneWithErrors" newStateId="PROCESSED_WITH_ERRORS"/>
 	</manual-state>
+
 	<if id='areThereErrors' condition="errors.size() > 0" then="yes" else="no">
 			<on eventId="yes" newStateId='PROCESSED_WITH_ERRORS'/>
 			<on eventId="no" newStateId="PROCESSED"/>
 	</if>
+
 	<manual-state id="PROCESSED"/>
 	<manual-state id="PROCESSED_WITH_ERRORS"/>
 </flow>
