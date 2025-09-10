@@ -32,7 +32,8 @@ public class PostSaveHook {
         String currentState = process.getCurrentState().getStateId();
         ProcessDef processDef = processConfigurator.processes.processMap.get(processType);
         if(processDef == null) return;
-        startSuccessors(processDef);
+        if (currentState.equals("PROCESSED"))
+            startSuccessors(processDef);
         if(workerStarter == null) return;
         Map<String,String> params = null;
         WorkerType workerType ;
@@ -57,7 +58,10 @@ public class PostSaveHook {
     }
 
     private void startSuccessors(ProcessDef processDef) {
+
         for (String successor: processDef.successors) {
+            System.err.println("Starting Successor for process type = " + processDef.processType +
+                    " Processing successor type = " + successor);
             Process process = new Process();
             process.processType = successor;
             ProcessDef successorProcessDef = processConfigurator.processes.processMap.get(successor);

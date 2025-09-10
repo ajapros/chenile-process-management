@@ -1,5 +1,6 @@
 package org.chenile.orchestrator.process.feedtest;
 
+import org.chenile.orchestrator.process.configuration.dao.ProcessRepository;
 import org.chenile.orchestrator.process.model.Process;
 import org.chenile.workflow.api.StateEntityService;
 import org.junit.Assert;
@@ -20,13 +21,11 @@ import org.springframework.test.context.junit4.SpringRunner;
 public class TestFeeds {
     @Autowired
     StateEntityService<Process> processManager;
-    @Before
-    public void setUp(){
 
-    }
     @Test
     @Order(1)
     public void testWith1File() throws Exception {
+        ChunkExecutor.successorId = null;
         FeedSplitter.numFiles = 1;
         Process process = new Process();
         process.processType = "feed";
@@ -39,11 +38,16 @@ public class TestFeeds {
         Assert.assertEquals("PROCESSED",fileProcess.getCurrentState().getStateId());
         Process chunkProcess = processManager.retrieve(fileId + "CHUNK1").getMutatedEntity();
         Assert.assertEquals("PROCESSED",chunkProcess.getCurrentState().getStateId());
+        // Make sure that the successor process is created and has been successfully processed.
+        Assert.assertNotNull(ChunkExecutor.successorId);
+        Process successorProcess = processManager.retrieve(ChunkExecutor.successorId).getMutatedEntity();
+        Assert.assertEquals("PROCESSED",successorProcess.getCurrentState().getStateId());
     }
 
     @Test
     @Order(2)
     public void testWith2Files() throws Exception {
+        ChunkExecutor.successorId = null;
         FeedSplitter.numFiles = 2;
         Process process = new Process();
         process.processType = "feed";

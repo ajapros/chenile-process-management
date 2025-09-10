@@ -14,11 +14,19 @@ import java.util.Map;
 public class ChunkExecutor implements WorkerStarter {
     @Autowired
     StateEntityService<Process> processManager ;
+    // Store the successor ID so that we can assert that a successor has been created.
+    // This is useful for the test assertion.
+    public static String successorId = null;
     @Override
     public void start(Process process, Map<String, String> execDef, WorkerType workerType) {
         // Assert if the executor args are passed from def.json to this method
         Assert.assertEquals("executor_value",execDef.get("executor_key"));
         DoneSuccessfullyPayload payload = new DoneSuccessfullyPayload();
+        if (process.processType.equals("feedSuccessor")) {
+            // There can only be one successor created for the entire chain of events.
+            Assert.assertNull(successorId);
+            successorId = process.id;
+        }
         processManager.processById(process.getId(), Constants.DONE_EVENT,payload);
     }
 }

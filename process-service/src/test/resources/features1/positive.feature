@@ -1,4 +1,4 @@
-Feature: Positive Test - SubProcess has terminated successfully - Parent is intimated
+Feature: Positive Test - SubProcess has terminated successfully - Parent is intimated.
 Scenario: Create a new file
 Given that "flowName" equals "PROCESS_FLOW"
 And that "initialState" equals "SPLIT_PENDING"

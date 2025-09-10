@@ -22,6 +22,11 @@ public class ProcessConfigurator {
     public void read(String file){
         try(InputStream stream = getClass().getClassLoader().getResourceAsStream(file)){
             processes = new ObjectMapper().readValue(stream, Processes.class);
+            for (Map.Entry<String,ProcessDef> entry: processes.processMap.entrySet()){
+                String key = entry.getKey();
+                ProcessDef processDef = entry.getValue();
+                processDef.processType = key;
+            }
         }catch(IOException e){
             throw new ConfigurationException(1200,"File name " + file + " cannot be processed. "+
                     " Error = " + e.getMessage());
