@@ -27,6 +27,10 @@ public class Process extends AbstractJpaStateEntity
 	 */
 	public boolean leaf;
 	/**
+	 * is this a dormant process
+	 */
+	public boolean dormant = false;
+	/**
 	 * the client is stored as part of the process.<br/>
 	 * this enables us to use the client ID to enable client isolation.
 	 */
@@ -62,4 +66,9 @@ public class Process extends AbstractJpaStateEntity
 	 	separate VM
 	 */
 	public String args ;
+	/**
+	 * The flag below is useful to skip worker creation when status updates are done.
+	 */
+	@Transient public boolean skipPostWorkerCreation = false;
+	public String predecessorId;
 }

@@ -19,8 +19,6 @@ import java.util.Map;
 public class PostSaveHook {
     Logger logger = LoggerFactory.getLogger(PostSaveHook.class);
     @Autowired  ProcessConfigurator processConfigurator;
-    @Autowired
-    StateEntityService<Process> processService;
 
     public void setWorkerStarter(WorkerStarter workerStarter) {
         this.workerStarter = workerStarter;
@@ -28,12 +26,12 @@ public class PostSaveHook {
     WorkerStarter workerStarter;
 
     public void execute(Process process) {
+        if(process.skipPostWorkerCreation)
+            return;
         String processType = process.processType;
         String currentState = process.getCurrentState().getStateId();
         ProcessDef processDef = processConfigurator.processes.processMap.get(processType);
         if(processDef == null) return;
-        if (currentState.equals("PROCESSED"))
-            startSuccessors(processDef);
         if(workerStarter == null) return;
         Map<String,String> params = null;
         WorkerType workerType ;
@@ -55,23 +53,5 @@ public class PostSaveHook {
                 return;
         }
         workerStarter.start(process,params,workerType);
-    }
-
-    private void startSuccessors(ProcessDef processDef) {
-
-        for (String successor: processDef.successors) {
-            System.err.println("Starting Successor for process type = " + processDef.processType +
-                    " Processing successor type = " + successor);
-            Process process = new Process();
-            process.processType = successor;
-            ProcessDef successorProcessDef = processConfigurator.processes.processMap.get(successor);
-            if (successorProcessDef == null){
-                logger.warn("Not starting successor " + successor + " since it ProcessDef not configured");
-                continue;
-            }
-            process.leaf = successorProcessDef.leaf;
-            process.args = successorProcessDef.args;
-            processService.create(process);
-        }
     }
 }

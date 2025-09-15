@@ -10,4 +10,5 @@ import java.util.List;
 */
 public class DoneWithErrorsPayload extends MinimalPayload{
     public List<String> errors = new ArrayList<>();
+    public String childId;
 }

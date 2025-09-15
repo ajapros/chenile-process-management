@@ -33,6 +33,6 @@ public class FeedSplitter implements WorkerStarter {
             Assert.assertEquals("splitter_value",execDef.get("splitter_key"));
             payload.subProcesses.add(p);
         }
-        processManager.processById(process.getId(), Constants.SPLIT_DONE,payload);
+        processManager.processById(process.getId(), Constants.SPLIT_DONE_EVENT,payload);
     }
 }

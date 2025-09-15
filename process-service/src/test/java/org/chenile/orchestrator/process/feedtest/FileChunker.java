@@ -20,6 +20,6 @@ public class FileChunker implements WorkerStarter {
         p.processType = "chunk";
         p.childId = process.id + "CHUNK1";
         payload.subProcesses.add(p);
-        processManager.processById(process.getId(), Constants.SPLIT_DONE,payload);
+        processManager.processById(process.getId(), Constants.SPLIT_DONE_EVENT,payload);
     }
 }

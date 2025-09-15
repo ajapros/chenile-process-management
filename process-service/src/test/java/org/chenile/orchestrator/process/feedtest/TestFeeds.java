@@ -1,6 +1,7 @@
 package org.chenile.orchestrator.process.feedtest;
 
 import org.chenile.orchestrator.process.configuration.dao.ProcessRepository;
+import org.chenile.orchestrator.process.model.Constants;
 import org.chenile.orchestrator.process.model.Process;
 import org.chenile.workflow.api.StateEntityService;
 import org.junit.Assert;
@@ -32,16 +33,16 @@ public class TestFeeds {
         process.id = "FEED1";
         processManager.create(process);
         Process feedProcess = processManager.retrieve(process.id).getMutatedEntity();
-        Assert.assertEquals("PROCESSED",feedProcess.getCurrentState().getStateId());
+        Assert.assertEquals(Constants.PROCESSED_STATE,feedProcess.getCurrentState().getStateId());
         String fileId = process.id + "FILE1";
         Process fileProcess = processManager.retrieve(fileId).getMutatedEntity();
-        Assert.assertEquals("PROCESSED",fileProcess.getCurrentState().getStateId());
+        Assert.assertEquals(Constants.PROCESSED_STATE,fileProcess.getCurrentState().getStateId());
         Process chunkProcess = processManager.retrieve(fileId + "CHUNK1").getMutatedEntity();
-        Assert.assertEquals("PROCESSED",chunkProcess.getCurrentState().getStateId());
+        Assert.assertEquals(Constants.PROCESSED_STATE,chunkProcess.getCurrentState().getStateId());
         // Make sure that the successor process is created and has been successfully processed.
         Assert.assertNotNull(ChunkExecutor.successorId);
         Process successorProcess = processManager.retrieve(ChunkExecutor.successorId).getMutatedEntity();
-        Assert.assertEquals("PROCESSED",successorProcess.getCurrentState().getStateId());
+        Assert.assertEquals(Constants.PROCESSED_STATE,successorProcess.getCurrentState().getStateId());
     }
 
     @Test
@@ -55,7 +56,7 @@ public class TestFeeds {
         processManager.create(process);
         // Test if file1 is updated for the feed.
         Process feedProcess = processManager.retrieve(process.id).getMutatedEntity();
-        Assert.assertEquals("PROCESSED",feedProcess.getCurrentState().getStateId());
+        Assert.assertEquals(Constants.PROCESSED_STATE,feedProcess.getCurrentState().getStateId());
         String fileId = process.id + "FILE1";
         // Make sure that the required args are passed for the sub process as well
         String expectedArgs = """
@@ -63,9 +64,9 @@ public class TestFeeds {
                 """;
         Process fileProcess = processManager.retrieve(fileId).getMutatedEntity();
         Assert.assertEquals(expectedArgs,fileProcess.args);
-        Assert.assertEquals("PROCESSED",fileProcess.getCurrentState().getStateId());
+        Assert.assertEquals(Constants.PROCESSED_STATE,fileProcess.getCurrentState().getStateId());
         Process chunkProcess = processManager.retrieve(fileId + "CHUNK1").getMutatedEntity();
-        Assert.assertEquals("PROCESSED",chunkProcess.getCurrentState().getStateId());
+        Assert.assertEquals(Constants.PROCESSED_STATE,chunkProcess.getCurrentState().getStateId());
         // Test if the second file has been processed successfully as well.
         fileId = process.id + "FILE2";
         fileProcess = processManager.retrieve(fileId).getMutatedEntity();
@@ -73,8 +74,12 @@ public class TestFeeds {
                 { "filename" : "file2" }
                 """;
         Assert.assertEquals(expectedArgs,fileProcess.args);
-        Assert.assertEquals("PROCESSED",fileProcess.getCurrentState().getStateId());
+        Assert.assertEquals(Constants.PROCESSED_STATE,fileProcess.getCurrentState().getStateId());
         chunkProcess = processManager.retrieve(fileId + "CHUNK1").getMutatedEntity();
-        Assert.assertEquals("PROCESSED",chunkProcess.getCurrentState().getStateId());
+        Assert.assertEquals(Constants.PROCESSED_STATE,chunkProcess.getCurrentState().getStateId());
+        // Make sure that the successor process is created and has been successfully processed.
+        Assert.assertNotNull(ChunkExecutor.successorId);
+        Process successorProcess = processManager.retrieve(ChunkExecutor.successorId).getMutatedEntity();
+        Assert.assertEquals(Constants.PROCESSED_STATE,successorProcess.getCurrentState().getStateId());
     }
 }

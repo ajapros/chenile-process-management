@@ -1,7 +1,6 @@
 {
   "processMap": {
     "feed": {
-      "successors": ["feedSuccessor"],
       "splitterConfig": {
         "splitter_key": "splitter_value"
       },
@@ -10,7 +9,8 @@
       }
     },
     "file": {
-      "parentProcessType": "feed"
+      "parentProcessType": "feed",
+      "successors": ["fileSuccessor"]
     },
     "chunk": {
       "leaf": true,
@@ -19,7 +19,7 @@
         "executor_key": "executor_value"
       }
     },
-    "feedSuccessor": {
+    "fileSuccessor": {
       "leaf": true,
       "executorConfig": {
         "executor_key": "executor_value"
