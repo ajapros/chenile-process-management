@@ -65,5 +65,8 @@ public class SpringConfig extends SpringBootServletInitializer{
     ChunkExecutor feedSuccessorExecutor(){
         return new ChunkExecutor();
     }
+
+    @Bean
+    FileSuccessorExecutor fileSuccessorExecutor(){return new FileSuccessorExecutor();}
 }
 

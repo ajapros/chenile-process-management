@@ -15,6 +15,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit4.SpringRunner;
 
+import java.util.List;
+
 @RunWith(SpringRunner.class)
 @SpringBootTest(classes = SpringConfig.class)
 @AutoConfigureMockMvc
@@ -23,10 +25,12 @@ public class TestFeeds {
     @Autowired
     StateEntityService<Process> processManager;
 
+    @Autowired
+    private ProcessRepository processRepository;
+
     @Test
     @Order(1)
     public void testWith1File() throws Exception {
-        ChunkExecutor.successorId = null;
         FeedSplitter.numFiles = 1;
         Process process = new Process();
         process.processType = "feed";
@@ -39,16 +43,19 @@ public class TestFeeds {
         Assert.assertEquals(Constants.PROCESSED_STATE,fileProcess.getCurrentState().getStateId());
         Process chunkProcess = processManager.retrieve(fileId + "CHUNK1").getMutatedEntity();
         Assert.assertEquals(Constants.PROCESSED_STATE,chunkProcess.getCurrentState().getStateId());
-        // Make sure that the successor process is created and has been successfully processed.
-        Assert.assertNotNull(ChunkExecutor.successorId);
-        Process successorProcess = processManager.retrieve(ChunkExecutor.successorId).getMutatedEntity();
-        Assert.assertEquals(Constants.PROCESSED_STATE,successorProcess.getCurrentState().getStateId());
+
+        // Make sure that the all successor processes are created and has been successfully processed.
+        List<Process> allPredecessorList= processRepository.findByPredecessorIdIsNotNull();
+        for(Process p: allPredecessorList){
+            Process successorProcess = processManager.retrieve(p.getId()).getMutatedEntity();
+            Assert.assertEquals(Constants.PROCESSED_STATE,successorProcess.getCurrentState().getStateId());
+        }
+
     }
 
     @Test
     @Order(2)
     public void testWith2Files() throws Exception {
-        ChunkExecutor.successorId = null;
         FeedSplitter.numFiles = 2;
         Process process = new Process();
         process.processType = "feed";
@@ -78,8 +85,10 @@ public class TestFeeds {
         chunkProcess = processManager.retrieve(fileId + "CHUNK1").getMutatedEntity();
         Assert.assertEquals(Constants.PROCESSED_STATE,chunkProcess.getCurrentState().getStateId());
         // Make sure that the successor process is created and has been successfully processed.
-        Assert.assertNotNull(ChunkExecutor.successorId);
-        Process successorProcess = processManager.retrieve(ChunkExecutor.successorId).getMutatedEntity();
-        Assert.assertEquals(Constants.PROCESSED_STATE,successorProcess.getCurrentState().getStateId());
+        List<Process> allPredecessorList= processRepository.findByPredecessorIdIsNotNull();
+        for(Process p: allPredecessorList){
+            Process successorProcess = processManager.retrieve(p.getId()).getMutatedEntity();
+            Assert.assertEquals(Constants.PROCESSED_STATE,successorProcess.getCurrentState().getStateId());
+        }
     }
 }

@@ -48,8 +48,13 @@
 
 	<if id='areThereErrors' condition="errors.size() > 0" then="yes" else="no">
 			<on eventId="yes" newStateId='PROCESSED_WITH_ERRORS'/>
-			<on eventId="no" newStateId="PROCESSED"/>
+			<on eventId="no" newStateId="executePredecessorIfAny"/>
 	</if>
+
+	<auto-state id='executePredecessorIfAny' componentName="processExecutePredecessorIfAny">
+		<on eventId="yes" newStateId='PROCESSED'/>
+		<on eventId="no" newStateId="PROCESSED_WITH_ERRORS"/>
+	</auto-state>
 
 	<manual-state id="PROCESSED"/>
 	<manual-state id="PROCESSED_WITH_ERRORS"/>

@@ -23,7 +23,9 @@ public class InVMWorkerStarterDelegator implements WorkerStarter {
         try {
             WorkerStarter workerStarter = (WorkerStarter) applicationContext.getBean(componentName);
             workerStarter.start(process, execDef,workerType);
-        }catch(Exception ignore){}
+        }catch(Exception ignore){
+            ignore.printStackTrace();
+        }
     }
 
     private String camelCase(WorkerType workerType){

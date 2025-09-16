@@ -17,4 +17,9 @@ public class Constants {
     public static final String SUB_PROCESS_DONE_WITH_ERRORS_EVENT = "subProcessDoneWithErrors";
     public static final String AGGREGATION_DONE_EVENT = "aggregationDone";
     public static final String SPLIT_PARTIALLY_DONE_EVENT = "splitPartiallyDone";
+    public static final String ACTIVATE_DORMANT_EVENT = "activate";
+
+    public static final String YES = "yes";
+    public static final String NO = "no";
+
 }

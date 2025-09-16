@@ -170,6 +170,14 @@ public class ProcessConfiguration {
     processStatusUpdate(){
         return new StatusUpdateAction();
     }
+
+
+    @Bean
+    PredecessorAction
+    processExecutePredecessorIfAny(){
+        return new PredecessorAction();
+    }
+
     @Bean ConfigProviderImpl processConfigProvider() {
         return new ConfigProviderImpl();
     }

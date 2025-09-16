@@ -74,6 +74,8 @@ public class SplitDoneAction extends AbstractSTMTransitionAction<Process,
 			successorProcess.leaf = successorProcessDef.leaf;
 			successorProcess.args = subProcess.args;
 			successorProcess.dormant = true;
+			successorProcess.parentId = subProcess.parentId;
+			successorProcess.predecessorId = subProcess.id;
 			list.add(successorProcess);
 		}
 	}

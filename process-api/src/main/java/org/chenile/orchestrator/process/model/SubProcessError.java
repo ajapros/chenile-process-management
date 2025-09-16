@@ -13,6 +13,8 @@ import java.util.List;
 public class SubProcessError extends BaseJpaEntity {
     public String processId;
     public Date timeOfCompletion;
+
+
     @ElementCollection
     public List<String> errors ;
 
