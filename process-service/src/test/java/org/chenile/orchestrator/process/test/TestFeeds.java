@@ -103,8 +103,10 @@ public class TestFeeds {
         unblock("FEED1-SPLITTER");
         assertState(process.id,Constants.SUB_PROCESSES_PENDING_STATE);
         unblock("FEED1FILE1-SPLITTER");
+        assertState("FEED1FILE1fileSuccessor",Constants.DORMANT_STATE);
         unblock("FEED1FILE1CHUNK1-EXECUTOR");
         unblock("FEED1FILE1-AGGREGATOR");
+        assertState("FEED1FILE1fileSuccessor",Constants.EXECUTING_STATE);
         unblock("FEED1FILE1fileSuccessor-EXECUTOR");
         assertState("FEED1FILE1fileSuccessor",Constants.PROCESSED_STATE);
         assertState(process.id,Constants.AGGREGATION_PENDING_STATE);
