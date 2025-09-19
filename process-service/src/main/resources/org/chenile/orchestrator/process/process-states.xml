@@ -14,15 +14,9 @@
 		<on eventId="activate" newStateId="isThisLeafNode"/>
 	</manual-state>
 	<manual-state id='SPLIT_PENDING'>
-			<on eventId="splitPartiallyDone" newStateId="SPLIT_PARTIALLY_DONE"/>
+			<on eventId="splitPartiallyDone" newStateId="SUB_PROCESSES_PENDING"/>
 			<on eventId="splitDone" newStateId='SUB_PROCESSES_PENDING'/>
 			<on eventId="splitDoneWithErrors" newStateId='PROCESSED_WITH_ERRORS'/>
-	</manual-state>
-
-	<manual-state id='SPLIT_PARTIALLY_DONE'>
-		<on eventId="splitPartiallyDone"/>
-		<on eventId="splitDone" newStateId='SUB_PROCESSES_PENDING'/>
-		<on eventId="splitDoneWithErrors" newStateId='PROCESSED_WITH_ERRORS'/>
 	</manual-state>
 
 	<manual-state id="EXECUTING">
@@ -32,11 +26,14 @@
 	</manual-state>
 
 	<manual-state id='SUB_PROCESSES_PENDING'>
+			<on eventId="splitPartiallyDone"/>
+			<on eventId="splitDone" newStateId='areAllSubProcessesDone'/>
 			<on eventId="subProcessDoneSuccessfully" newStateId='areAllSubProcessesDone'/>
 			<on eventId="subProcessDoneWithErrors" newStateId='areAllSubProcessesDone'/>
 	</manual-state>
 
-	<if id='areAllSubProcessesDone' condition="numSubProcesses == numCompletedSubProcesses" then="yes" else="no">
+	<if id='areAllSubProcessesDone' condition="(numSubProcesses == numCompletedSubProcesses)
+                        &amp;&amp; splitCompleted " then="yes" else="no">
 			<on eventId="yes" newStateId='AGGREGATION_PENDING'/>
 			<on eventId="no" newStateId="SUB_PROCESSES_PENDING"/>
 	</if>
@@ -48,14 +45,8 @@
 
 	<if id='areThereErrors' condition="errors.size() > 0" then="yes" else="no">
 			<on eventId="yes" newStateId='PROCESSED_WITH_ERRORS'/>
-			<on eventId="no" newStateId="executePredecessorIfAny"/>
+			<on eventId="no" newStateId="PROCESSED"/>
 	</if>
-
-	<auto-state id='executePredecessorIfAny' componentName="processExecutePredecessorIfAny">
-		<on eventId="yes" newStateId='PROCESSED'/>
-		<on eventId="no" newStateId="PROCESSED_WITH_ERRORS"/>
-	</auto-state>
-
 	<manual-state id="PROCESSED"/>
 	<manual-state id="PROCESSED_WITH_ERRORS"/>
 </flow>

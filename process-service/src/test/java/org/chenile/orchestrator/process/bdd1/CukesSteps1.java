@@ -2,7 +2,6 @@ package org.chenile.orchestrator.process.bdd1;
 
 import cucumber.api.java.en.Given;
 import org.chenile.orchestrator.process.SpringTestConfig;
-import org.chenile.orchestrator.process.feedtest.SpringConfig;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;

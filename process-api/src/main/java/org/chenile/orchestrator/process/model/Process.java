@@ -36,8 +36,15 @@ public class Process extends AbstractJpaStateEntity
 	 */
 	public String clientId;
 	public String processType;
+	/**
+	 * Has the split completed? Split will be completed only after the splitDone event is
+	 * called.
+	 */
+	public boolean splitCompleted;
 	public int completedPercent = 0;
 	public String parentId;
+	@Transient
+	public String childIdToActivateSuccessors;
 	/**
 	 * Primarily FYI
 	 */
@@ -54,8 +61,8 @@ public class Process extends AbstractJpaStateEntity
 	public int numCompletedSubProcesses = 0;
 	/**
 	 * All sub processes are pointed to here.<br/>
-	 * This will not be persisted. It is useful to persist the subprocesses after saving the
-	 * current process
+	 * This will not be persisted. The sub processes will be manually persisted after the current
+	 * process is saved.
 	 */
 	@Transient
 	public List<Process> subProcesses = new ArrayList<>();

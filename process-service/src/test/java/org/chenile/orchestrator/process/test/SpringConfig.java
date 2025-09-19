@@ -1,4 +1,4 @@
-package org.chenile.orchestrator.process.feedtest;
+package org.chenile.orchestrator.process.test;
 
 import org.chenile.orchestrator.process.service.defs.PostSaveHook;
 import org.chenile.orchestrator.process.service.defs.ProcessConfigurator;

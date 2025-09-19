@@ -9,5 +9,6 @@ import java.util.List;
     Customized Payload for the chunkProcessingDoneWithErrors event.
 */
 public class SubProcessDoneWithErrorsPayload extends MinimalPayload{
+    public String childId;
     public List<SubProcessError> errors = new ArrayList<>();
 }

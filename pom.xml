@@ -10,8 +10,8 @@
 	</modules>
 	<parent>
 		<groupId>org.chenile</groupId>
-		<version>2.0.40</version>
 		<artifactId>chenile-parent</artifactId>
+		<version>2.0.42</version>
 	</parent>
 
 	<properties>
@@ -23,6 +23,4 @@
 	<artifactId>process-parent</artifactId>
 	<name>All Modules that belong to the Process system </name>
 	<description>Modules execution project and Parent Pom</description>
-
-
 </project>

@@ -20,12 +20,14 @@ public class NotifyParent {
     public void notifyParentDone(Process process){
         if (process.parentId == null) return;
         DoneSuccessfullyPayload payload = new DoneSuccessfullyPayload();
+        payload.childId = process.id;
         stateEntityService.processById(process.parentId, Constants.SUB_PROCESS_DONE_EVENT,payload);
     }
 
     public void notifyParentDoneWithErrors(Process process){
         if (process.parentId == null) return;
         SubProcessDoneWithErrorsPayload payload = new SubProcessDoneWithErrorsPayload();
+        payload.childId = process.id;
         // clone the error so that all the IDs of this entity are not passed to the parent.
         payload.errors = process.errors.stream().map(SubProcessError::clone).toList();
         stateEntityService.processById(process.parentId,Constants.SUB_PROCESS_DONE_WITH_ERRORS_EVENT,payload);

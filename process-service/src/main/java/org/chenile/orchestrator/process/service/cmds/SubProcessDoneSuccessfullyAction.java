@@ -1,6 +1,8 @@
 package org.chenile.orchestrator.process.service.cmds;
 
 import org.chenile.orchestrator.process.config.model.ProcessDef;
+import org.chenile.orchestrator.process.configuration.dao.ProcessRepository;
+import org.chenile.orchestrator.process.model.Constants;
 import org.chenile.orchestrator.process.model.Process;
 import org.chenile.orchestrator.process.service.defs.ProcessConfigurator;
 import org.chenile.stm.STMInternalTransitionInvoker;
@@ -14,6 +16,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.util.List;
+
 /**
  Contains customized logic for the transition. Common logic resides at {@link DefaultSTMTransitionAction}
  <p>Use this class if you want to augment the common logic for this specific transition</p>
@@ -26,22 +30,20 @@ public class SubProcessDoneSuccessfullyAction extends AbstractSTMTransitionActio
 	StateEntityService<Process> processService;
 	@Autowired
 	ProcessConfigurator processConfigurator;
+
 	@Override
 	public void transitionTo(Process process,
 							 DoneSuccessfullyPayload payload,
 							 State startState, String eventId,
 							 State endState, STMInternalTransitionInvoker<?> stm, Transition transition) throws Exception {
 		if (process.numCompletedSubProcesses == process.numSubProcesses) {
-			logger.error("Received the chunk Processing event when the numCompletedSubProcesses = numSubProcesses ("+ process.numSubProcesses + ")");
+			logger.error("Received the sub process Processing event when the numCompletedSubProcesses = numSubProcesses ("+ process.numSubProcesses + ")");
 			return; // discard this event
 		}
-		// check if the child has successor
-		// (process,payload);
+		process.childIdToActivateSuccessors = payload.childId;
 		process.numCompletedSubProcesses++;
 	}
 
-	private void activateSuccessors(){
 
-	}
 
 }

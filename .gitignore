@@ -9,6 +9,7 @@ dist/
 
 # Compiled Java class files
 *.class
+.flattened-pom.xml
 
 # Compiled Python bytecode
 *.py[cod]

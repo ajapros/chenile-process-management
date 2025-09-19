@@ -1,6 +1,7 @@
 package org.chenile.orchestrator.process.service.cmds;
 
 import org.chenile.orchestrator.process.config.model.ProcessDef;
+import org.chenile.orchestrator.process.model.Constants;
 import org.chenile.orchestrator.process.model.Process;
 import org.chenile.orchestrator.process.model.StartProcessingPayload;
 import org.chenile.orchestrator.process.model.SubProcessPayload;
@@ -16,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /**
  Contains customized logic for the transition. Common logic resides at {@link DefaultSTMTransitionAction}
@@ -34,14 +36,17 @@ public class SplitDoneAction extends AbstractSTMTransitionAction<Process,
 							 StartProcessingPayload payload,
 							 State startState, String eventId,
 							 State endState, STMInternalTransitionInvoker<?> stm, Transition transition) throws Exception {
+		if (eventId.equals(Constants.SPLIT_DONE_EVENT))
+			process.splitCompleted = true;
 		List<Process> list = makeSubProcesses(process,payload);
 		process.subProcesses.addAll(list);
-		process.numSubProcesses = process.subProcesses.size();
+		System.err.println(list.stream().map(p -> p.id));
+		process.numSubProcesses += process.subProcesses.size();
 	}
 
 	private List<Process> makeSubProcesses(Process process,StartProcessingPayload payload) {
-		if (payload.subProcesses == null || payload.subProcesses.isEmpty()) return null;
 		List<Process> list = new ArrayList<>();
+		if (payload.subProcesses == null || payload.subProcesses.isEmpty()) return list;
 		for (SubProcessPayload p: payload.subProcesses) {
 			Process subProcess = new Process();
 			if(p.childId != null) subProcess.id = p.childId;
@@ -49,22 +54,30 @@ public class SplitDoneAction extends AbstractSTMTransitionAction<Process,
 			subProcess.parentId = process.id;
 			subProcess.args = p.args;
 			subProcess.leaf = p.leaf;
-			addSuccessor(subProcess,list);
+			addSuccessors(subProcess,list);
 			list.add(subProcess);
 		}
 		return list;
 	}
 
-	private void addSuccessor(Process subProcess, List<Process> list) {
+	private void addSuccessors(Process subProcess, List<Process> list) {
 		ProcessDef childProcessDef = processConfigurator.processes.processMap.get(subProcess.processType);
 		if (childProcessDef == null || childProcessDef.successors == null ||
 				childProcessDef.successors.isEmpty()) {
 			return;
 		}
+		// Ensure that the sub process has an ID. Else, it is not possible to track the successors.
+		if (subProcess.id == null || subProcess.id.isEmpty()){
+			subProcess.id = String.valueOf(UUID.randomUUID());
+		}
+		int index = 1;
 		for (String successor: childProcessDef.successors) {
-			logger.info("Starting Successor for process type = " + childProcessDef.processType +
-					" Processing successor type = " + successor);
+
 			Process successorProcess = new Process();
+			successorProcess.id = subProcess.id + successor;
+			logger.info("Creating Successor for process ID = " + subProcess.id +
+					" Processing successor type = " + successor + " successor process ID is " +
+					successorProcess.id);
 			successorProcess.processType = successor;
 			ProcessDef successorProcessDef = processConfigurator.processes.processMap.get(successor);
 			if (successorProcessDef == null){
