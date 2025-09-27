@@ -15,8 +15,7 @@ import java.util.Date;
 /**
  This is called if this process is done with errors.
 */
-public class DoneWithErrorsAction extends AbstractSTMTransitionAction<Process,
-		DoneWithErrorsPayload>{
+public class DoneWithErrorsAction extends BaseProcessAction<DoneWithErrorsPayload>{
 	Logger logger = LoggerFactory.getLogger(this.getClass());
 	@Override
 	public void transitionTo(Process process,
@@ -28,13 +27,15 @@ public class DoneWithErrorsAction extends AbstractSTMTransitionAction<Process,
 			return; // discard this event
 		}
 
-		if (payload.errors != null){
+        addErrorToProcess(process, payload);
+
+        /*if (payload.errors != null){
 			SubProcessError subProcessError = new SubProcessError();
 			subProcessError.processId = process.id;
 			subProcessError.timeOfCompletion = new Date();
 			subProcessError.errors = payload.errors;
 			process.errors.add(subProcessError);
-		}
+		}*/
 	}
 
 }
