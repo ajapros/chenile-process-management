@@ -8,6 +8,7 @@ import org.junit.Assert;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 public class FeedSplitter implements WorkerStarter {
@@ -16,9 +17,56 @@ public class FeedSplitter implements WorkerStarter {
      * individual test cases. See {@link TestFeeds} for the usage of this parameter.
      */
     public static int numFiles = 1;
+    public static int batchSize = 10;
     @Autowired
     StateEntityService<Process> processManager ;
+
     @Override
+    public void start(Process process, Map<String, String> execDef, WorkerType workerType) {
+        List<SubProcessPayload> allSubProcesses = new ArrayList<>();
+        for (int i = 0; i < numFiles; i++) {
+            allSubProcesses.add(createSubProcessPayload(process.getId(), i, execDef));
+        }
+
+        // Loop through the list of all sub-processes and send them in batches of 'batchSize'.
+        for (int i = 0; i < allSubProcesses.size(); i += batchSize) {
+            if(i > 0) {
+                try {
+                    // Adding a small sleep to simulate some delay between batches.
+                    Thread.sleep(100); // 100 milliseconds
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+            StartProcessingPayload batchPayload = new StartProcessingPayload();
+            // Create a sublist for the current batch
+            int end = Math.min(i + batchSize, allSubProcesses.size());
+            batchPayload.subProcesses = allSubProcesses.subList(i, end);
+            // Send the current batch
+            processManager.processById(process.getId(), Constants.SPLIT_PARTIALLY_DONE_EVENT, batchPayload);
+
+        }
+
+        // Always send splitDone at the end to signal completion.
+        processManager.processById(process.getId(), Constants.SPLIT_DONE_EVENT, new StartProcessingPayload());
+    }
+
+    private SubProcessPayload createSubProcessPayload(String parentId, int index, Map<String, String> execDef) {
+        SubProcessPayload p = new SubProcessPayload();
+        p.processType = "file";
+        p.childId = parentId + "FILE" + (index + 1);
+        p.args = """
+                { "filename" : "file%d" }
+                """.formatted(index + 1);
+        Assert.assertEquals("splitter_value", execDef.get("splitter_key"));
+        return p;
+    }
+
+
+
+
+
+/*    @Override
     public void start(Process process, Map<String, String> execDef, WorkerType workerType) {
         System.out.println("At the feed splitter. Process ID = " + process.id);
         StartProcessingPayload payload = new StartProcessingPayload();
@@ -38,5 +86,5 @@ public class FeedSplitter implements WorkerStarter {
             processManager.processById(process.getId(), Constants.SPLIT_PARTIALLY_DONE_EVENT,payload1);
         }
         processManager.processById(process.getId(), Constants.SPLIT_DONE_EVENT,payload);
-    }
+    }*/
 }

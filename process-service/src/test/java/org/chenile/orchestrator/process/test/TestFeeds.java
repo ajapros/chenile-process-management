@@ -149,7 +149,7 @@ public class TestFeeds {
         synch();
         int numTestFiles = 3;
         FeedSplitter.numFiles = numTestFiles;
-        //FeedSplitter.batchSize = 1;
+        FeedSplitter.batchSize = 1;
         Process process = new Process();
         process.processType = "feed";
         process.id = "FEED2";
@@ -181,7 +181,7 @@ public class TestFeeds {
         asynch();
         int numTestFiles = 3;
         FeedSplitter.numFiles = numTestFiles;
-       // FeedSplitter.batchSize = 1;
+        FeedSplitter.batchSize = 1;
 
         Process process = new Process();
         process.processType = "feed";
