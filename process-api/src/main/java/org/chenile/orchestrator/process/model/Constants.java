@@ -2,9 +2,9 @@ package org.chenile.orchestrator.process.model;
 
 public class Constants {
     public static final String DORMANT_STATE = "DORMANT";
-    public static final String SPLIT_PENDING_STATE = "SPLIT_PENDING";
+    public static final String SUB_PROCESSES_PENDING_STATE = "SPLITTING_AND_WAITING_SUBPROCESSES";
+    public static final String SPLIT_PENDING_STATE = SUB_PROCESSES_PENDING_STATE; //"SPLIT_PENDING";
     public static final String SPLIT_PARTIALLY_DONE_STATE = "SPLIT_PARTIALLY_STATE";
-    public static final String SUB_PROCESSES_PENDING_STATE = "SUB_PROCESSES_PENDING";
     public static final String AGGREGATION_PENDING_STATE = "AGGREGATION_PENDING";
     public static final String EXECUTING_STATE = "EXECUTING";
     public static final String PROCESSED_STATE = "PROCESSED";
