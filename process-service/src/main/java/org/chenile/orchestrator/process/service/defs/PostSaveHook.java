@@ -20,7 +20,8 @@ import java.util.Map;
  */
 public class PostSaveHook {
     Logger logger = LoggerFactory.getLogger(PostSaveHook.class);
-    @Autowired  ProcessConfigurator processConfigurator;
+    @Autowired
+    ProcessConfigurator processConfigurator;
 
     @Autowired
     private ProcessInitializeStateService processInitializeStateService;
@@ -29,30 +30,31 @@ public class PostSaveHook {
     public void setWorkerStarter(WorkerStarter workerStarter) {
         this.workerStarter = workerStarter;
     }
+
     WorkerStarter workerStarter;
 
     public void execute(Process process) {
         String processType = process.processType;
         String currentState = process.getCurrentState().getStateId();
-
-        if(process.initializedStates.contains(currentState)){
-            logger.debug("Process {} is already initialized for state {}, not executing PostSaveHook",process.id,currentState);
+        logger.debug("PostSaveHook executing for process ID {} in state {}", process.getId(), currentState);
+        if (process.initializedStates.contains(currentState)) {
+            logger.debug("Process {} is already initialized for state {}, not executing PostSaveHook", process.id, currentState);
             return;
-        }else{
-            process.initializedStates.add(currentState);
-            processInitializeStateService.markStateAsInitialized(process.getId(), currentState);
         }
+        logger.info("Initializing worker for process ID {} in state '{}'", process.getId(), currentState);
+        process.initializedStates.add(currentState);
+        processInitializeStateService.markStateAsInitialized(process.getId(), currentState);
 
        /* if(process.skipPostWorkerCreation)
             return;*/
 
         ProcessDef processDef = processConfigurator.processes.processMap.get(processType);
-        if(processDef == null) return;
-        if(workerStarter == null) return;
-        Map<String,String> params = null;
-        WorkerType workerType ;
+        if (processDef == null) return;
+        if (workerStarter == null) return;
+        Map<String, String> params = null;
+        WorkerType workerType;
         // Execute the correct type of worker that will lead to the next state transition
-        switch(currentState){
+        switch (currentState) {
             case Constants.SPLIT_PENDING_STATE:
                 workerType = WorkerType.SPLITTER;
                 params = processDef.splitterConfig;
@@ -66,9 +68,11 @@ public class PostSaveHook {
                 workerType = WorkerType.EXECUTOR;
                 break;
             default:
+                logger.debug("PostSaveHook: No workerStarter found for processId: {} processType: {} currentState: {} ", process.id, processType, currentState);
                 return;
         }
-        workerStarter.start(process,params,workerType);
+        logger.debug("PostSaveHook: Starting workerStarter for processId:{} processType: {} with workerType: {}", process.id, processType, workerType);
+        workerStarter.start(process, params, workerType);
 
     }
 }
