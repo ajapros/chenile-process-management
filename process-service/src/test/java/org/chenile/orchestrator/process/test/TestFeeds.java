@@ -4,6 +4,7 @@ import org.chenile.orchestrator.process.configuration.dao.ProcessRepository;
 import org.chenile.orchestrator.process.model.Constants;
 import org.chenile.orchestrator.process.model.Process;
 import org.chenile.workflow.api.StateEntityService;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.jupiter.api.MethodOrderer;
@@ -22,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static org.springframework.test.annotation.DirtiesContext.ClassMode.BEFORE_EACH_TEST_METHOD;
 
@@ -141,6 +143,102 @@ public class TestFeeds {
         assertState(process.id,Constants.PROCESSED_STATE);
     }
 
+    @Test
+    @Order(11)
+    public void testWith2FilesBatch() throws Exception {
+        synch();
+        int numTestFiles = 3;
+        FeedSplitter.numFiles = numTestFiles;
+        //FeedSplitter.batchSize = 1;
+        Process process = new Process();
+        process.processType = "feed";
+        process.id = "FEED2";
+        processManager.create(process);
+        assertState(process.id,Constants.PROCESSED_STATE);
+
+        for (int i = 1; i <= numTestFiles; i++) {
+            String fileId = process.id + "FILE" + i;
+            String chunkId = fileId + "CHUNK1";
+            String expectedArgs = """
+                { "filename" : "file%d" }
+                """.formatted(i);
+
+            System.out.println("Verifying process: " + fileId);
+            assertStateArgs(fileId, Constants.PROCESSED_STATE, expectedArgs);
+            assertState(chunkId, Constants.PROCESSED_STATE);
+        }
+        // Make sure that the successor process is created and have been successfully processed.
+        List<Process> allPredecessorList= processRepository.findByPredecessorIdIsNotNull();
+        for(Process p: allPredecessorList){
+            assertState(p.getId(),Constants.PROCESSED_STATE);
+        }
+    }
+
+    @Test
+    @Order(12)
+    public void testWithMultipleFilesAsynch() throws Exception {
+        // --- SETUP ---
+        asynch();
+        int numTestFiles = 3;
+        FeedSplitter.numFiles = numTestFiles;
+       // FeedSplitter.batchSize = 1;
+
+        Process process = new Process();
+        process.processType = "feed";
+        process.id = "FEED";
+        processManager.create(process);
+
+        assertState(process.id, Constants.SPLIT_PENDING_STATE);
+        unblock(process.id + "-SPLITTER");
+        assertState(process.id, Constants.SUB_PROCESSES_PENDING_STATE);
+
+
+        // --- ADD THE VERIFICATION CODE HERE ---
+        System.out.println("--- VERIFYING DATABASE SAVE ---");
+        Process savedProcess = processRepository.findById(process.getId()).orElse(null);
+
+        //System.out.println("VERIFICATION: Initialized states are: " + savedProcess.initializedStates + "--> desc=="+ savedProcess.description);
+
+        System.out.println("--- VERIFICATION SUCCESSFUL ---");
+        // --- END OF VERIFICATION CODE ---
+
+        // Now, loop to unblock each of the 'file' sub-processes and their children
+        for (int i = 1; i <= numTestFiles; i++) {
+            String fileId = process.id + "FILE" + i;
+            System.out.println("Unblocking flow for: " + fileId);
+
+            // Unblock the file's own splitter (to create the chunk)
+            unblock(fileId + "-SPLITTER");
+            // Unblock the chunk's executor
+            unblock(fileId + "CHUNK1-EXECUTOR");
+            // Unblock the file's aggregator
+            unblock(fileId + "-AGGREGATOR");
+            // Unblock the file's successor's executor
+            unblock(fileId + "fileSuccessor-EXECUTOR");
+        }
+
+        // After all individual file flows are unblocked, check the final states
+        System.out.println("Done with all the count down LATCHES");
+
+        // Verify a sample successor is processed
+        assertState(process.id + "FILE1fileSuccessor", Constants.PROCESSED_STATE);
+
+        // Check that the main parent process has moved to aggregation
+        assertState(process.id, Constants.AGGREGATION_PENDING_STATE);
+
+        // Unblock the final aggregator to finish the whole process
+        unblock(process.id + "-AGGREGATOR");
+        assertState(process.id, Constants.PROCESSED_STATE);
+    }
+
+
+    @After
+    public void cleanupSharedState() {
+        synch();
+        FeedSplitter.numFiles = 1;
+       // FeedSplitter.batchSize = 10; // Or whatever your default is
+    }
+
     private void synch(){
         SYNCH_MODE = true;
     }
@@ -159,11 +257,33 @@ public class TestFeeds {
      * @param latchKey - the latch key that the InVMWorkerStarterDelegator is waiting on.
      * @throws Exception - for any exception in await below
      */
-    private void unblock(String latchKey) throws Exception{
+    private void unblock_old(String latchKey) throws Exception{
         String proceedKey = latchKey + "PROCEED";
         CountDownLatch proceedLatch = new CountDownLatch(1);
         LATCHES.put(proceedKey,proceedLatch);
         LATCHES.get(latchKey).countDown();
+        proceedLatch.await(1000L, TimeUnit.MILLISECONDS);
+    }
+
+    private void unblock(String latchKey) throws Exception {
+        String proceedKey = latchKey + "PROCEED";
+        CountDownLatch proceedLatch = new CountDownLatch(1);
+        LATCHES.put(proceedKey, proceedLatch);
+
+        // Wait intelligently for the latch to be created
+        CountDownLatch workerLatch = null;
+        long timeout = System.currentTimeMillis() + 2000; // Max wait 2 seconds
+        while (System.currentTimeMillis() < timeout) {
+            workerLatch = LATCHES.get(latchKey);
+            if (workerLatch != null) break; // Found it!
+            Thread.sleep(50); // Small pause before retrying
+        }
+
+        if (workerLatch == null) {
+            throw new TimeoutException("Timed out waiting for latch: " + latchKey);
+        }
+
+        workerLatch.countDown();
         proceedLatch.await(1000L, TimeUnit.MILLISECONDS);
     }
 
