@@ -5,7 +5,7 @@ import org.chenile.orchestrator.process.model.Process;
 import org.chenile.workflow.param.MinimalPayload;
 
 public interface ProcessManagerClient {
-    Process splitPartiallyDone(String id, StartProcessingPayload payload);
+    Process splitUpdate(String id, StartProcessingPayload payload);
     Process splitDone(String id, StartProcessingPayload payload);
     Process aggregationDone(String id, MinimalPayload payload);
     public Process statusUpdate(String id, StatusUpdatePayload payload);

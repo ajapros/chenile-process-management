@@ -43,7 +43,7 @@ public class FeedSplitter implements WorkerStarter {
             int end = Math.min(i + batchSize, allSubProcesses.size());
             batchPayload.subProcesses = allSubProcesses.subList(i, end);
             // Send the current batch
-            processManager.processById(process.getId(), Constants.SPLIT_PARTIALLY_DONE_EVENT, batchPayload);
+            processManager.processById(process.getId(), Constants.SPLIT_UPDATE_EVENT, batchPayload);
 
         }
 
@@ -83,7 +83,7 @@ public class FeedSplitter implements WorkerStarter {
             // Assert if the splitter args are passed from def.json to this method
             Assert.assertEquals("splitter_value",execDef.get("splitter_key"));
             payload1.subProcesses.add(p);
-            processManager.processById(process.getId(), Constants.SPLIT_PARTIALLY_DONE_EVENT,payload1);
+            processManager.processById(process.getId(), Constants.SPLIT_UPDATE_EVENT,payload1);
         }
         processManager.processById(process.getId(), Constants.SPLIT_DONE_EVENT,payload);
     }*/

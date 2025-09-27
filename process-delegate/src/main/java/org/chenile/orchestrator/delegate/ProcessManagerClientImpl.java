@@ -25,8 +25,8 @@ public class ProcessManagerClientImpl implements ProcessManagerClient {
     }
 
     @Override
-    public Process splitPartiallyDone(String id, StartProcessingPayload payload) {
-        return process(id, Constants.SPLIT_PARTIALLY_DONE_EVENT, payload);
+    public Process splitUpdate(String id, StartProcessingPayload payload) {
+        return process(id, Constants.SPLIT_UPDATE_EVENT, payload);
     }
 
     @Override

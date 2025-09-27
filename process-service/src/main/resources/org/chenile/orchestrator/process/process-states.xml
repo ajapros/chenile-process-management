@@ -14,7 +14,7 @@
 		<on eventId="activate" newStateId="isThisLeafNode"/>
 	</manual-state>
 	<manual-state id='SPLIT_PENDING'>
-			<on eventId="splitPartiallyDone" newStateId="SUB_PROCESSES_PENDING"/>
+			<on eventId="splitUpdate" newStateId="SUB_PROCESSES_PENDING"/>
 			<on eventId="splitDone" newStateId='SUB_PROCESSES_PENDING'/>
 			<on eventId="splitDoneWithErrors" newStateId='PROCESSED_WITH_ERRORS'/>
 	</manual-state>
@@ -26,7 +26,7 @@
 	</manual-state>
 
 	<manual-state id='SUB_PROCESSES_PENDING'>
-			<on eventId="splitPartiallyDone"/>
+			<on eventId="splitUpdate"/>
 			<on eventId="splitDone" newStateId='areAllSubProcessesDone'/>
 			<on eventId="subProcessDoneSuccessfully" newStateId='areAllSubProcessesDone'/>
 			<on eventId="subProcessDoneWithErrors" newStateId='areAllSubProcessesDone'/>
