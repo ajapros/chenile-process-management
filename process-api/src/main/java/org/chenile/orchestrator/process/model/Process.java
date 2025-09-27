@@ -4,7 +4,9 @@ import jakarta.persistence.*;
 import org.chenile.jpautils.entity.AbstractJpaStateEntity;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Entity
 @Table(name = "process_table")
@@ -76,6 +78,9 @@ public class Process extends AbstractJpaStateEntity
 	/**
 	 * The flag below is useful to skip worker creation when status updates are done.
 	 */
-	@Transient public boolean skipPostWorkerCreation = false;
+	//@Transient public boolean skipPostWorkerCreation = false;
 	public String predecessorId;
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    public Set<String> initializedStates = new HashSet<>();
 }

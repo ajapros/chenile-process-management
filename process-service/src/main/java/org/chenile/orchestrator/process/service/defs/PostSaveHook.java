@@ -5,9 +5,12 @@ import org.chenile.orchestrator.process.config.model.ProcessDef;
 import org.chenile.orchestrator.process.model.Constants;
 import org.chenile.orchestrator.process.model.Process;
 import org.chenile.orchestrator.process.model.WorkerType;
+import org.chenile.orchestrator.process.service.ProcessInitializeStateService;
+import org.chenile.utils.entity.service.EntityStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 
 import java.util.Map;
 
@@ -19,16 +22,30 @@ public class PostSaveHook {
     Logger logger = LoggerFactory.getLogger(PostSaveHook.class);
     @Autowired  ProcessConfigurator processConfigurator;
 
+    @Autowired
+    private ProcessInitializeStateService processInitializeStateService;
+
+
     public void setWorkerStarter(WorkerStarter workerStarter) {
         this.workerStarter = workerStarter;
     }
     WorkerStarter workerStarter;
 
     public void execute(Process process) {
-        if(process.skipPostWorkerCreation)
-            return;
         String processType = process.processType;
         String currentState = process.getCurrentState().getStateId();
+
+        if(process.initializedStates.contains(currentState)){
+            logger.debug("Process {} is already initialized for state {}, not executing PostSaveHook",process.id,currentState);
+            return;
+        }else{
+            process.initializedStates.add(currentState);
+            processInitializeStateService.markStateAsInitialized(process.getId(), currentState);
+        }
+
+       /* if(process.skipPostWorkerCreation)
+            return;*/
+
         ProcessDef processDef = processConfigurator.processes.processMap.get(processType);
         if(processDef == null) return;
         if(workerStarter == null) return;
@@ -52,5 +69,6 @@ public class PostSaveHook {
                 return;
         }
         workerStarter.start(process,params,workerType);
+
     }
 }
