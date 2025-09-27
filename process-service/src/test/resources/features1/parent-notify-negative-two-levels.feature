@@ -64,7 +64,7 @@ When I PATCH a REST request to URL "/process/${grandChildId}/${event}" with payl
 """json
 {
     "comment": "${comment}",
-    "errors": [ "error1","error2"]
+    "validationErrors": [ "error1","error2"]
 }
 """
 Then the REST response contains key "mutatedEntity"

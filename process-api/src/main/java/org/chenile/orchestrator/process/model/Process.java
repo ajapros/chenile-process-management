@@ -1,5 +1,6 @@
 package org.chenile.orchestrator.process.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import org.chenile.jpautils.entity.AbstractJpaStateEntity;
 
@@ -8,6 +9,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 @Entity
 @Table(name = "process_table")
 public class Process extends AbstractJpaStateEntity
@@ -74,7 +76,8 @@ public class Process extends AbstractJpaStateEntity
 	 	database or transmitted over the wire since the sub-process will be created in a
 	 	separate VM
 	 */
-	public String args ;
+    @Column(name = "args", columnDefinition = "TEXT")
+    public String args ;
 	/**
 	 * The flag below is useful to skip worker creation when status updates are done.
 	 */
