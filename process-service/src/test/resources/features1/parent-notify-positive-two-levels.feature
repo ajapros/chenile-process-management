@@ -1,7 +1,7 @@
 Feature: Positive 2 Level Test - Grand child is intimated
 Scenario: Create a new Process
 Given that "flowName" equals "PROCESS_FLOW"
-And that "initialState" equals "SPLIT_PENDING"
+And that "initialState" equals "SPLITTING_AND_WAITING_SUBPROCESSES"
 When I POST a REST request to URL "/process" with payload
 """json
 {
@@ -36,7 +36,7 @@ When I PATCH a REST request to URL "/process/${id}/${event}" with payload
 """
 Then the REST response contains key "mutatedEntity"
 And the REST response key "mutatedEntity.id" is "${id}"
-And the REST response key "mutatedEntity.currentState.stateId" is "SUB_PROCESSES_PENDING"
+And the REST response key "mutatedEntity.currentState.stateId" is "SPLITTING_AND_WAITING_SUBPROCESSES"
 And store "$.payload.mutatedEntity.currentState.stateId" from response to "finalState"
 
  Scenario: Send the splitDone event to the child process
@@ -53,7 +53,7 @@ And store "$.payload.mutatedEntity.currentState.stateId" from response to "final
 }
 """
   Then the REST response contains key "mutatedEntity"
-  And the REST response key "mutatedEntity.currentState.stateId" is "SUB_PROCESSES_PENDING"
+  And the REST response key "mutatedEntity.currentState.stateId" is "SPLITTING_AND_WAITING_SUBPROCESSES"
 
 
  Scenario: Send the doneSuccessfully event to the grand child
