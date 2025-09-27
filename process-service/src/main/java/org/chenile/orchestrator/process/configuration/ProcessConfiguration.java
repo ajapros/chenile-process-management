@@ -1,5 +1,7 @@
 package org.chenile.orchestrator.process.configuration;
 
+import org.chenile.orchestrator.process.configuration.dao.ProcessRepository;
+import org.chenile.orchestrator.process.service.ProcessInitializeStateService;
 import org.chenile.orchestrator.process.service.defs.PostSaveHook;
 import org.chenile.orchestrator.process.service.defs.ProcessConfigurator;
 import org.chenile.orchestrator.process.model.Process;
@@ -195,6 +197,11 @@ public class ProcessConfiguration {
     @Bean
     PostSaveHook postSaveHook(){
         return new PostSaveHook();
+    }
+
+    @Bean
+    ProcessInitializeStateService processInitializeStateService(ProcessRepository processRepository){
+        return new ProcessInitializeStateService(processRepository);
     }
 
 }

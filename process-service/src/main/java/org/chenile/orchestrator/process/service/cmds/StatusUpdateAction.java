@@ -16,6 +16,6 @@ public class StatusUpdateAction extends AbstractSTMTransitionAction<Process,
                              State startState, String eventId,
                              State endState, STMInternalTransitionInvoker<?> stm, Transition transition) throws Exception {
         process.completedPercent = payload.percentComplete;
-        process.skipPostWorkerCreation = true;
+       // process.skipPostWorkerCreation = true;
     }
 }
