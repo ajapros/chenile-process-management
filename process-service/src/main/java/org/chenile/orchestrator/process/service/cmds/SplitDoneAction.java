@@ -3,14 +3,13 @@ package org.chenile.orchestrator.process.service.cmds;
 import org.chenile.orchestrator.process.config.model.ProcessDef;
 import org.chenile.orchestrator.process.model.Constants;
 import org.chenile.orchestrator.process.model.Process;
-import org.chenile.orchestrator.process.model.StartProcessingPayload;
-import org.chenile.orchestrator.process.model.SubProcessPayload;
+import org.chenile.orchestrator.process.model.payload.StartProcessingPayload;
+import org.chenile.orchestrator.process.model.payload.SubProcessPayload;
 import org.chenile.orchestrator.process.service.defs.ProcessConfigurator;
 import org.chenile.stm.STMInternalTransitionInvoker;
 import org.chenile.stm.State;
 import org.chenile.stm.model.Transition;
 import org.chenile.workflow.api.StateEntityService;
-import org.chenile.workflow.service.stmcmds.AbstractSTMTransitionAction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,8 +23,7 @@ import java.util.UUID;
  <p>Use this class if you want to augment the common logic for this specific transition</p>
  <p>Use a customized payload if required instead of MinimalPayload</p>
 */
-public class SplitDoneAction extends AbstractSTMTransitionAction<Process,
-        StartProcessingPayload>{
+public class SplitDoneAction extends BaseProcessAction<StartProcessingPayload>{
 	Logger logger = LoggerFactory.getLogger(this.getClass());
 	@Autowired
 	StateEntityService<Process> processService;
