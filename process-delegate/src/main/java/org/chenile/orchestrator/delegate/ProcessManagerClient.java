@@ -1,7 +1,10 @@
 package org.chenile.orchestrator.delegate;
 
-import org.chenile.orchestrator.process.model.*;
 import org.chenile.orchestrator.process.model.Process;
+import org.chenile.orchestrator.process.model.payload.DoneSuccessfullyPayload;
+import org.chenile.orchestrator.process.model.payload.DoneWithErrorsPayload;
+import org.chenile.orchestrator.process.model.payload.StartProcessingPayload;
+import org.chenile.orchestrator.process.model.payload.StatusUpdatePayload;
 import org.chenile.workflow.param.MinimalPayload;
 
 public interface ProcessManagerClient {

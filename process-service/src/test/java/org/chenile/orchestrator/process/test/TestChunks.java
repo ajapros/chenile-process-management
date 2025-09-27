@@ -1,7 +1,7 @@
 package org.chenile.orchestrator.process.test;
 
 import org.chenile.orchestrator.process.model.Process;
-import org.chenile.orchestrator.process.model.StatusUpdatePayload;
+import org.chenile.orchestrator.process.model.payload.StatusUpdatePayload;
 import org.chenile.stm.STMInternalTransitionInvoker;
 import org.chenile.stm.State;
 import org.chenile.stm.model.Transition;

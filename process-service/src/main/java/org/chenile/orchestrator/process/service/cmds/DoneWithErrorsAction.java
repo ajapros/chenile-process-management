@@ -1,16 +1,12 @@
 package org.chenile.orchestrator.process.service.cmds;
 
 import org.chenile.orchestrator.process.model.Process;
-import org.chenile.orchestrator.process.model.DoneWithErrorsPayload;
-import org.chenile.orchestrator.process.model.SubProcessError;
+import org.chenile.orchestrator.process.model.payload.DoneWithErrorsPayload;
 import org.chenile.stm.STMInternalTransitionInvoker;
 import org.chenile.stm.State;
 import org.chenile.stm.model.Transition;
-import org.chenile.workflow.service.stmcmds.AbstractSTMTransitionAction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.Date;
 
 /**
  This is called if this process is done with errors.

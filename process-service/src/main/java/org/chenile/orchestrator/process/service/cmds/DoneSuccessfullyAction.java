@@ -1,11 +1,10 @@
 package org.chenile.orchestrator.process.service.cmds;
 
 import org.chenile.orchestrator.process.model.Process;
-import org.chenile.orchestrator.process.model.DoneSuccessfullyPayload;
+import org.chenile.orchestrator.process.model.payload.DoneSuccessfullyPayload;
 import org.chenile.stm.STMInternalTransitionInvoker;
 import org.chenile.stm.State;
 import org.chenile.stm.model.Transition;
-import org.chenile.workflow.service.stmcmds.AbstractSTMTransitionAction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,8 +13,7 @@ import org.slf4j.LoggerFactory;
  <p>Use this class if you want to augment the common logic for this specific transition</p>
  <p>Use a customized payload if required instead of MinimalPayload</p>
 */
-public class DoneSuccessfullyAction extends AbstractSTMTransitionAction<Process,
-		DoneSuccessfullyPayload>{
+public class DoneSuccessfullyAction extends BaseProcessAction<DoneSuccessfullyPayload>{
 	Logger logger = LoggerFactory.getLogger(this.getClass());
 	@Override
 	public void transitionTo(Process process,
