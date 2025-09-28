@@ -30,7 +30,7 @@ When I PATCH a REST request to URL "/process/${id}/${event}" with payload
 {
     "comment": "${comment}",
     "subProcesses": [
-      {"args": "filename=f1", "childId":  "${childId}", "processType":  "file"}
+      {"args": "filename=f1", "workerSuppliedId":  "${childId}", "processType":  "file"}
     ]
 }
 """
@@ -48,7 +48,7 @@ And store "$.payload.mutatedEntity.currentState.stateId" from response to "final
 {
     "comment": "${comment}",
     "subProcesses": [
-      {"args": "filename=f1", "childId":  "${grandChildId}", "processType":  "chunk", "leaf":  true}
+      {"args": "filename=f1", "workerSuppliedId":  "${grandChildId}", "processType":  "chunk", "leaf":  true}
     ]
 }
 """

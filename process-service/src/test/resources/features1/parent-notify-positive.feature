@@ -30,7 +30,7 @@ When I PATCH a REST request to URL "/process/${id}/${event}" with payload
 {
     "comment": "${comment}",
     "subProcesses": [
-      {"args": "filename=f1", "childId":  "${childId}", "processType":  "file", "leaf": true}
+      {"args": "filename=f1", "workerSuppliedId":  "${childId}", "processType":  "file", "leaf": true}
     ]
 }
 """

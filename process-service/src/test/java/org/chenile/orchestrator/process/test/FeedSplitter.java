@@ -4,7 +4,7 @@ import org.chenile.orchestrator.process.model.*;
 import org.chenile.orchestrator.process.WorkerStarter;
 import org.chenile.orchestrator.process.model.Process;
 import org.chenile.orchestrator.process.model.payload.StartProcessingPayload;
-import org.chenile.orchestrator.process.model.payload.SubProcessPayload;
+import org.chenile.orchestrator.process.model.payload.common.SubProcessPayload;
 import org.chenile.workflow.api.StateEntityService;
 import org.junit.Assert;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,7 +56,7 @@ public class FeedSplitter implements WorkerStarter {
     private SubProcessPayload createSubProcessPayload(String parentId, int index, Map<String, String> execDef) {
         SubProcessPayload p = new SubProcessPayload();
         p.processType = "file";
-        p.childId = parentId + "FILE" + (index + 1);
+        p.workerSuppliedId = parentId + "FILE" + (index + 1);
         p.args = """
                 { "filename" : "file%d" }
                 """.formatted(index + 1);
@@ -78,7 +78,7 @@ public class FeedSplitter implements WorkerStarter {
             payload1.subProcesses = new ArrayList<>();
             SubProcessPayload p = new SubProcessPayload();
             p.processType = "file";
-            p.childId = process.id + "FILE" + (i+1);
+            p.workerSuppliedId = process.id + "FILE" + (i+1);
             p.args = """
                     { "filename" : "file%d" }
                     """.formatted(i+1);
