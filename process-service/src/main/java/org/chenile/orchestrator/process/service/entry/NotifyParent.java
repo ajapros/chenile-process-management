@@ -27,7 +27,7 @@ public class NotifyParent {
         if (process.parentId == null) return;
         DoneSuccessfullyPayload payload = new DoneSuccessfullyPayload();
         payload.childId = process.id;
-        stateEntityService.processById(process.parentId, Constants.SUB_PROCESS_DONE_EVENT,payload);
+        stateEntityService.processById(process.parentId, Constants.Events.SUB_PROCESS_DONE_SUCCESSFULLY,payload);
     }
 
   /*  public void notifyParentDoneWithErrors(Process process){
@@ -44,7 +44,7 @@ public class NotifyParent {
             return;
         }
         SubProcessDoneWithErrorsPayload payload = buildErrorPayloadFromProcess(process);
-        stateEntityService.processById(process.parentId, Constants.SUB_PROCESS_DONE_WITH_ERRORS_EVENT, payload);
+        stateEntityService.processById(process.parentId, Constants.Events.SUB_PROCESS_DONE_WITH_ERRORS, payload);
     }
 
     private SubProcessDoneWithErrorsPayload buildErrorPayloadFromProcess(Process process) {

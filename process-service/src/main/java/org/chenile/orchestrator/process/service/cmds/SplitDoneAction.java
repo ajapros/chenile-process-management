@@ -34,7 +34,7 @@ public class SplitDoneAction extends BaseProcessAction<StartProcessingPayload>{
 							 StartProcessingPayload payload,
 							 State startState, String eventId,
 							 State endState, STMInternalTransitionInvoker<?> stm, Transition transition) throws Exception {
-		if (eventId.equals(Constants.SPLIT_DONE_EVENT))
+		if (eventId.equals(Constants.Events.SPLIT_DONE))
 			process.splitCompleted = true;
 		List<Process> list = makeSubProcesses(process,payload);
 		process.subProcesses.addAll(list);

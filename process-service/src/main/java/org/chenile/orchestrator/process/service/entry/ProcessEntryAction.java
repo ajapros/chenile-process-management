@@ -34,16 +34,16 @@ public class ProcessEntryAction extends GenericEntryAction<Process> {
         super.execute(process);
         String currentState = process.getCurrentState().getStateId();
         switch(currentState){
-            case Constants.SUB_PROCESSES_PENDING_STATE:
+            case Constants.States.SPLITTING_AND_WAITING_SUBPROCESSES:
                 createSubProcesses(process);
                 activateSuccessors(process);
                 break;
             // intimate the parent that we are done
-            case Constants.PROCESSED_STATE:
+            case Constants.States.PROCESSED:
                 activateSuccessors(process);
                 notifyParent.notifyParentDone(process);
                 break;
-            case Constants.PROCESSED_WITH_ERRORS_STATE:
+            case Constants.States.PROCESSED_WITH_ERRORS:
                  notifyParent.notifyParentDoneWithErrors(process);
                  break;
             default:
@@ -69,7 +69,7 @@ public class ProcessEntryAction extends GenericEntryAction<Process> {
         if(process.childIdToActivateSuccessors == null) return;
         List<Process> predecessorList =  processRepository.findByPredecessorId(process.childIdToActivateSuccessors);
         for(Process predecessor: predecessorList){
-            processService.processById(predecessor.getId(), Constants.ACTIVATE_DORMANT_EVENT, null);
+            processService.processById(predecessor.getId(), Constants.Events.ACTIVATE, null);
         }
     }
 }
