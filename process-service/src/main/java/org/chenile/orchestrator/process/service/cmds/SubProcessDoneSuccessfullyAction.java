@@ -33,7 +33,7 @@ public class SubProcessDoneSuccessfullyAction extends BaseProcessAction<DoneSucc
 			logger.error("Received the sub process Processing event when the numCompletedSubProcesses = numSubProcesses ("+ process.numSubProcesses + ")");
 			return; // discard this event
 		}
-		process.childIdToActivateSuccessors = payload.childId;
+		process.childIdToActivateSuccessors = payload.predecessorId;
 		process.numCompletedSubProcesses++;
 	}
 
