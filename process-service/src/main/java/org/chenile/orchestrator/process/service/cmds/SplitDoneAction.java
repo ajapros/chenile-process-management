@@ -4,7 +4,7 @@ import org.chenile.orchestrator.process.config.model.ProcessDef;
 import org.chenile.orchestrator.process.model.Constants;
 import org.chenile.orchestrator.process.model.Process;
 import org.chenile.orchestrator.process.model.payload.StartProcessingPayload;
-import org.chenile.orchestrator.process.model.payload.SubProcessPayload;
+import org.chenile.orchestrator.process.model.payload.common.SubProcessPayload;
 import org.chenile.orchestrator.process.service.defs.ProcessConfigurator;
 import org.chenile.stm.STMInternalTransitionInvoker;
 import org.chenile.stm.State;
@@ -47,7 +47,7 @@ public class SplitDoneAction extends BaseProcessAction<StartProcessingPayload>{
 		if (payload.subProcesses == null || payload.subProcesses.isEmpty()) return list;
 		for (SubProcessPayload p: payload.subProcesses) {
 			Process subProcess = new Process();
-			if(p.childId != null) subProcess.id = p.childId;
+			if(p.workerSuppliedId != null) subProcess.id = p.workerSuppliedId;
 			if(p.processType != null)subProcess.processType = p.processType;
 			subProcess.parentId = process.id;
 			subProcess.args = p.args;
