@@ -13,11 +13,11 @@ import java.util.Map;
 public class FileSuccessorExecutor implements WorkerStarter {
 
     @Autowired
-    StateEntityService<Process> processManager ;
+    StateEntityService<Process> processManager;
 
     @Override
     public void start(Process process, Map<String, String> execDef, WorkerType workerType) {
         DoneSuccessfullyPayload payload = new DoneSuccessfullyPayload();
-        processManager.processById(process.getId(), Constants.DONE_EVENT,payload);
+        processManager.processById(process.getId(), Constants.Events.DONE_SUCCESSFULLY, payload);
     }
 }

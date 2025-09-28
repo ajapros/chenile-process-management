@@ -29,13 +29,13 @@ public class ChunkExecutor implements WorkerStarter {
                 Thread.sleep(10); // Simulate 10ms of work
                 StatusUpdatePayload update1 = new StatusUpdatePayload();
                 update1.percentComplete = 50;
-                processManager.processById(process.getId(), Constants.STATUS_UPDATE_EVENT, update1);
+                processManager.processById(process.getId(), Constants.Events.STATUS_UPDATE, update1);
 
                 // Simulate more work and send a 90% complete update
                 Thread.sleep(20);
                 StatusUpdatePayload update2 = new StatusUpdatePayload();
                 update2.percentComplete = 90;
-                processManager.processById(process.getId(), Constants.STATUS_UPDATE_EVENT, update2);
+                processManager.processById(process.getId(), Constants.Events.STATUS_UPDATE, update2);
 
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -44,6 +44,6 @@ public class ChunkExecutor implements WorkerStarter {
 
         DoneSuccessfullyPayload payload = new DoneSuccessfullyPayload();
 
-        processManager.processById(process.getId(), Constants.DONE_EVENT,payload);
+        processManager.processById(process.getId(), Constants.Events.DONE_SUCCESSFULLY,payload);
     }
 }

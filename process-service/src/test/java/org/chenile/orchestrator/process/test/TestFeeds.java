@@ -49,15 +49,15 @@ public class TestFeeds {
         process.processType = "feed";
         process.id = "FEED1";
         processManager.create(process);
-        assertState(process.id,Constants.PROCESSED_STATE);
+        assertState(process.id,Constants.States.PROCESSED);
         String fileId = process.id + "FILE1";
-        assertState(fileId,Constants.PROCESSED_STATE);
-        assertState(fileId + "CHUNK1",Constants.PROCESSED_STATE);
+        assertState(fileId,Constants.States.PROCESSED);
+        assertState(fileId + "CHUNK1",Constants.States.PROCESSED);
 
         // Make sure that the all successor processes are created and have been successfully processed.
         List<Process> allPredecessorList= processRepository.findByPredecessorIdIsNotNull();
         for(Process p: allPredecessorList){
-            assertState(p.getId(),Constants.PROCESSED_STATE);
+            assertState(p.getId(),Constants.States.PROCESSED);
         }
     }
 
@@ -70,25 +70,25 @@ public class TestFeeds {
         process.processType = "feed";
         process.id = "FEED2";
         processManager.create(process);
-        assertState(process.id,Constants.PROCESSED_STATE);
+        assertState(process.id,Constants.States.PROCESSED);
         // Is FILE1 processed with the correct args?
         String fileId = process.id + "FILE1";
         String expectedArgs = """
                 { "filename" : "file1" }
                 """;
-        assertStateArgs(fileId,Constants.PROCESSED_STATE,expectedArgs);
-        assertState(fileId + "CHUNK1",Constants.PROCESSED_STATE);
+        assertStateArgs(fileId,Constants.States.PROCESSED,expectedArgs);
+        assertState(fileId + "CHUNK1",Constants.States.PROCESSED);
         // Test if the second file has been processed successfully as well.
         fileId = process.id + "FILE2";
         expectedArgs = """
                 { "filename" : "file2" }
                 """;
-        assertStateArgs(fileId,Constants.PROCESSED_STATE,expectedArgs);
-        assertState(fileId + "CHUNK1",Constants.PROCESSED_STATE);
+        assertStateArgs(fileId,Constants.States.PROCESSED,expectedArgs);
+        assertState(fileId + "CHUNK1",Constants.States.PROCESSED);
         // Make sure that the successor process is created and have been successfully processed.
         List<Process> allPredecessorList= processRepository.findByPredecessorIdIsNotNull();
         for(Process p: allPredecessorList){
-            assertState(p.getId(),Constants.PROCESSED_STATE);
+            assertState(p.getId(),Constants.States.PROCESSED);
         }
     }
 
@@ -101,19 +101,19 @@ public class TestFeeds {
         process.processType = "feed";
         process.id = "FEED1";
         processManager.create(process);
-        assertState(process.id,Constants.SPLIT_PENDING_STATE);
+        assertState(process.id,Constants.States.SPLITTING_AND_WAITING_SUBPROCESSES);
         unblock("FEED1-SPLITTER");
-        assertState(process.id,Constants.SUB_PROCESSES_PENDING_STATE);
+        assertState(process.id,Constants.States.SPLITTING_AND_WAITING_SUBPROCESSES);
         unblock("FEED1FILE1-SPLITTER");
-        assertState("FEED1FILE1fileSuccessor",Constants.DORMANT_STATE);
+        assertState("FEED1FILE1fileSuccessor",Constants.States.DORMANT);
         unblock("FEED1FILE1CHUNK1-EXECUTOR");
         unblock("FEED1FILE1-AGGREGATOR");
-        assertState("FEED1FILE1fileSuccessor",Constants.EXECUTING_STATE);
+        assertState("FEED1FILE1fileSuccessor",Constants.States.EXECUTING);
         unblock("FEED1FILE1fileSuccessor-EXECUTOR");
-        assertState("FEED1FILE1fileSuccessor",Constants.PROCESSED_STATE);
-        assertState(process.id,Constants.AGGREGATION_PENDING_STATE);
+        assertState("FEED1FILE1fileSuccessor",Constants.States.PROCESSED);
+        assertState(process.id,Constants.States.AGGREGATION_PENDING);
         unblock("FEED1-AGGREGATOR");
-        assertState(process.id,Constants.PROCESSED_STATE);
+        assertState(process.id,Constants.States.PROCESSED);
     }
 
     @Test
@@ -125,9 +125,9 @@ public class TestFeeds {
         process.processType = "feed";
         process.id = "FEED1";
         processManager.create(process);
-        assertState(process.id,Constants.SPLIT_PENDING_STATE);
+        assertState(process.id,Constants.States.SPLITTING_AND_WAITING_SUBPROCESSES);
         unblock("FEED1-SPLITTER");
-        assertState(process.id,Constants.SUB_PROCESSES_PENDING_STATE);
+        assertState(process.id,Constants.States.SPLITTING_AND_WAITING_SUBPROCESSES);
         unblock("FEED1FILE1-SPLITTER");
         unblock("FEED1FILE2-SPLITTER");
         unblock("FEED1FILE1CHUNK1-EXECUTOR");
@@ -137,10 +137,10 @@ public class TestFeeds {
         unblock("FEED1FILE1fileSuccessor-EXECUTOR");
         unblock("FEED1FILE2fileSuccessor-EXECUTOR");
         System.out.println("Done with all the count down LATCHES");
-        assertState("FEED1FILE1fileSuccessor",Constants.PROCESSED_STATE);
-        assertState(process.id,Constants.AGGREGATION_PENDING_STATE);
+        assertState("FEED1FILE1fileSuccessor",Constants.States.PROCESSED);
+        assertState(process.id,Constants.States.AGGREGATION_PENDING);
         unblock("FEED1-AGGREGATOR");
-        assertState(process.id,Constants.PROCESSED_STATE);
+        assertState(process.id,Constants.States.PROCESSED);
     }
 
     @Test
@@ -154,7 +154,7 @@ public class TestFeeds {
         process.processType = "feed";
         process.id = "FEED2";
         processManager.create(process);
-        assertState(process.id,Constants.PROCESSED_STATE);
+        assertState(process.id,Constants.States.PROCESSED);
 
         for (int i = 1; i <= numTestFiles; i++) {
             String fileId = process.id + "FILE" + i;
@@ -164,13 +164,13 @@ public class TestFeeds {
                 """.formatted(i);
 
             System.out.println("Verifying process: " + fileId);
-            assertStateArgs(fileId, Constants.PROCESSED_STATE, expectedArgs);
-            assertState(chunkId, Constants.PROCESSED_STATE);
+            assertStateArgs(fileId, Constants.States.PROCESSED, expectedArgs);
+            assertState(chunkId, Constants.States.PROCESSED);
         }
         // Make sure that the successor process is created and have been successfully processed.
         List<Process> allPredecessorList= processRepository.findByPredecessorIdIsNotNull();
         for(Process p: allPredecessorList){
-            assertState(p.getId(),Constants.PROCESSED_STATE);
+            assertState(p.getId(),Constants.States.PROCESSED);
         }
     }
 
@@ -188,9 +188,9 @@ public class TestFeeds {
         process.id = "FEED";
         processManager.create(process);
 
-        assertState(process.id, Constants.SPLIT_PENDING_STATE);
+        assertState(process.id, Constants.States.SPLITTING_AND_WAITING_SUBPROCESSES);
         unblock(process.id + "-SPLITTER");
-        assertState(process.id, Constants.SUB_PROCESSES_PENDING_STATE);
+        assertState(process.id, Constants.States.SPLITTING_AND_WAITING_SUBPROCESSES);
 
 
         // --- ADD THE VERIFICATION CODE HERE ---
@@ -221,14 +221,14 @@ public class TestFeeds {
         System.out.println("Done with all the count down LATCHES");
 
         // Verify a sample successor is processed
-        assertState(process.id + "FILE1fileSuccessor", Constants.PROCESSED_STATE);
+        assertState(process.id + "FILE1fileSuccessor", Constants.States.PROCESSED);
 
         // Check that the main parent process has moved to aggregation
-        assertState(process.id, Constants.AGGREGATION_PENDING_STATE);
+        assertState(process.id, Constants.States.AGGREGATION_PENDING);
 
         // Unblock the final aggregator to finish the whole process
         unblock(process.id + "-AGGREGATOR");
-        assertState(process.id, Constants.PROCESSED_STATE);
+        assertState(process.id, Constants.States.PROCESSED);
     }
 
 

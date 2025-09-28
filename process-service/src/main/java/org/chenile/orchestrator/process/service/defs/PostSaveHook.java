@@ -6,11 +6,9 @@ import org.chenile.orchestrator.process.model.Constants;
 import org.chenile.orchestrator.process.model.Process;
 import org.chenile.orchestrator.process.model.WorkerType;
 import org.chenile.orchestrator.process.service.ProcessInitializeStateService;
-import org.chenile.utils.entity.service.EntityStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 
 import java.util.Map;
 
@@ -55,15 +53,15 @@ public class PostSaveHook {
         WorkerType workerType;
         // Execute the correct type of worker that will lead to the next state transition
         switch (currentState) {
-            case Constants.SPLIT_PENDING_STATE:
+            case Constants.States.SPLITTING_AND_WAITING_SUBPROCESSES:
                 workerType = WorkerType.SPLITTER;
                 params = processDef.splitterConfig;
                 break;
-            case Constants.AGGREGATION_PENDING_STATE:
+            case Constants.States.AGGREGATION_PENDING:
                 workerType = WorkerType.AGGREGATOR;
                 params = processDef.aggregatorConfig;
                 break;
-            case Constants.EXECUTING_STATE:
+            case Constants.States.EXECUTING:
                 params = processDef.executorConfig;
                 workerType = WorkerType.EXECUTOR;
                 break;
