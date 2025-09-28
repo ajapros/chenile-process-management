@@ -26,7 +26,7 @@ public class NotifyParent {
     public void notifyParentDone(Process process){
         if (process.parentId == null) return;
         DoneSuccessfullyPayload payload = new DoneSuccessfullyPayload();
-        payload.childId = process.id;
+        payload.predecessorId = process.id;
         stateEntityService.processById(process.parentId, Constants.Events.SUB_PROCESS_DONE_SUCCESSFULLY,payload);
     }
 
