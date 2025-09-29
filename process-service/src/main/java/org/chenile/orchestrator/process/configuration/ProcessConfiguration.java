@@ -157,6 +157,16 @@ public class ProcessConfiguration {
     }
 
     @Bean
+    SplitDoneWithErrorsAction processSplitDoneWithErrors(){
+        return new SplitDoneWithErrorsAction();
+    }
+
+    @Bean
+    AggregationDoneWithErrorsAction processAggregationDoneWithErrors(){
+        return new AggregationDoneWithErrorsAction();
+    }
+
+    @Bean
     SubProcessDoneWithErrorsAction
             processSubProcessDoneWithErrors(){
         return new SubProcessDoneWithErrorsAction();
