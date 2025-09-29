@@ -4,6 +4,7 @@ import org.chenile.orchestrator.process.model.Constants;
 import org.chenile.orchestrator.process.model.Process;
 import org.chenile.orchestrator.process.WorkerStarter;
 import org.chenile.orchestrator.process.model.WorkerType;
+import org.chenile.orchestrator.process.model.payload.AggregationDonePayload;
 import org.chenile.workflow.api.StateEntityService;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -14,6 +15,6 @@ public class FileAggregator implements WorkerStarter {
     StateEntityService<Process> processManager ;
     @Override
     public void start(Process process, Map<String, String> execDef, WorkerType workerType) {
-        processManager.processById(process.getId(), Constants.Events.AGGREGATION_DONE,null);
+        processManager.processById(process.getId(), Constants.Events.AGGREGATION_DONE,new AggregationDonePayload());
     }
 }

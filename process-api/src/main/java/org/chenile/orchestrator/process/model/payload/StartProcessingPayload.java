@@ -10,4 +10,21 @@ import java.util.List;
 */
 public class StartProcessingPayload extends MinimalPayload{
     public List<SubProcessPayload> subProcesses;
+    public boolean splitCompleted = false;
+
+    public List<SubProcessPayload> getSubProcesses() {
+        return subProcesses;
+    }
+
+    public void setSubProcesses(List<SubProcessPayload> subProcesses) {
+        this.subProcesses = subProcesses;
+    }
+
+    public boolean isSplitCompleted() {
+        return splitCompleted;
+    }
+
+    public void setSplitCompleted(boolean splitCompleted) {
+        this.splitCompleted = splitCompleted;
+    }
 }

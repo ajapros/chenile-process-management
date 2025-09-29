@@ -4,10 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chenile.orchestrator.process.model.*;
 import org.chenile.orchestrator.process.model.Process;
-import org.chenile.orchestrator.process.model.payload.DoneSuccessfullyPayload;
-import org.chenile.orchestrator.process.model.payload.DoneWithErrorsPayload;
-import org.chenile.orchestrator.process.model.payload.StartProcessingPayload;
-import org.chenile.orchestrator.process.model.payload.StatusUpdatePayload;
+import org.chenile.orchestrator.process.model.payload.*;
 import org.chenile.workflow.dto.StateEntityServiceResponse;
 import org.chenile.workflow.param.MinimalPayload;
 import org.springframework.beans.factory.annotation.Value;
@@ -39,7 +36,7 @@ public class ProcessManagerClientImpl implements ProcessManagerClient {
     }
 
     @Override
-    public Process aggregationDone(String id, MinimalPayload payload) {
+    public Process aggregationDone(String id, AggregationDonePayload payload) {
         return process(id, Constants.Events.AGGREGATION_DONE, payload);
     }
 

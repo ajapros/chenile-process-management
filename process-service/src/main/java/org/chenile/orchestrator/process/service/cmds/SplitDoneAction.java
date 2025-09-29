@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  Contains customized logic for the transition. Common logic resides at {@link DefaultSTMTransitionAction}
@@ -34,11 +35,15 @@ public class SplitDoneAction extends BaseProcessAction<StartProcessingPayload>{
 							 StartProcessingPayload payload,
 							 State startState, String eventId,
 							 State endState, STMInternalTransitionInvoker<?> stm, Transition transition) throws Exception {
-		if (eventId.equals(Constants.Events.SPLIT_DONE))
-			process.splitCompleted = true;
+		process.splitCompleted = payload.splitCompleted;
+        if (eventId.equals(Constants.Events.SPLIT_DONE)){
+            process.splitCompleted = true;
+        }
 		List<Process> list = makeSubProcesses(process,payload);
 		process.subProcesses.addAll(list);
-		System.err.println(list.stream().map(p -> p.id));
+        logger.debug("Adding subprocessed IDs: {}", list.stream()
+                .map(p -> p.id)
+                .collect(Collectors.toList()));
 		process.numSubProcesses += process.subProcesses.size();
 	}
 
@@ -52,6 +57,8 @@ public class SplitDoneAction extends BaseProcessAction<StartProcessingPayload>{
 			subProcess.parentId = process.id;
 			subProcess.args = p.args;
 			subProcess.leaf = p.leaf;
+			subProcess.dormant = p.dormant;
+			subProcess.predecessorId = p.predecessorId;
 			addSuccessors(subProcess,list);
 			list.add(subProcess);
 		}
