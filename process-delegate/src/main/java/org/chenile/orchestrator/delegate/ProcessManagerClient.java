@@ -1,13 +1,12 @@
 package org.chenile.orchestrator.delegate;
 
-import org.chenile.orchestrator.process.model.*;
 import org.chenile.orchestrator.process.model.Process;
-import org.chenile.workflow.param.MinimalPayload;
+import org.chenile.orchestrator.process.model.payload.*;
 
 public interface ProcessManagerClient {
-    Process splitPartiallyDone(String id, StartProcessingPayload payload);
+    Process splitUpdate(String id, StartProcessingPayload payload);
     Process splitDone(String id, StartProcessingPayload payload);
-    Process aggregationDone(String id, MinimalPayload payload);
+    Process aggregationDone(String id, AggregationDonePayload payload);
     public Process statusUpdate(String id, StatusUpdatePayload payload);
     public Process doneSuccessfully(String id, DoneSuccessfullyPayload payload);
     public Process doneWithErrors(String id, DoneWithErrorsPayload payload);

@@ -1,7 +1,7 @@
 Feature: Negative test - SubProcess has errors - Parent is intimated
 Scenario: Create a new process
 Given that "flowName" equals "PROCESS_FLOW"
-And that "initialState" equals "SPLIT_PENDING"
+And that "initialState" equals "SPLITTING_AND_WAITING_SUBPROCESSES"
 When I POST a REST request to URL "/process" with payload
 """json
 {
@@ -35,7 +35,7 @@ When I PATCH a REST request to URL "/process/${id}/${event}" with payload
 """
 Then the REST response contains key "mutatedEntity"
 And the REST response key "mutatedEntity.id" is "${id}"
-And the REST response key "mutatedEntity.currentState.stateId" is "SUB_PROCESSES_PENDING"
+And the REST response key "mutatedEntity.currentState.stateId" is "SPLITTING_AND_WAITING_SUBPROCESSES"
 And store "$.payload.mutatedEntity.currentState.stateId" from response to "finalState"
 
 Scenario: Send the subProcessDoneWithErrors event to the file with comments
@@ -45,10 +45,7 @@ When I PATCH a REST request to URL "/process/${id}/${event}" with payload
 """json
 {
     "comment": "${comment}",
-    "errors": [{
-    "processId": "child29",
-     "errors": ["row1 was not structured properly"]
-     }]
+     "validationErrors": ["row1 was not structured properly"]
 }
 """
 Then the REST response contains key "mutatedEntity"
