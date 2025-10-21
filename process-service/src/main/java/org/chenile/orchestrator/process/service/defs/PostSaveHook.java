@@ -34,9 +34,10 @@ public class PostSaveHook {
     public void execute(Process process) {
         String processType = process.processType;
         String currentState = process.getCurrentState().getStateId();
-        logger.debug("PostSaveHook executing for process ID {} in state {}", process.getId(), currentState);
+        logger.debug("PostSaveHook | processId={} | type={} | state={}", process.getId(), processType, currentState);
         if (process.initializedStates.contains(currentState)) {
-            logger.debug("Process {} is already initialized for state {}, not executing PostSaveHook", process.id, currentState);
+            logger.debug("PostSaveHook skipped — processId={}, type={}, currentState={} (already initialized)",
+                    process.getId(), processType, currentState);
             return;
         }
         logger.info("Initializing worker for process ID {} in state '{}'", process.getId(), currentState);
@@ -47,8 +48,17 @@ public class PostSaveHook {
             return;*/
 
         ProcessDef processDef = processConfigurator.processes.processMap.get(processType);
-        if (processDef == null) return;
-        if (workerStarter == null) return;
+
+        if (processDef == null) {
+            logger.debug("PostSaveHook: Skipping worker start. Reason: ProcessDef is NULL for processType: {}", processType);
+            return;
+        }
+
+        if (workerStarter == null) {
+            logger.debug("PostSaveHook: Skipping worker start. Reason: workerStarter bean is NULL (ProcessType: {})", processType);
+            return;
+        }
+
         Map<String, String> params = null;
         WorkerType workerType;
         // Execute the correct type of worker that will lead to the next state transition

@@ -1,5 +1,6 @@
 package org.chenile.orchestrator.process.configuration;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chenile.orchestrator.process.configuration.dao.ProcessRepository;
 import org.chenile.orchestrator.process.service.ProcessInitializeStateService;
 import org.chenile.orchestrator.process.service.defs.PostSaveHook;
@@ -200,8 +201,8 @@ public class ProcessConfiguration {
     }
 
     @Bean
-    ProcessConfigurator processConfigurator() throws Exception{
-       return new ProcessConfigurator();
+    ProcessConfigurator processConfigurator(ObjectMapper objectMapper) throws Exception{
+       return new ProcessConfigurator(objectMapper);
     }
 
     @Bean
