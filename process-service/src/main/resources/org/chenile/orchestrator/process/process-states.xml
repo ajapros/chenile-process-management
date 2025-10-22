@@ -8,16 +8,16 @@
 
 	<if id='isThisLeafNode' condition="leaf" then="isLeaf" else="isNotLeaf">
 		<on eventId="isLeaf" newStateId="EXECUTING"/>
-		<on eventId="isNotLeaf" newStateId="SPLIT_PENDING"/>
+		<on eventId="isNotLeaf" newStateId="SPLITTING_AND_WAITING_SUBPROCESSES"/>
 	</if>
 	<manual-state id='DORMANT'>
 		<on eventId="activate" newStateId="isThisLeafNode"/>
 	</manual-state>
-	<manual-state id='SPLIT_PENDING'>
-			<on eventId="splitPartiallyDone" newStateId="SUB_PROCESSES_PENDING"/>
+<!--	<manual-state id='SPLIT_PENDING'>
+			<on eventId="splitUpdate" newStateId='areAllSubProcessesDone'/>
 			<on eventId="splitDone" newStateId='SUB_PROCESSES_PENDING'/>
 			<on eventId="splitDoneWithErrors" newStateId='PROCESSED_WITH_ERRORS'/>
-	</manual-state>
+	</manual-state>-->
 
 	<manual-state id="EXECUTING">
 		<on eventId="statusUpdate"/>
@@ -25,9 +25,10 @@
 		<on eventId="doneWithErrors" newStateId="PROCESSED_WITH_ERRORS"/>
 	</manual-state>
 
-	<manual-state id='SUB_PROCESSES_PENDING'>
-			<on eventId="splitPartiallyDone"/>
+	<manual-state id='SPLITTING_AND_WAITING_SUBPROCESSES'>
+			<on eventId="splitUpdate" newStateId='areAllSubProcessesDone'/>
 			<on eventId="splitDone" newStateId='areAllSubProcessesDone'/>
+            <on eventId="splitDoneWithErrors" newStateId='PROCESSED_WITH_ERRORS'/>
 			<on eventId="subProcessDoneSuccessfully" newStateId='areAllSubProcessesDone'/>
 			<on eventId="subProcessDoneWithErrors" newStateId='areAllSubProcessesDone'/>
 	</manual-state>
@@ -35,7 +36,7 @@
 	<if id='areAllSubProcessesDone' condition="(numSubProcesses == numCompletedSubProcesses)
                         &amp;&amp; splitCompleted " then="yes" else="no">
 			<on eventId="yes" newStateId='AGGREGATION_PENDING'/>
-			<on eventId="no" newStateId="SUB_PROCESSES_PENDING"/>
+			<on eventId="no" newStateId="SPLITTING_AND_WAITING_SUBPROCESSES"/>
 	</if>
 
 	<manual-state id="AGGREGATION_PENDING">

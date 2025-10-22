@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chenile.orchestrator.process.model.*;
 import org.chenile.orchestrator.process.model.Process;
+import org.chenile.orchestrator.process.model.payload.*;
 import org.chenile.workflow.dto.StateEntityServiceResponse;
 import org.chenile.workflow.param.MinimalPayload;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,43 +26,43 @@ public class ProcessManagerClientImpl implements ProcessManagerClient {
     }
 
     @Override
-    public Process splitPartiallyDone(String id, StartProcessingPayload payload) {
-        return process(id, Constants.SPLIT_PARTIALLY_DONE_EVENT, payload);
+    public Process splitUpdate(String id, StartProcessingPayload payload) {
+        return process(id, Constants.Events.SPLIT_UPDATE, payload);
     }
 
     @Override
     public Process splitDone(String id, StartProcessingPayload payload) {
-        return process(id, Constants.SPLIT_DONE_EVENT, payload);
+        return process(id, Constants.Events.SPLIT_DONE, payload);
     }
 
     @Override
-    public Process aggregationDone(String id, MinimalPayload payload) {
-        return process(id, Constants.AGGREGATION_DONE_EVENT, payload);
+    public Process aggregationDone(String id, AggregationDonePayload payload) {
+        return process(id, Constants.Events.AGGREGATION_DONE, payload);
     }
 
     @Override
     public Process statusUpdate(String id, StatusUpdatePayload payload) {
-        return process(id, Constants.DONE_EVENT, payload);
+        return process(id, Constants.Events.DONE_SUCCESSFULLY, payload);
     }
 
     @Override
     public Process doneSuccessfully(String id, DoneSuccessfullyPayload payload) {
-        return process(id, Constants.DONE_EVENT, payload);
+        return process(id, Constants.Events.DONE_SUCCESSFULLY, payload);
     }
 
     @Override
     public Process doneWithErrors(String id, DoneWithErrorsPayload payload) {
-        return process(id, Constants.DONE_WITH_ERRORS_EVENT, payload);
+        return process(id, Constants.Events.DONE_WITH_ERRORS, payload);
     }
 
     @Override
     public Process splitDoneWithErrors(String id, DoneWithErrorsPayload payload) {
-        return process(id, Constants.SPLIT_DONE_WITH_ERRORS_EVENT, payload);
+        return process(id, Constants.Events.SPLIT_DONE_WITH_ERRORS, payload);
     }
 
     @Override
     public Process aggregationDoneWithErrors(String id, DoneWithErrorsPayload payload) {
-        return process(id, Constants.AGGREGATION_DONE_WITH_ERRORS_EVENT, payload);
+        return process(id, Constants.Events.AGGREGATION_DONE_WITH_ERRORS, payload);
     }
 
     private Process process(String id, String event, Object payload) {

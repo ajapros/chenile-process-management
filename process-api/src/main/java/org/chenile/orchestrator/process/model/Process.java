@@ -1,11 +1,15 @@
 package org.chenile.orchestrator.process.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import org.chenile.jpautils.entity.AbstractJpaStateEntity;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 @Entity
 @Table(name = "process_table")
 public class Process extends AbstractJpaStateEntity
@@ -72,10 +76,142 @@ public class Process extends AbstractJpaStateEntity
 	 	database or transmitted over the wire since the sub-process will be created in a
 	 	separate VM
 	 */
-	public String args ;
+    @Column(name = "args", columnDefinition = "TEXT")
+    public String args ;
 	/**
 	 * The flag below is useful to skip worker creation when status updates are done.
 	 */
-	@Transient public boolean skipPostWorkerCreation = false;
+	//@Transient public boolean skipPostWorkerCreation = false;
 	public String predecessorId;
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    public Set<String> initializedStates = new HashSet<>();
+
+    public boolean isLeaf() {
+        return leaf;
+    }
+
+    public void setLeaf(boolean leaf) {
+        this.leaf = leaf;
+    }
+
+    public boolean isDormant() {
+        return dormant;
+    }
+
+    public void setDormant(boolean dormant) {
+        this.dormant = dormant;
+    }
+
+    public String getClientId() {
+        return clientId;
+    }
+
+    public void setClientId(String clientId) {
+        this.clientId = clientId;
+    }
+
+    public String getProcessType() {
+        return processType;
+    }
+
+    public void setProcessType(String processType) {
+        this.processType = processType;
+    }
+
+    public boolean isSplitCompleted() {
+        return splitCompleted;
+    }
+
+    public void setSplitCompleted(boolean splitCompleted) {
+        this.splitCompleted = splitCompleted;
+    }
+
+    public int getCompletedPercent() {
+        return completedPercent;
+    }
+
+    public void setCompletedPercent(int completedPercent) {
+        this.completedPercent = completedPercent;
+    }
+
+    public String getParentId() {
+        return parentId;
+    }
+
+    public void setParentId(String parentId) {
+        this.parentId = parentId;
+    }
+
+    public String getChildIdToActivateSuccessors() {
+        return childIdToActivateSuccessors;
+    }
+
+    public void setChildIdToActivateSuccessors(String childIdToActivateSuccessors) {
+        this.childIdToActivateSuccessors = childIdToActivateSuccessors;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public List<SubProcessError> getErrors() {
+        return errors;
+    }
+
+    public void setErrors(List<SubProcessError> errors) {
+        this.errors = errors;
+    }
+
+    public int getNumSubProcesses() {
+        return numSubProcesses;
+    }
+
+    public void setNumSubProcesses(int numSubProcesses) {
+        this.numSubProcesses = numSubProcesses;
+    }
+
+    public int getNumCompletedSubProcesses() {
+        return numCompletedSubProcesses;
+    }
+
+    public void setNumCompletedSubProcesses(int numCompletedSubProcesses) {
+        this.numCompletedSubProcesses = numCompletedSubProcesses;
+    }
+
+    public List<Process> getSubProcesses() {
+        return subProcesses;
+    }
+
+    public void setSubProcesses(List<Process> subProcesses) {
+        this.subProcesses = subProcesses;
+    }
+
+    public String getArgs() {
+        return args;
+    }
+
+    public void setArgs(String args) {
+        this.args = args;
+    }
+
+    public String getPredecessorId() {
+        return predecessorId;
+    }
+
+    public void setPredecessorId(String predecessorId) {
+        this.predecessorId = predecessorId;
+    }
+
+    public Set<String> getInitializedStates() {
+        return initializedStates;
+    }
+
+    public void setInitializedStates(Set<String> initializedStates) {
+        this.initializedStates = initializedStates;
+    }
 }

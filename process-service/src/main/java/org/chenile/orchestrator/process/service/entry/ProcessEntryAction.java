@@ -1,5 +1,6 @@
 package org.chenile.orchestrator.process.service.entry;
 
+import org.apache.commons.logging.Log;
 import org.chenile.orchestrator.process.configuration.dao.ProcessRepository;
 import org.chenile.orchestrator.process.model.Constants;
 import org.chenile.orchestrator.process.model.Process;
@@ -8,11 +9,14 @@ import org.chenile.stm.impl.STMActionsInfoProvider;
 import org.chenile.utils.entity.service.EntityStore;
 import org.chenile.workflow.api.StateEntityService;
 import org.chenile.workflow.service.stmcmds.GenericEntryAction;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.List;
 
 public class ProcessEntryAction extends GenericEntryAction<Process> {
+    Logger logger = LoggerFactory.getLogger(ProcessEntryAction.class);
     @Autowired
     NotifyParent notifyParent;
     @Autowired
@@ -28,17 +32,18 @@ public class ProcessEntryAction extends GenericEntryAction<Process> {
     @Override
     public void execute(Process process) throws Exception {
         super.execute(process);
-        switch(process.getCurrentState().getStateId()){
-            case Constants.SUB_PROCESSES_PENDING_STATE:
+        String currentState = process.getCurrentState().getStateId();
+        switch(currentState){
+            case Constants.States.SPLITTING_AND_WAITING_SUBPROCESSES:
                 createSubProcesses(process);
                 activateSuccessors(process);
                 break;
             // intimate the parent that we are done
-            case Constants.PROCESSED_STATE:
+            case Constants.States.PROCESSED:
                 activateSuccessors(process);
                 notifyParent.notifyParentDone(process);
                 break;
-            case Constants.PROCESSED_WITH_ERRORS_STATE:
+            case Constants.States.PROCESSED_WITH_ERRORS:
                  notifyParent.notifyParentDoneWithErrors(process);
                  break;
             default:
@@ -64,7 +69,7 @@ public class ProcessEntryAction extends GenericEntryAction<Process> {
         if(process.childIdToActivateSuccessors == null) return;
         List<Process> predecessorList =  processRepository.findByPredecessorId(process.childIdToActivateSuccessors);
         for(Process predecessor: predecessorList){
-            processService.processById(predecessor.getId(), Constants.ACTIVATE_DORMANT_EVENT, null);
+            processService.processById(predecessor.getId(), Constants.Events.ACTIVATE, null);
         }
     }
 }

@@ -1,5 +1,8 @@
 package org.chenile.orchestrator.process.configuration;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.chenile.orchestrator.process.configuration.dao.ProcessRepository;
+import org.chenile.orchestrator.process.service.ProcessInitializeStateService;
 import org.chenile.orchestrator.process.service.defs.PostSaveHook;
 import org.chenile.orchestrator.process.service.defs.ProcessConfigurator;
 import org.chenile.orchestrator.process.model.Process;
@@ -150,9 +153,18 @@ public class ProcessConfiguration {
     }
 
     @Bean
-    SplitDoneAction
-    processSplitPartiallyDone(){
+    SplitDoneAction processSplitUpdate(){
         return new SplitDoneAction();
+    }
+
+    @Bean
+    SplitDoneWithErrorsAction processSplitDoneWithErrors(){
+        return new SplitDoneWithErrorsAction();
+    }
+
+    @Bean
+    AggregationDoneWithErrorsAction processAggregationDoneWithErrors(){
+        return new AggregationDoneWithErrorsAction();
     }
 
     @Bean
@@ -189,13 +201,18 @@ public class ProcessConfiguration {
     }
 
     @Bean
-    ProcessConfigurator processConfigurator() throws Exception{
-       return new ProcessConfigurator();
+    ProcessConfigurator processConfigurator(ObjectMapper objectMapper) throws Exception{
+       return new ProcessConfigurator(objectMapper);
     }
 
     @Bean
     PostSaveHook postSaveHook(){
         return new PostSaveHook();
+    }
+
+    @Bean
+    ProcessInitializeStateService processInitializeStateService(ProcessRepository processRepository){
+        return new ProcessInitializeStateService(processRepository);
     }
 
 }
