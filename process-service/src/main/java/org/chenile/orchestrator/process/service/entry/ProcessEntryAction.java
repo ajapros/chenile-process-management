@@ -1,10 +1,12 @@
 package org.chenile.orchestrator.process.service.entry;
 
-import org.apache.commons.logging.Log;
+
 import org.chenile.orchestrator.process.configuration.dao.ProcessRepository;
+
 import org.chenile.orchestrator.process.model.Constants;
 import org.chenile.orchestrator.process.model.Process;
 import org.chenile.orchestrator.process.service.defs.PostSaveHook;
+import org.chenile.stm.State;
 import org.chenile.stm.impl.STMActionsInfoProvider;
 import org.chenile.utils.entity.service.EntityStore;
 import org.chenile.workflow.api.StateEntityService;
@@ -30,8 +32,8 @@ public class ProcessEntryAction extends GenericEntryAction<Process> {
     }
 
     @Override
-    public void execute(Process process) throws Exception {
-        super.execute(process);
+    public void execute(State startState, State endState, Process process) throws Exception {
+        super.execute(startState,endState,process);
         String currentState = process.getCurrentState().getStateId();
         switch(currentState){
             case Constants.States.SPLITTING_AND_WAITING_SUBPROCESSES:
