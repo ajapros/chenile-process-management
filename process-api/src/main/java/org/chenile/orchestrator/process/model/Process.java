@@ -76,8 +76,13 @@ public class Process extends AbstractJpaStateEntity
 	 	database or transmitted over the wire since the sub-process will be created in a
 	 	separate VM
 	 */
-    @Column(name = "args", columnDefinition = "TEXT")
-    public String args ;
+    @Column(name = "input", columnDefinition = "TEXT")
+    public String input ;
+    /**
+     * Output of the process. Computed by the executors or the Aggregators.
+     * The output will be rolled up to the parent process.
+     */
+    public String output;
 	/**
 	 * The flag below is useful to skip worker creation when status updates are done.
 	 */
@@ -191,12 +196,12 @@ public class Process extends AbstractJpaStateEntity
         this.subProcesses = subProcesses;
     }
 
-    public String getArgs() {
-        return args;
+    public String getInput() {
+        return input;
     }
 
-    public void setArgs(String args) {
-        this.args = args;
+    public void setInput(String args) {
+        this.input = args;
     }
 
     public String getPredecessorId() {

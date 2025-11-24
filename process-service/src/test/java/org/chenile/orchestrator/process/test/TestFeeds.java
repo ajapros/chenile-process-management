@@ -3,7 +3,7 @@ package org.chenile.orchestrator.process.test;
 import org.chenile.orchestrator.process.configuration.dao.ProcessRepository;
 import org.chenile.orchestrator.process.model.Constants;
 import org.chenile.orchestrator.process.model.Process;
-import org.chenile.workflow.api.StateEntityService;
+import org.chenile.orchestrator.process.service.impl.ProcessManagerImpl;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Test;
@@ -34,8 +34,11 @@ import static org.springframework.test.annotation.DirtiesContext.ClassMode.BEFOR
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @DirtiesContext(classMode = BEFORE_EACH_TEST_METHOD)
 public class TestFeeds {
+    //@Autowired
+    //StateEntityService<Process> processManager;
+
     @Autowired
-    StateEntityService<Process> processManager;
+    ProcessManagerImpl processManager;
 
     @Autowired
     private ProcessRepository processRepository;
@@ -90,6 +93,10 @@ public class TestFeeds {
         for(Process p: allPredecessorList){
             assertState(p.getId(),Constants.States.PROCESSED);
         }
+        List<Process> processList = processManager.getSubProcesses(process.id,true);
+        processList.forEach(p -> {
+            Assert.assertEquals("PROCESSED",p.getCurrentState().getStateId());
+        });
     }
 
     @Test
@@ -229,6 +236,8 @@ public class TestFeeds {
         // Unblock the final aggregator to finish the whole process
         unblock(process.id + "-AGGREGATOR");
         assertState(process.id, Constants.States.PROCESSED);
+
+
     }
 
 
@@ -295,7 +304,7 @@ public class TestFeeds {
     private void assertStateArgs(String processId,String stateId,String args){
         Process p = processManager.retrieve(processId).getMutatedEntity();
         Assert.assertEquals(stateId,p.getCurrentState().getStateId());
-        Assert.assertEquals(args,p.args);
+        Assert.assertEquals(args,p.input);
     }
 
 }

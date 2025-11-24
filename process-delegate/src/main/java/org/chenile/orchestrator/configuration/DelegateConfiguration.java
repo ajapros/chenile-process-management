@@ -2,29 +2,26 @@ package org.chenile.orchestrator.configuration;
 
 import org.chenile.orchestrator.delegate.ProcessManagerClient;
 import org.chenile.orchestrator.delegate.ProcessManagerClientImpl;
+import org.chenile.orchestrator.process.api.ProcessManager;
+import org.chenile.proxy.builder.ProxyBuilder;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
-import org.springframework.web.client.RestTemplate;
-
-import org.apache.hc.client5.http.classic.HttpClient;
-import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
 
 @Configuration
 public class DelegateConfiguration {
-
+    @Autowired ProxyBuilder proxyBuilder;
+    @Value("${process.manager.base-url}")
+    String baseUrl;
     @Bean
-    public ProcessManagerClient processManagerClient(RestTemplate restTemplate){
-        return new ProcessManagerClientImpl(restTemplate);
+    public ProcessManagerClient processManagerClient(){
+        return new ProcessManagerClientImpl();
     }
 
-    @Bean
-    public RestTemplate restTemplate() {
-        RestTemplate restTemplate = new RestTemplate();
-        HttpClient httpClient = HttpClientBuilder.create().build();
-        HttpComponentsClientHttpRequestFactory requestFactory = new HttpComponentsClientHttpRequestFactory(httpClient);
-        restTemplate.setRequestFactory(requestFactory);
-        return restTemplate;
+    @Bean public ProcessManager processServiceProxy(){
+        return proxyBuilder.buildProxy(ProcessManager.class,
+                "processService",null,
+                baseUrl);
     }
-
 }

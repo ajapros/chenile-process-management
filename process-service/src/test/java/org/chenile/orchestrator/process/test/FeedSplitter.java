@@ -24,10 +24,10 @@ public class FeedSplitter implements WorkerStarter {
     StateEntityService<Process> processManager ;
 
     @Override
-    public void start(Process process, Map<String, String> execDef, WorkerType workerType) {
+    public void start(WorkerDto workerDto) {
         List<SubProcessPayload> allSubProcesses = new ArrayList<>();
         for (int i = 0; i < numFiles; i++) {
-            allSubProcesses.add(createSubProcessPayload(process.getId(), i, execDef));
+            allSubProcesses.add(createSubProcessPayload(workerDto.process.getId(), i, workerDto.execDef));
         }
 
         // Loop through the list of all sub-processes and send them in batches of 'batchSize'.
@@ -45,12 +45,12 @@ public class FeedSplitter implements WorkerStarter {
             int end = Math.min(i + batchSize, allSubProcesses.size());
             batchPayload.subProcesses = allSubProcesses.subList(i, end);
             // Send the current batch
-            processManager.processById(process.getId(), Constants.Events.SPLIT_UPDATE, batchPayload);
+            processManager.processById(workerDto.process.getId(), Constants.Events.SPLIT_UPDATE, batchPayload);
 
         }
 
         // Always send splitDone at the end to signal completion.
-        processManager.processById(process.getId(), Constants.Events.SPLIT_DONE, new StartProcessingPayload());
+        processManager.processById(workerDto.process.getId(), Constants.Events.SPLIT_DONE, new StartProcessingPayload());
     }
 
     private SubProcessPayload createSubProcessPayload(String parentId, int index, Map<String, String> execDef) {

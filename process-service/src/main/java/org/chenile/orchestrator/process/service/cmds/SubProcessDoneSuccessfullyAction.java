@@ -11,6 +11,7 @@ import org.chenile.orchestrator.process.model.payload.DoneSuccessfullyPayload;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 
 /**
  Contains customized logic for the transition. Common logic resides at {@link DefaultSTMTransitionAction}
@@ -19,7 +20,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 */
 public class SubProcessDoneSuccessfullyAction extends BaseProcessAction<DoneSuccessfullyPayload>{
 	Logger logger = LoggerFactory.getLogger(this.getClass());
-	@Autowired
+	@Autowired @Qualifier("_processStateEntityService_")
 	StateEntityService<Process> processService;
 	@Autowired
 	ProcessConfigurator processConfigurator;

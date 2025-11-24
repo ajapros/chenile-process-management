@@ -13,6 +13,7 @@ import org.chenile.workflow.api.StateEntityService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,7 +27,7 @@ import java.util.stream.Collectors;
 */
 public class SplitDoneAction extends BaseProcessAction<StartProcessingPayload>{
 	Logger logger = LoggerFactory.getLogger(this.getClass());
-	@Autowired
+	@Autowired @Qualifier("_processStateEntityService_")
 	StateEntityService<Process> processService;
 	@Autowired
 	ProcessConfigurator processConfigurator;
@@ -55,7 +56,7 @@ public class SplitDoneAction extends BaseProcessAction<StartProcessingPayload>{
 			if(p.workerSuppliedId != null) subProcess.id = p.workerSuppliedId;
 			if(p.processType != null)subProcess.processType = p.processType;
 			subProcess.parentId = process.id;
-			subProcess.args = p.args;
+			subProcess.input = p.args;
 			subProcess.leaf = p.leaf;
 			subProcess.dormant = p.dormant;
 			subProcess.predecessorId = p.predecessorId;
@@ -90,7 +91,7 @@ public class SplitDoneAction extends BaseProcessAction<StartProcessingPayload>{
 				continue;
 			}
 			successorProcess.leaf = successorProcessDef.leaf;
-			successorProcess.args = subProcess.args;
+			successorProcess.input = subProcess.input;
 			successorProcess.dormant = true;
 			successorProcess.parentId = subProcess.parentId;
 			successorProcess.predecessorId = subProcess.id;

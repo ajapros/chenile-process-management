@@ -1,32 +1,35 @@
 package org.chenile.orchestrator.process.configuration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.chenile.orchestrator.process.api.ProcessManager;
 import org.chenile.orchestrator.process.configuration.dao.ProcessRepository;
+import org.chenile.orchestrator.process.model.Process;
 import org.chenile.orchestrator.process.service.ProcessInitializeStateService;
+import org.chenile.orchestrator.process.service.cmds.*;
 import org.chenile.orchestrator.process.service.defs.PostSaveHook;
 import org.chenile.orchestrator.process.service.defs.ProcessConfigurator;
-import org.chenile.orchestrator.process.model.Process;
 import org.chenile.orchestrator.process.service.entry.NotifyParent;
 import org.chenile.orchestrator.process.service.entry.ProcessEntryAction;
-import org.chenile.orchestrator.process.service.cmds.*;
-import org.chenile.orchestrator.process.service.impl.ProcessManager;
-import org.chenile.stm.*;
+import org.chenile.orchestrator.process.service.healthcheck.ProcessHealthChecker;
+import org.chenile.orchestrator.process.service.impl.ProcessManagerImpl;
+import org.chenile.orchestrator.process.service.store.ProcessEntityStore;
+import org.chenile.stm.ConfigProvider;
+import org.chenile.stm.STM;
 import org.chenile.stm.action.STMTransitionAction;
 import org.chenile.stm.impl.*;
 import org.chenile.stm.spring.SpringBeanFactoryAdapter;
+import org.chenile.utils.entity.service.EntityStore;
 import org.chenile.workflow.api.StateEntityService;
+import org.chenile.workflow.api.WorkflowRegistry;
 import org.chenile.workflow.param.MinimalPayload;
+import org.chenile.workflow.service.stmcmds.BaseTransitionAction;
+import org.chenile.workflow.service.stmcmds.GenericExitAction;
+import org.chenile.workflow.service.stmcmds.STMTransitionActionResolver;
+import org.chenile.workflow.service.stmcmds.StmBodyTypeSelector;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
-import org.chenile.utils.entity.service.EntityStore;
-import org.chenile.workflow.service.impl.StateEntityServiceImpl;
-import org.chenile.workflow.service.stmcmds.*;
-import org.chenile.orchestrator.process.service.healthcheck.ProcessHealthChecker;
-import org.chenile.orchestrator.process.service.store.ProcessEntityStore;
-import org.chenile.workflow.api.WorkflowRegistry;
 
 
 /**
@@ -66,11 +69,12 @@ public class ProcessConfiguration {
 		return new ProcessEntityStore();
 	}
 	
-	@Bean @Autowired StateEntityServiceImpl<Process> _processStateEntityService_(
+	@Bean @Autowired
+    ProcessManager _processStateEntityService_(
 			@Qualifier("processEntityStm") STM<Process> stm,
 			@Qualifier("processActionsInfoProvider") STMActionsInfoProvider fileInfoProvider,
 			@Qualifier("processEntityStore") EntityStore<Process> entityStore){
-		return new ProcessManager(stm, fileInfoProvider, entityStore);
+		return new ProcessManagerImpl(stm, fileInfoProvider, entityStore);
 	}
 	
 	// Now we start constructing the STM Components 
@@ -201,7 +205,8 @@ public class ProcessConfiguration {
     }
 
     @Bean
-    ProcessConfigurator processConfigurator(ObjectMapper objectMapper) throws Exception{
+    ProcessConfigurator processConfigurator() throws Exception{
+        ObjectMapper objectMapper = new ObjectMapper();
        return new ProcessConfigurator(objectMapper);
     }
 

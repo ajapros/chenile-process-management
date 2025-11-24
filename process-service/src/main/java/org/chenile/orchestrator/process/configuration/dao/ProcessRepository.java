@@ -8,7 +8,6 @@ import java.util.List;
 
 @Repository  public interface ProcessRepository extends JpaRepository<Process,String> {
     List<Process> findByPredecessorId(String id);
-
     List<Process> findByPredecessorIdIsNotNull();
-
+    List<Process> findByParentId(String id);
 }

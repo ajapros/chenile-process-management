@@ -19,6 +19,9 @@ public class ChunkExecutor implements WorkerStarter {
     // Store the successor ID so that we can assert that a successor has been created.
     // This is useful for the test assertion.
     @Override
+    public void start(WorkerDto workerDto){
+        start(workerDto.process,workerDto.execDef,workerDto.workerType);
+    }
     public void start(Process process, Map<String, String> execDef, WorkerType workerType) {
         // Assert if the executor args are passed from def.json to this method
         Assert.assertEquals("executor_value",execDef.get("executor_key"));

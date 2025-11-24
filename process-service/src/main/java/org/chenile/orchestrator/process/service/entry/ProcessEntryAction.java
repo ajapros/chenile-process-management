@@ -14,6 +14,7 @@ import org.chenile.workflow.service.stmcmds.GenericEntryAction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 
 import java.util.List;
 
@@ -23,7 +24,7 @@ public class ProcessEntryAction extends GenericEntryAction<Process> {
     NotifyParent notifyParent;
     @Autowired
     PostSaveHook postSaveHook;
-    @Autowired
+    @Autowired @Qualifier("_processStateEntityService_")
     StateEntityService<Process> processService ;
     @Autowired
     private ProcessRepository processRepository;
@@ -57,8 +58,8 @@ public class ProcessEntryAction extends GenericEntryAction<Process> {
     /**
      * Since process.subProcesses is transient, it will only be initialized when
      * the splitDone event is received. Hence, sub processes will only be created
-     * when the solitDone event is received.
-     * @param process
+     * when the splitDone event is received.
+     * @param process - the process for which sub processes need to be created
      */
     private void createSubProcesses(Process process) {
         if (process.subProcesses == null || process.subProcesses.isEmpty()) return;

@@ -4,6 +4,7 @@ import org.chenile.orchestrator.process.WorkerStarter;
 import org.chenile.orchestrator.process.config.model.ProcessDef;
 import org.chenile.orchestrator.process.model.Constants;
 import org.chenile.orchestrator.process.model.Process;
+import org.chenile.orchestrator.process.model.WorkerDto;
 import org.chenile.orchestrator.process.model.WorkerType;
 import org.chenile.orchestrator.process.service.ProcessInitializeStateService;
 import org.slf4j.Logger;
@@ -23,8 +24,6 @@ public class PostSaveHook {
 
     @Autowired
     private ProcessInitializeStateService processInitializeStateService;
-
-
     public void setWorkerStarter(WorkerStarter workerStarter) {
         this.workerStarter = workerStarter;
     }
@@ -48,7 +47,7 @@ public class PostSaveHook {
             return;*/
 
         ProcessDef processDef = processConfigurator.processes.processMap.get(processType);
-
+        
         if (processDef == null) {
             logger.debug("PostSaveHook: Skipping worker start. Reason: ProcessDef is NULL for processType: {}", processType);
             return;
@@ -76,11 +75,15 @@ public class PostSaveHook {
                 workerType = WorkerType.EXECUTOR;
                 break;
             default:
-                logger.debug("PostSaveHook: No workerStarter found for processId: {} processType: {} currentState: {} ", process.id, processType, currentState);
+                logger.debug("Current state is {}. Ignoring",currentState);
                 return;
         }
         logger.debug("PostSaveHook: Starting workerStarter for processId:{} processType: {} with workerType: {}", process.id, processType, workerType);
-        workerStarter.start(process, params, workerType);
+        WorkerDto workerDto = new WorkerDto();
+        workerDto.process = process;
+        workerDto.execDef = params;
+        workerDto.workerType = workerType;
+        workerStarter.start(workerDto);
 
     }
 }
