@@ -70,7 +70,7 @@ When I PATCH a REST request to URL "/process/${grandChildId}/${event}" with payl
 Then the REST response contains key "mutatedEntity"
 And the REST response key "mutatedEntity.currentState.stateId" is "PROCESSED_WITH_ERRORS"
 
- Scenario: Retrieve the first child. It should also be processed.
+ Scenario: Retrieve the first child. It should be aggregation pending
   When I GET a REST request to URL "/process/${childId}"
   Then the REST response contains key "mutatedEntity"
   And the REST response key "mutatedEntity.currentState.stateId" is "AGGREGATION_PENDING"

@@ -1,7 +1,7 @@
 package org.chenile.orchestrator.process.service.cmds;
 
 import org.chenile.orchestrator.process.model.Process;
-import org.chenile.orchestrator.process.model.DoneSuccessfullyPayload;
+import org.chenile.orchestrator.process.model.payload.DoneSuccessfullyPayload;
 import org.chenile.stm.STMInternalTransitionInvoker;
 import org.chenile.stm.State;
 import org.chenile.stm.model.Transition;
@@ -26,5 +26,7 @@ public class DoneSuccessfullyAction extends AbstractSTMTransitionAction<Process,
 			logger.error("Received Done for a non leaf process" + process.id);
 			return; // discard this event
 		}
+		if (payload.output != null)
+			process.output = payload.output;
 	}
 }

@@ -12,13 +12,10 @@ import org.springframework.http.ResponseEntity;
 
 import org.chenile.stm.StateEntity;
 
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.chenile.workflow.dto.StateEntityServiceResponse;
+
+import java.util.List;
 
 @RestController
 @ChenileController(value = "processService", serviceName = "_processStateEntityService_",
@@ -52,5 +49,12 @@ public class ProcessController extends ControllerSupport{
 		return process(httpServletRequest,id,eventID,eventPayload);
 	}
 
+	@GetMapping("/processChildren/{id}")
+	public ResponseEntity<GenericResponse<List<Process>>> getSubProcesses(
+			HttpServletRequest httpServletRequest,
+			@PathVariable String id,
+			@RequestParam(defaultValue = "true", required = false) boolean recursive){
+		return process(httpServletRequest,id,recursive);
+	}
 
 }

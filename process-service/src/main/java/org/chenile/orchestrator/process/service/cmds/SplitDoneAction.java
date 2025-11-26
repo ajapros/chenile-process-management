@@ -3,13 +3,12 @@ package org.chenile.orchestrator.process.service.cmds;
 import org.chenile.orchestrator.process.config.model.ProcessDef;
 import org.chenile.orchestrator.process.model.Constants;
 import org.chenile.orchestrator.process.model.Process;
-import org.chenile.orchestrator.process.model.StartProcessingPayload;
-import org.chenile.orchestrator.process.model.SubProcessPayload;
+import org.chenile.orchestrator.process.model.payload.StartProcessingPayload;
+import org.chenile.orchestrator.process.model.payload.SubProcessPayload;
 import org.chenile.orchestrator.process.service.defs.ProcessConfigurator;
 import org.chenile.stm.STMInternalTransitionInvoker;
 import org.chenile.stm.State;
 import org.chenile.stm.model.Transition;
-import org.chenile.workflow.api.StateEntityService;
 import org.chenile.workflow.service.stmcmds.AbstractSTMTransitionAction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,10 +24,8 @@ import java.util.UUID;
  <p>Use a customized payload if required instead of MinimalPayload</p>
 */
 public class SplitDoneAction extends AbstractSTMTransitionAction<Process,
-        StartProcessingPayload>{
+		StartProcessingPayload>{
 	Logger logger = LoggerFactory.getLogger(this.getClass());
-	@Autowired
-	StateEntityService<Process> processService;
 	@Autowired
 	ProcessConfigurator processConfigurator;
 	@Override
@@ -36,12 +33,11 @@ public class SplitDoneAction extends AbstractSTMTransitionAction<Process,
 							 StartProcessingPayload payload,
 							 State startState, String eventId,
 							 State endState, STMInternalTransitionInvoker<?> stm, Transition transition) throws Exception {
-		if (eventId.equals(Constants.SPLIT_DONE_EVENT))
+		if (eventId.equals(Constants.Events.SPLIT_DONE))
 			process.splitCompleted = true;
 		List<Process> list = makeSubProcesses(process,payload);
 		process.subProcesses.addAll(list);
-		System.err.println(list.stream().map(p -> p.id));
-		process.numSubProcesses += process.subProcesses.size();
+		process.numSubProcesses += list.size();
 	}
 
 	private List<Process> makeSubProcesses(Process process,StartProcessingPayload payload) {
@@ -52,7 +48,7 @@ public class SplitDoneAction extends AbstractSTMTransitionAction<Process,
 			if(p.childId != null) subProcess.id = p.childId;
 			if(p.processType != null)subProcess.processType = p.processType;
 			subProcess.parentId = process.id;
-			subProcess.args = p.args;
+			subProcess.input = p.args;
 			subProcess.leaf = p.leaf;
 			addSuccessors(subProcess,list);
 			list.add(subProcess);
@@ -85,7 +81,7 @@ public class SplitDoneAction extends AbstractSTMTransitionAction<Process,
 				continue;
 			}
 			successorProcess.leaf = successorProcessDef.leaf;
-			successorProcess.args = subProcess.args;
+			successorProcess.input = subProcess.input;
 			successorProcess.dormant = true;
 			successorProcess.parentId = subProcess.parentId;
 			successorProcess.predecessorId = subProcess.id;

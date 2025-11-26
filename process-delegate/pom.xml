@@ -21,10 +21,9 @@
 			<artifactId>process-api</artifactId>
 		</dependency>
 
-		<!-- https://mvnrepository.com/artifact/org.apache.httpcomponents.client5/httpclient5 -->
 		<dependency>
-			<groupId>org.apache.httpcomponents.client5</groupId>
-			<artifactId>httpclient5</artifactId>
+			<groupId>org.chenile</groupId>
+			<artifactId>chenile-proxy</artifactId>
 		</dependency>
 
 	</dependencies>

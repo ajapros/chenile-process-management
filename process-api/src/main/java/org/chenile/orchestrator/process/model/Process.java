@@ -2,6 +2,7 @@ package org.chenile.orchestrator.process.model;
 
 import jakarta.persistence.*;
 import org.chenile.jpautils.entity.AbstractJpaStateEntity;
+import org.chenile.orchestrator.process.model.payload.SubProcessError;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -67,12 +68,19 @@ public class Process extends AbstractJpaStateEntity
 	@Transient
 	public List<Process> subProcesses = new ArrayList<>();
 	/**
-		Arguments required to start this process.<br/>
-	 	This is stored as a String since it needs to be persisted into the
-	 	database or transmitted over the wire since the sub-process will be created in a
-	 	separate VM
+	 Arguments required to start this process.<br/>
+	 This is stored as a String since it needs to be persisted into the
+	 database or transmitted over the wire since the sub-process will be created in a
+	 separate VM
 	 */
-	public String args ;
+	@Column(name = "input", columnDefinition = "TEXT")
+	public String input ;
+	/**
+	 * Output of the process. Computed by the executors or the Aggregators.
+	 * The output will be rolled up to the parent process.
+	 */
+	@Column(name = "output", columnDefinition = "TEXT")
+	public String output;
 	/**
 	 * The flag below is useful to skip worker creation when status updates are done.
 	 */

@@ -1,7 +1,7 @@
 package org.chenile.orchestrator.process.service.cmds;
 
-import org.chenile.orchestrator.process.model.ActivatePayload;
 import org.chenile.orchestrator.process.model.Process;
+import org.chenile.orchestrator.process.model.payload.ActivatePayload;
 import org.chenile.stm.STMInternalTransitionInvoker;
 import org.chenile.stm.State;
 import org.chenile.stm.model.Transition;

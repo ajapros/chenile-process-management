@@ -4,6 +4,7 @@ import org.chenile.orchestrator.process.WorkerStarter;
 import org.chenile.orchestrator.process.config.model.ProcessDef;
 import org.chenile.orchestrator.process.model.Constants;
 import org.chenile.orchestrator.process.model.Process;
+import org.chenile.orchestrator.process.model.WorkerDto;
 import org.chenile.orchestrator.process.model.WorkerType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,21 +37,25 @@ public class PostSaveHook {
         WorkerType workerType ;
         // Execute the correct type of worker that will lead to the next state transition
         switch(currentState){
-            case Constants.SPLIT_PENDING_STATE:
+            case Constants.States.SPLIT_PENDING:
                 workerType = WorkerType.SPLITTER;
                 params = processDef.splitterConfig;
                 break;
-            case Constants.AGGREGATION_PENDING_STATE:
+            case Constants.States.AGGREGATION_PENDING:
                 workerType = WorkerType.AGGREGATOR;
                 params = processDef.aggregatorConfig;
                 break;
-            case Constants.EXECUTING_STATE:
+            case Constants.States.EXECUTING:
                 params = processDef.executorConfig;
                 workerType = WorkerType.EXECUTOR;
                 break;
             default:
                 return;
         }
-        workerStarter.start(process,params,workerType);
+        WorkerDto workerDto = new WorkerDto();
+        workerDto.process = process;
+        workerDto.execDef = params;
+        workerDto.workerType = workerType;
+        workerStarter.start(workerDto);
     }
 }

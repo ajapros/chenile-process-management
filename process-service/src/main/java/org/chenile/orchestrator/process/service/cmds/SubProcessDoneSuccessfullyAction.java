@@ -1,22 +1,13 @@
 package org.chenile.orchestrator.process.service.cmds;
 
-import org.chenile.orchestrator.process.config.model.ProcessDef;
-import org.chenile.orchestrator.process.configuration.dao.ProcessRepository;
-import org.chenile.orchestrator.process.model.Constants;
 import org.chenile.orchestrator.process.model.Process;
-import org.chenile.orchestrator.process.service.defs.ProcessConfigurator;
+import org.chenile.orchestrator.process.model.payload.DoneSuccessfullyPayload;
 import org.chenile.stm.STMInternalTransitionInvoker;
 import org.chenile.stm.State;
 import org.chenile.stm.model.Transition;
-
-import org.chenile.workflow.api.StateEntityService;
 import org.chenile.workflow.service.stmcmds.AbstractSTMTransitionAction;
-import org.chenile.orchestrator.process.model.DoneSuccessfullyPayload;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-
-import java.util.List;
 
 /**
  Contains customized logic for the transition. Common logic resides at {@link DefaultSTMTransitionAction}
@@ -24,12 +15,8 @@ import java.util.List;
  <p>Use a customized payload if required instead of MinimalPayload</p>
 */
 public class SubProcessDoneSuccessfullyAction extends AbstractSTMTransitionAction<Process,
-        DoneSuccessfullyPayload>{
+		DoneSuccessfullyPayload>{
 	Logger logger = LoggerFactory.getLogger(this.getClass());
-	@Autowired
-	StateEntityService<Process> processService;
-	@Autowired
-	ProcessConfigurator processConfigurator;
 
 	@Override
 	public void transitionTo(Process process,

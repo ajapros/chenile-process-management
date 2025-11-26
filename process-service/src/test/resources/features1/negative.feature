@@ -45,10 +45,7 @@ When I PATCH a REST request to URL "/process/${id}/${event}" with payload
 """json
 {
     "comment": "${comment}",
-    "errors": [{
-    "processId": "child29",
      "errors": ["row1 was not structured properly"]
-     }]
 }
 """
 Then the REST response contains key "mutatedEntity"

@@ -1,7 +1,8 @@
 package org.chenile.orchestrator.process.test;
 
-import org.chenile.orchestrator.process.model.Process;
 import org.chenile.orchestrator.process.WorkerStarter;
+import org.chenile.orchestrator.process.model.Process;
+import org.chenile.orchestrator.process.model.WorkerDto;
 import org.chenile.orchestrator.process.model.WorkerType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
@@ -10,7 +11,9 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import static org.chenile.orchestrator.process.test.SharedData.*;
+
+import static org.chenile.orchestrator.process.test.SharedData.LATCHES;
+import static org.chenile.orchestrator.process.test.SharedData.SYNCH_MODE;
 /**
  * Starts a process within the same JVM by using a component that has been
  * defined within the Spring Bean factory. This delegates to the correct component name<br/>
@@ -22,29 +25,32 @@ public class InVMWorkerStarterDelegator implements WorkerStarter {
     ApplicationContext applicationContext;
     ExecutorService executorService = Executors.newFixedThreadPool(20);
     @Override
-    public void start(Process process, Map<String, String> execDef, WorkerType workerType) {
+    public void start(WorkerDto workerDto){
+        Process process = workerDto.process;
+        Map<String, String> execDef = workerDto.execDef;
+        WorkerType workerType = workerDto.workerType;
         String componentName = process.processType + camelCase(workerType);
         try {
             WorkerStarter actualWorker = (WorkerStarter) applicationContext.getBean(componentName);
             if(SYNCH_MODE)
-                doSynchStart(actualWorker,process, execDef,workerType);
+                doSynchStart(actualWorker,workerDto);
             else
-                doAsynchStart(actualWorker,process, execDef,workerType);
+                doAsynchStart(actualWorker,workerDto);
         }catch(Exception e){
             e.printStackTrace();
         }
     }
 
     protected void doAsynchStart(WorkerStarter actualWorker,
-                           Process process, Map<String, String> execDef, WorkerType workerType) {
+                           WorkerDto workerDto) {
         executorService.submit(() -> {
             try {
-                String latchKey = process.id + "-" + workerType.name();
+                String latchKey = workerDto.process.id + "-" + workerDto.workerType.name();
                 String proceedKey = latchKey + "PROCEED";
                 CountDownLatch latch = new CountDownLatch(1);
                 LATCHES.put(latchKey , latch);
                 latch.await();
-                actualWorker.start(process, execDef, workerType);
+                actualWorker.start(workerDto);
                 LATCHES.get(proceedKey).countDown();
             }catch (Exception e){
                 e.printStackTrace();
@@ -53,8 +59,8 @@ public class InVMWorkerStarterDelegator implements WorkerStarter {
     }
 
     protected void doSynchStart(WorkerStarter actualWorker,
-                                Process process, Map<String, String> execDef, WorkerType workerType) {
-        actualWorker.start(process, execDef, workerType);
+                                WorkerDto workerDto) {
+        actualWorker.start(workerDto);
     }
 
     private String camelCase(WorkerType workerType){
