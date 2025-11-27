@@ -52,6 +52,8 @@ public class PostSaveHook {
             default:
                 return;
         }
+        logger.info("State = {}. Starting worker type = {}",
+                currentState,workerType);
         WorkerDto workerDto = new WorkerDto();
         workerDto.process = process;
         workerDto.execDef = params;

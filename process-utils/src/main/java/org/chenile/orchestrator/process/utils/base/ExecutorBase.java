@@ -7,12 +7,15 @@ import org.chenile.orchestrator.process.model.Constants;
 import org.chenile.orchestrator.process.model.WorkerDto;
 import org.chenile.orchestrator.process.model.payload.DoneSuccessfullyPayload;
 import org.chenile.orchestrator.process.utils.api.IWorker;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import static org.chenile.orchestrator.process.utils.ErrorsHelper.handleErrors;
 import static org.chenile.orchestrator.process.utils.ProcessUtil.processProgressUpdate;
 
 public abstract class ExecutorBase<Input,Output> implements IWorker<Input> {
+    Logger logger = LoggerFactory.getLogger(ExecutorBase.class);
     @Autowired
     ProcessManagerClient processManagerClient;
     protected final ObjectMapper objectMapper = new ObjectMapper();
@@ -23,6 +26,7 @@ public abstract class ExecutorBase<Input,Output> implements IWorker<Input> {
     @Override
     public final void start(WorkerDto workerDto, Input input) {
         try {
+            logger.info("Worker type = {} input = {}",workerDto.workerType,input);
             Output output = doStart(workerDto, input);
             String outString = objectMapper.writeValueAsString(output);
             DoneSuccessfullyPayload payload = new DoneSuccessfullyPayload();

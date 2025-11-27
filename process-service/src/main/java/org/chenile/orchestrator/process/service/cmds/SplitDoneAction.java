@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  Contains customized logic for the transition. Common logic resides at {@link DefaultSTMTransitionAction}
@@ -36,8 +37,10 @@ public class SplitDoneAction extends AbstractSTMTransitionAction<Process,
 		if (eventId.equals(Constants.Events.SPLIT_DONE))
 			process.splitCompleted = true;
 		List<Process> list = makeSubProcesses(process,payload);
-		process.subProcesses.addAll(list);
+		process.subProcesses = list;
 		process.numSubProcesses += list.size();
+		logger.info("===AAA=== list.size() = {} Creating {} ",
+				list.size(), list.stream().map(p -> p.input).collect(Collectors.toList()));
 	}
 
 	private List<Process> makeSubProcesses(Process process,StartProcessingPayload payload) {

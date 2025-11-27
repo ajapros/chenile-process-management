@@ -28,6 +28,7 @@ public abstract class SplitterBase<Input,ChildInput> implements IWorker<Input> {
     @Override
     public void start(WorkerDto workerDto, Input input) {
         try {
+            logger.info("Input = {}",input);
             StartProcessingPayload payload = new StartProcessingPayload();
             payload.subProcesses = doStart(workerDto, input);
             processManagerClient.splitDone(workerDto.process.getId(), payload);
@@ -37,7 +38,7 @@ public abstract class SplitterBase<Input,ChildInput> implements IWorker<Input> {
     }
 
     /**
-     * Implementations can call processManagerClient.splitUpdate(workerDto.process.getId(), batchPayload); as many times
+     * Implementations can call processManagerClient.splitPartiallyDone(workerDto.process.getId(), batchPayload); as many times
      * as required. This would keep starting the other processes. Or else, it can return all the accumulated
      * processes in one shot and they will be sent to the process manager along with Split Done event.
      *
@@ -47,7 +48,7 @@ public abstract class SplitterBase<Input,ChildInput> implements IWorker<Input> {
      */
     protected abstract List<SubProcessPayload> doStart(WorkerDto workerDto, Input input);
 
-    protected void splitUpdate(String id, List<SubProcessPayload> subProcessPayloads){
+    protected void splitPartiallyDone(String id, List<SubProcessPayload> subProcessPayloads){
         StartProcessingPayload payload = new StartProcessingPayload();
         payload.subProcesses = subProcessPayloads;
         processManagerClient.splitPartiallyDone(id, payload);

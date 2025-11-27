@@ -91,6 +91,48 @@ public class TestFeeds {
     }
 
     @Test
+    @Order(9)
+    public void testWith3Files() throws Exception {
+        synch();
+        FeedSplitter.numFiles = 3;
+        Process process = new Process();
+        process.processType = "feed";
+        process.id = "FEED3";
+        processManager.create(process);
+        assertState(process.id,Constants.States.PROCESSED);
+        // Is FILE1 processed with the correct args?
+        String fileId = process.id + "FILE1";
+        String expectedArgs = """
+                { "filename" : "file1" }
+                """;
+        assertStateArgs(fileId,Constants.States.PROCESSED,expectedArgs);
+        // Is the chunk corresponding to file 1 processed correctly.
+        assertState(fileId + "CHUNK1",Constants.States.PROCESSED);
+        // Is FILE2 processed with the correct args?
+        fileId = process.id + "FILE2";
+        expectedArgs = """
+                { "filename" : "file2" }
+                """;
+        assertStateArgs(fileId,Constants.States.PROCESSED,expectedArgs);
+        // Is the chunk corresponding to file 2 processed correctly.
+        assertState(fileId + "CHUNK1",Constants.States.PROCESSED);
+        // Is FILE3 processed with the correct args?
+        fileId = process.id + "FILE3";
+        expectedArgs = """
+                { "filename" : "file3" }
+                """;
+        assertStateArgs(fileId,Constants.States.PROCESSED,expectedArgs);
+        // Is the chunk corresponding to file 2 processed correctly.
+        assertState(fileId + "CHUNK1",Constants.States.PROCESSED);
+
+        // Make sure that the successor process is created and have been successfully processed.
+        List<Process> allPredecessorList= processRepository.findByPredecessorIdIsNotNull();
+        for(Process p: allPredecessorList){
+            assertState(p.getId(),Constants.States.PROCESSED);
+        }
+    }
+
+    @Test
     @Order(8)
     public void testWith1FileAsynch() throws Exception {
         asynch();

@@ -35,6 +35,7 @@ public abstract class AggregatorBase<Input,Output,ChildOutput> implements IWorke
     @Override
     public void start(WorkerDto workerDto, Input input) {
         try {
+            logger.info("Input = {}",input);
             List<Process> processes = processManagerClient.getSubProcesses(workerDto.process.getId(),false);
             Output out = null;
             for (Process p: processes){
