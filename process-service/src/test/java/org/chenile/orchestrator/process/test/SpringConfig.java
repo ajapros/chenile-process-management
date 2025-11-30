@@ -1,7 +1,7 @@
 package org.chenile.orchestrator.process.test;
 
+import org.chenile.orchestrator.process.config.reader.ProcessConfigurator;
 import org.chenile.orchestrator.process.service.defs.PostSaveHook;
-import org.chenile.orchestrator.process.service.defs.ProcessConfigurator;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.domain.EntityScan;
@@ -23,7 +23,7 @@ public class SpringConfig extends SpringBootServletInitializer{
     @Bean
     InVMWorkerStarterDelegator inVMProcessStarterDelegator(
             @Qualifier("postSaveHook") PostSaveHook postSaveHook,
-		    @Qualifier("processConfigurator")ProcessConfigurator processConfigurator){
+		    @Qualifier("processConfigurator") ProcessConfigurator processConfigurator){
         InVMWorkerStarterDelegator workerStarter = new InVMWorkerStarterDelegator();
         postSaveHook.setWorkerStarter(workerStarter);
         processConfigurator.read("def.json");

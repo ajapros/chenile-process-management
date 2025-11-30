@@ -1,9 +1,9 @@
-package org.chenile.orchestrator.process.service.defs;
+package org.chenile.orchestrator.process.config.reader;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.chenile.base.exception.ConfigurationException;
 import org.chenile.orchestrator.process.config.model.ProcessDef;
 import org.chenile.orchestrator.process.config.model.Processes;
-import org.chenile.base.exception.ConfigurationException;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -21,15 +21,18 @@ public class ProcessConfigurator {
 
     public void read(String file){
         try(InputStream stream = getClass().getClassLoader().getResourceAsStream(file)){
-            processes = new ObjectMapper().readValue(stream, Processes.class);
-            for (Map.Entry<String,ProcessDef> entry: processes.processMap.entrySet()){
-                String key = entry.getKey();
-                ProcessDef processDef = entry.getValue();
-                processDef.processType = key;
-            }
+            read(stream);
         }catch(IOException e){
             throw new ConfigurationException(1200,"File name " + file + " cannot be processed. "+
                     " Error = " + e.getMessage());
+        }
+    }
+    public void read(InputStream inputStream) throws IOException{
+        processes = new ObjectMapper().readValue(inputStream, Processes.class);
+        for (Map.Entry<String,ProcessDef> entry: processes.processMap.entrySet()){
+            String key = entry.getKey();
+            ProcessDef processDef = entry.getValue();
+            processDef.processType = key;
         }
     }
 }

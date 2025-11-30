@@ -1,10 +1,10 @@
 package org.chenile.orchestrator.process.configuration;
 
 import org.chenile.orchestrator.process.api.ProcessManager;
+import org.chenile.orchestrator.process.config.reader.ProcessConfigurator;
 import org.chenile.orchestrator.process.model.Process;
 import org.chenile.orchestrator.process.service.cmds.*;
 import org.chenile.orchestrator.process.service.defs.PostSaveHook;
-import org.chenile.orchestrator.process.service.defs.ProcessConfigurator;
 import org.chenile.orchestrator.process.service.entry.NotifyParent;
 import org.chenile.orchestrator.process.service.entry.ProcessEntryAction;
 import org.chenile.orchestrator.process.service.healthcheck.ProcessHealthChecker;

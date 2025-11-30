@@ -2,6 +2,7 @@ package org.chenile.orchestrator.process.service.defs;
 
 import org.chenile.orchestrator.process.WorkerStarter;
 import org.chenile.orchestrator.process.config.model.ProcessDef;
+import org.chenile.orchestrator.process.config.reader.ProcessConfigurator;
 import org.chenile.orchestrator.process.model.Constants;
 import org.chenile.orchestrator.process.model.Process;
 import org.chenile.orchestrator.process.model.WorkerDto;
@@ -18,7 +19,8 @@ import java.util.Map;
  */
 public class PostSaveHook {
     Logger logger = LoggerFactory.getLogger(PostSaveHook.class);
-    @Autowired  ProcessConfigurator processConfigurator;
+    @Autowired
+    ProcessConfigurator processConfigurator;
 
     public void setWorkerStarter(WorkerStarter workerStarter) {
         this.workerStarter = workerStarter;
