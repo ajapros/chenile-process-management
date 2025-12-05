@@ -1,6 +1,7 @@
 package org.chenile.orchestrator.process.utils.base;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import org.chenile.orchestrator.delegate.ProcessManagerClient;
 import org.chenile.orchestrator.process.model.Process;
 import org.chenile.orchestrator.process.model.WorkerDto;
@@ -20,6 +21,10 @@ public class BatchServiceBase<T> implements BatchService<T> {
 	private final ObjectMapper objectMapper = new ObjectMapper();
 	@Autowired ProcessManagerClient processManagerClient ;
 	@Autowired ApplicationContext applicationContext;
+	public BatchServiceBase(){
+		objectMapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS,false);
+	}
+
 	@Override
 	public Process doFirstTrigger(String firstProcessType,T input) {
         logger.debug("At the trigger method ");
