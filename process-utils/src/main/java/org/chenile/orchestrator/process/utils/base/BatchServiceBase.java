@@ -43,7 +43,7 @@ public class BatchServiceBase<T> implements BatchService<T> {
 	@Override
 	public boolean startWorker(WorkerDto workerDto) {
 		String componentName = workerDto.process.processType + camelCase(workerDto.workerType);
-        logger.info("Start() method of IngestionService. Worker Type is {}", workerDto.workerType);
+        logger.info("Start() method of BatchServiceBase. Worker Type is {}", workerDto.workerType);
 		try {
 			IWorker<?> actualWorker = (IWorker<?>) applicationContext.getBean(componentName);
 			invoke(actualWorker,workerDto);

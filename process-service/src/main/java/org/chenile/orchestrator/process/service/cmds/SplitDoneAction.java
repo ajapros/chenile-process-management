@@ -20,9 +20,10 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
- Contains customized logic for the transition. Common logic resides at {@link DefaultSTMTransitionAction}
- <p>Use this class if you want to augment the common logic for this specific transition</p>
- <p>Use a customized payload if required instead of MinimalPayload</p>
+ * SplitDoneAction handles both splitPartiallyDone and splitDone events. This initializes a transient
+ * variable {@link Process#subProcesses} to the processes that need to be created. This is used in the
+ * post processor to start all the sub process workers.
+ *
 */
 public class SplitDoneAction extends AbstractSTMTransitionAction<Process,
 		StartProcessingPayload>{
@@ -39,7 +40,7 @@ public class SplitDoneAction extends AbstractSTMTransitionAction<Process,
 		List<Process> list = makeSubProcesses(process,payload);
 		process.subProcesses = list;
 		process.numSubProcesses += list.size();
-		logger.info("===AAA=== list.size() = {} Creating {} ",
+		logger.debug("list.size() = {} Creating {} ",
 				list.size(), list.stream().map(p -> p.input).collect(Collectors.toList()));
 	}
 
@@ -53,12 +54,20 @@ public class SplitDoneAction extends AbstractSTMTransitionAction<Process,
 			subProcess.parentId = process.id;
 			subProcess.input = p.args;
 			subProcess.leaf = p.leaf;
+			subProcess.clientId = process.clientId;
 			addSuccessors(subProcess,list);
 			list.add(subProcess);
 		}
 		return list;
 	}
 
+	/**
+	 * Add a successor if configured for this subprocess. For every subprocess instance, successors will
+	 * be created using the same input as that of the subprocess. We do not support different inputs for
+	 * successors.
+	 * @param subProcess - the sub process to which we need to add successors
+	 * @param list - list of Processes that got created.
+	 */
 	private void addSuccessors(Process subProcess, List<Process> list) {
 		ProcessDef childProcessDef = processConfigurator.processes.processMap.get(subProcess.processType);
 		if (childProcessDef == null || childProcessDef.successors == null ||

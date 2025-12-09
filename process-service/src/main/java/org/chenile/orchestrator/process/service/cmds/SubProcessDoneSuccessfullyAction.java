@@ -10,9 +10,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- Contains customized logic for the transition. Common logic resides at {@link DefaultSTMTransitionAction}
- <p>Use this class if you want to augment the common logic for this specific transition</p>
- <p>Use a customized payload if required instead of MinimalPayload</p>
+ * If subprocess is done successfully, then we should increment the num of completed sub processes.
+ * We should also activate the successors for this sub process. (These would have been created in a
+ * dormant state when this subprocess was created)
 */
 public class SubProcessDoneSuccessfullyAction extends AbstractSTMTransitionAction<Process,
 		DoneSuccessfullyPayload>{
@@ -30,7 +30,4 @@ public class SubProcessDoneSuccessfullyAction extends AbstractSTMTransitionActio
 		process.childIdToActivateSuccessors = payload.childId;
 		process.numCompletedSubProcesses++;
 	}
-
-
-
 }

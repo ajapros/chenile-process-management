@@ -1,5 +1,6 @@
 package org.chenile.orchestrator.process.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import org.chenile.jpautils.entity.AbstractJpaStateEntity;
 import org.chenile.orchestrator.process.model.payload.SubProcessError;
@@ -14,17 +15,16 @@ public class Process extends AbstractJpaStateEntity
 	public Process(){
 		leaf = false;
 	}
-	public Process(boolean... isLeaf){
-		if(isLeaf != null && isLeaf.length == 1)
-			this.leaf = isLeaf[0];
+	public Process(boolean isLeaf){
+		this.leaf = isLeaf;
 	}
-	public Process(String processType, boolean... isLeaf){
+	public Process(String processType, boolean isLeaf){
 		this(isLeaf);
 		this.processType = processType;
 	}
 
 	/**
-	 * // is this leaf process.
+	 * is this leaf process.
 	 */
 	public boolean leaf;
 	/**
@@ -44,7 +44,7 @@ public class Process extends AbstractJpaStateEntity
 	public boolean splitCompleted;
 	public int completedPercent = 0;
 	public String parentId;
-	@Transient
+	@Transient @JsonIgnore
 	public String childIdToActivateSuccessors;
 	/**
 	 * Primarily FYI
@@ -65,7 +65,7 @@ public class Process extends AbstractJpaStateEntity
 	 * This will not be persisted. The sub processes will be manually persisted after the current
 	 * process is saved.
 	 */
-	@Transient
+	@Transient @JsonIgnore
 	public List<Process> subProcesses = new ArrayList<>();
 	/**
 	 Arguments required to start this process.<br/>
@@ -84,6 +84,6 @@ public class Process extends AbstractJpaStateEntity
 	/**
 	 * The flag below is useful to skip worker creation when status updates are done.
 	 */
-	@Transient public boolean skipPostWorkerCreation = false;
+	@Transient @JsonIgnore  public boolean skipPostWorkerCreation = false;
 	public String predecessorId;
 }
