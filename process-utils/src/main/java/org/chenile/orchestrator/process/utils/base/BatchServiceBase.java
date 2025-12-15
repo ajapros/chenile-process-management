@@ -16,7 +16,7 @@ import static org.chenile.orchestrator.process.utils.ProcessUtil.camelCase;
 import static org.chenile.orchestrator.process.utils.ProcessUtil.invoke;
 
 
-public class BatchServiceBase<T> implements BatchService<T> {
+public abstract class BatchServiceBase<T> implements BatchService<T> {
     private static final Logger logger = LoggerFactory.getLogger(BatchServiceBase.class);
 	private final ObjectMapper objectMapper = new ObjectMapper();
 	@Autowired ProcessManagerClient processManagerClient ;
@@ -25,11 +25,14 @@ public class BatchServiceBase<T> implements BatchService<T> {
 		objectMapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS,false);
 	}
 
+	protected abstract String getClientName();
+
 	@Override
 	public Process doFirstTrigger(String firstProcessType,T input) {
         logger.debug("At the trigger method ");
 		// Start the ingestion process.
 		Process process = new Process();
+		process.clientId = getClientName();
 		// Get the process started with the root process.
 		process.processType = firstProcessType;
 		try {
