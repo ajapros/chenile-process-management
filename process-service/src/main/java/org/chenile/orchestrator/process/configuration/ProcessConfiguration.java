@@ -50,13 +50,13 @@ public class ProcessConfiguration {
         return stmFlowStore;
     }
 
-    @Bean @Autowired STM<Process> processEntityStm(@Qualifier("processFlowStore") STMFlowStoreImpl stmFlowStore) throws Exception{
+    @Bean STM<Process> processEntityStm(@Qualifier("processFlowStore") STMFlowStoreImpl stmFlowStore) throws Exception{
         STMImpl<Process> stm = new STMImpl<>();
         stm.setStmFlowStore(stmFlowStore);
         return stm;
     }
 
-    @Bean @Autowired STMActionsInfoProvider processActionsInfoProvider(@Qualifier("processFlowStore") STMFlowStoreImpl stmFlowStore) {
+    @Bean STMActionsInfoProvider processActionsInfoProvider(@Qualifier("processFlowStore") STMFlowStoreImpl stmFlowStore) {
         STMActionsInfoProvider provider =  new STMActionsInfoProvider(stmFlowStore);
         WorkflowRegistry.addSTMActionsInfoProvider("process",provider);
         return provider;
@@ -66,7 +66,7 @@ public class ProcessConfiguration {
         return new ProcessEntityStore();
     }
 
-    @Bean @Autowired
+    @Bean
     ProcessManager _processStateEntityService_(
             @Qualifier("processEntityStm") STM<Process> stm,
             @Qualifier("processActionsInfoProvider") STMActionsInfoProvider fileInfoProvider,
@@ -76,7 +76,7 @@ public class ProcessConfiguration {
 
     // Now we start constructing the STM Components
 
-    @Bean @Autowired
+    @Bean
     ProcessEntryAction processEntryAction(@Qualifier("processEntityStore") EntityStore<Process> entityStore,
                                           @Qualifier("processActionsInfoProvider") STMActionsInfoProvider fileInfoProvider,
                                           @Qualifier("processFlowStore") STMFlowStoreImpl stmFlowStore){
@@ -114,13 +114,13 @@ public class ProcessConfiguration {
         return new STMTransitionActionResolver(PREFIX_FOR_RESOLVER,defaultSTMTransitionAction);
     }
 
-    @Bean @Autowired StmBodyTypeSelector processBodyTypeSelector(
+    @Bean StmBodyTypeSelector processBodyTypeSelector(
             @Qualifier("processActionsInfoProvider") STMActionsInfoProvider fileInfoProvider,
             @Qualifier("processTransitionActionResolver") STMTransitionActionResolver stmTransitionActionResolver) {
         return new StmBodyTypeSelector(fileInfoProvider,stmTransitionActionResolver);
     }
 
-    @Bean @Autowired STMTransitionAction<Process> processBaseTransitionAction(
+    @Bean STMTransitionAction<Process> processBaseTransitionAction(
             @Qualifier("processTransitionActionResolver") STMTransitionActionResolver stmTransitionActionResolver,
             @Qualifier("processFlowStore") STMFlowStoreImpl stmFlowStore){
         BaseTransitionAction<Process> baseTransitionAction = new BaseTransitionAction<>(stmTransitionActionResolver);

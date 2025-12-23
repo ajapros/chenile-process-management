@@ -18,7 +18,9 @@ public class InVMProcessStarter implements WorkerStarter{
         try{
             String s = objectMapper.writeValueAsString(workerDto);
             eventProcessor.handleEvent(topic,s);
-        }catch(Exception ignore){}
+        }catch(Exception ignore){
+            ignore.printStackTrace();
+        }
 
     }
 }

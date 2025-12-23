@@ -1,11 +1,13 @@
 package org.chenile.orchestrator.process.bdd1;
 
-import cucumber.api.java.en.Given;
+import io.cucumber.java.en.Given;
+import io.cucumber.spring.CucumberContextConfiguration;
 import org.chenile.orchestrator.process.SpringTestConfig;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.ContextConfiguration;
 
 /**
 * This "steps" file's purpose is to hook up the SpringConfig to the test case.
@@ -17,6 +19,7 @@ import org.springframework.test.context.ActiveProfiles;
 */
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT,classes = SpringTestConfig.class)
 @AutoConfigureMockMvc
+@CucumberContextConfiguration
 @ActiveProfiles("unittest")
 public class CukesSteps1 {
 	@Given("dummy") public void dummy(){}
