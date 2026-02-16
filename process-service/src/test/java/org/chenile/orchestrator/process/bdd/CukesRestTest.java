@@ -1,7 +1,7 @@
 package org.chenile.orchestrator.process.bdd;
 
-import io.cucumber.junit.Cucumber;
-import io.cucumber.junit.CucumberOptions;
+import cucumber.api.CucumberOptions;
+import cucumber.api.junit.Cucumber;
 import org.junit.runner.RunWith;
 import org.springframework.test.context.ActiveProfiles;
 
