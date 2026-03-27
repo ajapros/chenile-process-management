@@ -60,6 +60,7 @@
             <plugin>
                 <groupId>org.chenile</groupId>
                 <artifactId>stm-generate-puml</artifactId>
+                <version>${chenile.query.workflow.blueprints.version}</version>
                 <executions>
                     <execution>
                         <goals>
