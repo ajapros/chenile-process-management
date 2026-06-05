@@ -45,7 +45,7 @@ public class ProcessManagerImpl extends StateEntityServiceImpl<Process> implemen
     public List<Process> getSubProcesses(String processId, boolean recursive){
         StateEntityServiceResponse<Process> response = retrieve(processId);
         if (response == null)
-            throw new NotFoundException(40001,"Missing process " + processId);
+            throw new NotFoundException("40001","Missing process " + processId);
         Process process = response.getMutatedEntity();
         List<Process> childProcesses = new ArrayList<>();
         childProcesses.add(process);

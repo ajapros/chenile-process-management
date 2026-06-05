@@ -19,7 +19,7 @@ public class ProcessEntityStore implements EntityStore<Process>{
 	public Process retrieve(String id) {
         Optional<Process> entity = processRepository.findById(id);
         if (entity.isPresent()) return entity.get();
-        throw new NotFoundException(1500,"Unable to find Process with ID " + id);
+        throw new NotFoundException("1500","Unable to find Process with ID " + id);
 	}
 
 }
