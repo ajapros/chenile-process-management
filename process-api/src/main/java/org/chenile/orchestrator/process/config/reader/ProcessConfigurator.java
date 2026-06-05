@@ -23,7 +23,7 @@ public class ProcessConfigurator {
         try(InputStream stream = getClass().getClassLoader().getResourceAsStream(file)){
             read(stream);
         }catch(IOException e){
-            throw new ConfigurationException(1200,"File name " + file + " cannot be processed. "+
+            throw new ConfigurationException("1200","File name " + file + " cannot be processed. "+
                     " Error = " + e.getMessage());
         }
     }
