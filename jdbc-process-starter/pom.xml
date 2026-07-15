@@ -1,0 +1,47 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>org.chenile.orchestrator.process</groupId>
+		<artifactId>process-parent</artifactId>
+		<version>${revision}</version>
+		<relativePath>../pom.xml</relativePath>
+	</parent>
+
+	<artifactId>jdbc-process-starter</artifactId>
+	<packaging>jar</packaging>
+
+	<name>JDBC Process Starter</name>
+	<description>Durable Postgres/JDBC backed worker starter for process-manager workers.</description>
+
+	<dependencies>
+		<dependency>
+			<groupId>org.chenile.orchestrator.process</groupId>
+			<artifactId>process-service</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.chenile.orchestrator.process</groupId>
+			<artifactId>process-utils</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-jdbc</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-tx</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.h2database</groupId>
+			<artifactId>h2</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>junit</groupId>
+			<artifactId>junit</artifactId>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+</project>
