@@ -38,9 +38,11 @@ public abstract class SplitterBase<Input,ChildInput> implements IWorker<Input> {
     }
 
     /**
-     * Implementations can call processManagerClient.splitPartiallyDone(workerDto.process.getId(), batchPayload); as many times
+     * Implementations can call {@link #splitPartiallyDone(String, List)} as many times
      * as required. This would keep starting the other processes. Or else, it can return all the accumulated
      * processes in one shot and they will be sent to the process manager along with Split Done event.
+     * Also leverage {@link #makeSubProcessPayload(Object, String)} for making a sub process payload for
+     * each of the sub processes that are required to be generated for the current process.
      *
      * @param workerDto - The DTO
      * @param input - Input

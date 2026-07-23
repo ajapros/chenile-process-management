@@ -64,6 +64,18 @@ public abstract class AggregatorBase<Input,Output,ChildOutput> implements IWorke
     protected void progressUpdate(String processId, int percent){
         processProgressUpdate(processManagerClient,processId,percent);
     }
-    protected abstract Output doStart(Output out, Input input, ChildOutput childOutput,WorkerDto workerDto, Process p) ;
+
+    /**
+     * This would be called once for each child process to create and progressively enhance
+     * the output from childOutput. In the first invocation, the out param below will be null. In
+     * subsequent invocations, the previous out is passed to this function.
+     * @param out - the output of the aggregation.
+     * @param input - the input of this process
+     * @param childOutput - the child output of the current child
+     * @param workerDto - the worker DTO that was passed for the current process.
+     * @param childProcess - the process descriptor for the child process
+     * @return
+     */
+    protected abstract Output doStart(Output out, Input input, ChildOutput childOutput,WorkerDto workerDto, Process childProcess) ;
 
 }

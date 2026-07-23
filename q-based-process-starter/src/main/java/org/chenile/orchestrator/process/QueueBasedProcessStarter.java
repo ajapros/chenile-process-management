@@ -18,6 +18,7 @@ public class QueueBasedProcessStarter implements WorkerStarter{
     @Override
     public void start(WorkerDto workerDto) {
         String topic = "topic1";
+        topic = workerDto.execDef.get("queue");
         logger.info("start(): Posting the following message to topic " + topic + " WorkerDto.type is {}", workerDto.workerType);
         Map<String,Object> props = new HashMap<>();
         try{

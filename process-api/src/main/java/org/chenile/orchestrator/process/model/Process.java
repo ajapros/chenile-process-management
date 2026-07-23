@@ -22,7 +22,16 @@ public class Process extends AbstractJpaStateEntity
 		this(isLeaf);
 		this.processType = processType;
 	}
+	public Process(String processType, String tenantId, boolean isLeaf){
+		this(processType,isLeaf);
+		this.tenantId = tenantId;
+	}
 
+	/**
+	 * Tenant ID is required to be stored in a multi-tenant implementation. This can be null if Process
+	 * Manager runs in a single tenant mode.
+	 */
+	public String tenantId;
 	/**
 	 * is this leaf process.
 	 */
