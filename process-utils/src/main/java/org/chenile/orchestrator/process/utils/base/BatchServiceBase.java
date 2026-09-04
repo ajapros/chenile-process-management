@@ -5,6 +5,9 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import org.chenile.orchestrator.delegate.ProcessManagerClient;
 import org.chenile.orchestrator.process.model.Process;
 import org.chenile.orchestrator.process.model.WorkerDto;
+import org.chenile.orchestrator.process.model.WorkerType;
+import org.chenile.orchestrator.process.model.Constants;
+import org.chenile.orchestrator.process.utils.ErrorsHelper;
 import org.chenile.orchestrator.process.utils.api.BatchService;
 import org.chenile.orchestrator.process.utils.api.IWorker;
 import org.slf4j.Logger;
@@ -52,8 +55,24 @@ public abstract class BatchServiceBase<T> implements BatchService<T> {
 			invoke(actualWorker,workerDto);
 			return true;
 		}catch(Exception e){
-			logger.error("Cannot start the worker of type {}.",workerDto.workerType,e);
-			return false;
+			logger.error("Cannot start the worker of type {}. Reporting the failure to the process daemon.",
+					workerDto.workerType, e);
+			try {
+				ErrorsHelper.handleErrors(workerDto, e, processManagerClient, errorEvent(workerDto.workerType));
+				return true;
+			} catch (Exception reportingFailure) {
+				logger.error("Unable to report worker failure for process {} to the process daemon.",
+						workerDto.process.getId(), reportingFailure);
+				return false;
+			}
 		}
+	}
+
+	private String errorEvent(WorkerType workerType) {
+		return switch (workerType) {
+			case SPLITTER -> Constants.Events.SPLIT_DONE_WITH_ERRORS;
+			case AGGREGATOR -> Constants.Events.AGGREGATION_DONE_WITH_ERRORS;
+			case EXECUTOR -> Constants.Events.DONE_WITH_ERRORS;
+		};
 	}
 }
