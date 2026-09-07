@@ -1,6 +1,7 @@
 package org.chenile.orchestrator.process;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.chenile.core.context.HeaderUtils;
 import org.chenile.orchestrator.process.model.WorkerDto;
 import org.chenile.pubsub.ChenilePub;
 import org.slf4j.Logger;
@@ -21,6 +22,9 @@ public class QueueBasedProcessStarter implements WorkerStarter{
         topic = workerDto.execDef.get("queue");
         logger.info("start(): Posting the following message to topic " + topic + " WorkerDto.type is {}", workerDto.workerType);
         Map<String,Object> props = new HashMap<>();
+        if (workerDto.process.clientId != null) {
+            props.put(HeaderUtils.TENANT_ID_KEY, workerDto.process.clientId);
+        }
         try{
             String s = objectMapper.writeValueAsString(workerDto);
             chenilePub.asyncPublish(topic,s,props);
