@@ -2,6 +2,7 @@ package org.chenile.orchestrator.process.configuration;
 
 import org.chenile.orchestrator.process.api.ProcessManager;
 import org.chenile.orchestrator.process.config.reader.ProcessConfigurator;
+import org.chenile.orchestrator.process.configuration.dao.ProcessDefinitionRepository;
 import org.chenile.orchestrator.process.model.Process;
 import org.chenile.orchestrator.process.service.cmds.*;
 import org.chenile.orchestrator.process.service.defs.PostSaveHook;
@@ -27,6 +28,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 
 /**
@@ -202,9 +204,16 @@ public class ProcessConfiguration {
         return enablementStrategy;
     }
 
-    @Bean
-    ProcessConfigurator processConfigurator() throws Exception{
+    @Bean(name = "processConfigurator")
+    @ConditionalOnProperty(name = "chenile.process.configurator", havingValue = "json", matchIfMissing = true)
+    ProcessConfigurator jsonProcessConfigurator() throws Exception{
         return new ProcessConfigurator();
+    }
+
+    @Bean(name = "processConfigurator")
+    @ConditionalOnProperty(name = "chenile.process.configurator", havingValue = "database")
+    ProcessConfigurator databaseProcessConfigurator(ProcessDefinitionRepository processDefinitionRepository) {
+        return new DatabaseProcessConfigurator(processDefinitionRepository);
     }
 
     @Bean

@@ -11,6 +11,33 @@ as complete.
 Chenile Process Manager addresses this need. 
 It is super flexible and can be controlled using a JSON file. 
 
+## Database-backed process definitions
+
+`process-service` can load the same `ProcessDef` JSON structure from a database
+instead of a classpath JSON file. Set the following property to select it:
+
+```properties
+chenile.process.configurator=database
+```
+
+The service reads `process_definition`, keyed by `process_type`. Its
+`definition` column contains the JSON that would otherwise be the value in the
+`processMap` for that type. For example:
+
+```sql
+create table process_definition (
+  process_type varchar(255) primary key,
+  definition text not null
+);
+
+insert into process_definition (process_type, definition) values
+('chunk', '{"leaf":true,"executorConfig":{"batchSize":"100"}}');
+```
+
+The database value is read for every lookup, so a changed row is used by the
+next process operation. If the property is absent, the existing classpath JSON
+`ProcessConfigurator` remains the default for backward compatibility.
+
 ## Production Worker Execution
 
 The framework supports three worker launch modes:
