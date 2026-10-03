@@ -6,6 +6,9 @@
 # Node artifact files
 node_modules/
 dist/
+playwright-report/
+test-results/
+.process-admin/
 
 # Compiled Java class files
 *.class

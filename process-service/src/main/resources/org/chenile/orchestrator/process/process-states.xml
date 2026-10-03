@@ -1,18 +1,10 @@
 <!-- Implements the Splitter aggregator pattern. -->
 <states>
 <flow id='PROCESS_FLOW' default="true">
-	<if id='isDormant' condition="dormant" then="isDormant" else="isNotDormant" initialState="true">
-		<on eventId="isDormant" newStateId="DORMANT"/>
-		<on eventId="isNotDormant" newStateId="isThisLeafNode"/>
-	</if>
-
-	<if id='isThisLeafNode' condition="leaf" then="isLeaf" else="isNotLeaf">
+	<if id='isThisLeafNode' condition="leaf" then="isLeaf" else="isNotLeaf" initialState="true">
 		<on eventId="isLeaf" newStateId="EXECUTING"/>
 		<on eventId="isNotLeaf" newStateId="SPLIT_PENDING"/>
 	</if>
-	<manual-state id='DORMANT'>
-		<on eventId="activate" newStateId="isThisLeafNode"/>
-	</manual-state>
 	<manual-state id='SPLIT_PENDING'>
 			<on eventId="splitPartiallyDone" newStateId="SUB_PROCESSES_PENDING"/>
 			<on eventId="splitDone" newStateId='SUB_PROCESSES_PENDING'/>
@@ -51,4 +43,3 @@
 	<manual-state id="PROCESSED_WITH_ERRORS"/>
 </flow>
 </states>
-

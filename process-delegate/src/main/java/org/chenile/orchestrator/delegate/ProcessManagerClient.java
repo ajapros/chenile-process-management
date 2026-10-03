@@ -1,12 +1,13 @@
 package org.chenile.orchestrator.delegate;
 
 import org.chenile.orchestrator.process.model.Process;
+import org.chenile.orchestrator.process.model.ProcessDto;
 import org.chenile.orchestrator.process.model.payload.*;
 
 import java.util.List;
 
 public interface ProcessManagerClient {
-    Process start(Process process);
+    Process start(ProcessDto processDto);
     Process splitPartiallyDone(String id, StartProcessingPayload payload);
     Process splitDone(String id, StartProcessingPayload payload);
     Process aggregationDone(String id, AggregationDonePayload payload);

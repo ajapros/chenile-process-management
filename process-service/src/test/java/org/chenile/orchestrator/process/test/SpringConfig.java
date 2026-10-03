@@ -61,12 +61,4 @@ public class SpringConfig extends SpringBootServletInitializer{
         return new FeedAggregator();
     }
 
-    @Bean
-    ChunkExecutor feedSuccessorExecutor(){
-        return new ChunkExecutor();
-    }
-
-    @Bean
-    FileSuccessorExecutor fileSuccessorExecutor(){return new FileSuccessorExecutor();}
 }
-

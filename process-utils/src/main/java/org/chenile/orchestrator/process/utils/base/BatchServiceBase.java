@@ -4,9 +4,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import org.chenile.orchestrator.delegate.ProcessManagerClient;
 import org.chenile.orchestrator.process.model.Process;
+import org.chenile.orchestrator.process.model.ProcessDto;
 import org.chenile.orchestrator.process.model.WorkerDto;
 import org.chenile.orchestrator.process.model.WorkerType;
 import org.chenile.orchestrator.process.model.Constants;
+import org.chenile.core.context.ContextContainer;
 import org.chenile.orchestrator.process.utils.ErrorsHelper;
 import org.chenile.orchestrator.process.utils.api.BatchService;
 import org.chenile.orchestrator.process.utils.api.IWorker;
@@ -28,22 +30,31 @@ public abstract class BatchServiceBase<T> implements BatchService<T> {
 		objectMapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS,false);
 	}
 
-	protected abstract String getClientName();
+	/** Returns the tenant to propagate when this batch starts a root process. */
+	protected abstract String getTenant();
 
 	@Override
 	public Process doFirstTrigger(String firstProcessType,T input) {
         logger.debug("At the trigger method ");
 		// Start the ingestion process.
-		Process process = new Process();
-		process.clientId = getClientName();
+		ProcessDto processDto = new ProcessDto();
 		// Get the process started with the root process.
-		process.processType = firstProcessType;
+		processDto.processDefName = firstProcessType;
 		try {
-			process.input = objectMapper.writeValueAsString(input);
+			processDto.args = objectMapper.convertValue(input,
+					new com.fasterxml.jackson.core.type.TypeReference<java.util.LinkedHashMap<String, Object>>() { });
         }catch(Exception e){
 			logger.warn("Cannot serialize object {} into string", input,e);
 		}
-		return processManagerClient.start(process);
+		ContextContainer context = ContextContainer.CONTEXT_CONTAINER;
+		ContextContainer.ContextSnapshot snapshot = context.snapshot();
+		try {
+			String tenant = getTenant();
+			if (tenant != null) context.setTenant(tenant);
+			return processManagerClient.start(processDto);
+		} finally {
+			context.restore(snapshot);
+		}
 	}
 
 	@Override

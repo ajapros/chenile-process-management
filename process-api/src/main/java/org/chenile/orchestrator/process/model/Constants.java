@@ -6,7 +6,6 @@ public final class Constants {
     public static final class States {
         private States() { /* Prevent instantiation */ }
         // --- Core States ---
-        public static final String DORMANT = "DORMANT";
         public static final String SUB_PROCESSES_PENDING = "SUB_PROCESSES_PENDING";
         public static final String SPLIT_PENDING = "SPLIT_PENDING";
         public static final String AGGREGATION_PENDING = "AGGREGATION_PENDING";
@@ -22,7 +21,8 @@ public final class Constants {
         private Events() { /* Prevent instantiation */ }
 
         // --- Primary Actions & Updates ---
-        public static final String ACTIVATE = "activate";
+        public static final String PROCESS_CREATE = "ProcessCreate";
+        public static final String PROCESS_COMPLETED = "ProcessCompleted";
         public static final String SPLIT_PARTIALLY_DONE = "splitPartiallyDone";
         public static final String STATUS_UPDATE = "statusUpdate";
 

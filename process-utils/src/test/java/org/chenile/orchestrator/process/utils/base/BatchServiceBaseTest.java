@@ -2,10 +2,13 @@ package org.chenile.orchestrator.process.utils.base;
 
 import org.chenile.orchestrator.delegate.ProcessManagerClient;
 import org.chenile.orchestrator.process.model.Process;
+import org.chenile.orchestrator.process.model.ProcessDto;
 import org.chenile.orchestrator.process.model.WorkerDto;
 import org.chenile.orchestrator.process.model.WorkerType;
 import org.chenile.orchestrator.process.model.payload.DoneWithErrorsPayload;
 import org.chenile.orchestrator.process.utils.api.IWorker;
+import org.chenile.core.context.ContextContainer;
+import org.chenile.core.context.HeaderUtils;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.context.ApplicationContext;
@@ -19,8 +22,23 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doAnswer;
 
 class BatchServiceBaseTest {
+    @Test
+    void startsTheRootProcessWithTheConfiguredTenantInTheChenileContext() {
+        ProcessManagerClient client = mock(ProcessManagerClient.class);
+        ApplicationContext applicationContext = mock(ApplicationContext.class);
+        doAnswer(invocation -> {
+            assertEquals("test", ContextContainer.CONTEXT_CONTAINER.get(HeaderUtils.TENANT_ID_KEY));
+            return new Process();
+        }).when(client).start(any(ProcessDto.class));
+
+        new TestBatchService(client, applicationContext).doFirstTrigger("feed", new Object());
+
+        assertFalse(ContextContainer.CONTEXT_CONTAINER.getContext().containsKey(HeaderUtils.TENANT_ID_KEY));
+    }
+
     @Test
     void acceptsAdditiveFieldsInWorkerPayloads() {
         ProcessManagerClient client = mock(ProcessManagerClient.class);
@@ -128,7 +146,7 @@ class BatchServiceBaseTest {
         }
 
         @Override
-        protected String getClientName() {
+		protected String getTenant() {
             return "test";
         }
     }

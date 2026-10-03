@@ -16,8 +16,7 @@ import java.util.Map;
  * model. <br/>
  * This also provides additional information to start a worker.
  */
-public class ProcessConfigurator {
-    public Processes processes = new Processes();
+public class ProcessConfigurator extends ProcessConfiguratorBase {
 
     public void read(String file){
         try(InputStream stream = getClass().getClassLoader().getResourceAsStream(file)){

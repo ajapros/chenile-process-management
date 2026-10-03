@@ -16,9 +16,17 @@
 
 	<dependencies>
 
+        <dependency><groupId>org.chenile.orchestrator.process</groupId><artifactId>process-outbox</artifactId><version>${revision}</version></dependency>
+        <dependency><groupId>org.postgresql</groupId><artifactId>postgresql</artifactId><scope>test</scope></dependency>
+
 		<dependency>
 			<groupId>org.chenile.orchestrator.process</groupId>
 			<artifactId>process-api</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.chenile.orchestrator.process</groupId>
+			<artifactId>chenile-trigger</artifactId>
+			<version>${revision}</version>
 		</dependency>
 	
 		<dependency>

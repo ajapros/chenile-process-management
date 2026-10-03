@@ -6,7 +6,7 @@ When I POST a REST request to URL "/process" with payload
 """json
 {
     "description": "Description",
-    "processType": "feed"
+    "processDefName": "feed"
 }
 """
 Then the REST response contains key "mutatedEntity"

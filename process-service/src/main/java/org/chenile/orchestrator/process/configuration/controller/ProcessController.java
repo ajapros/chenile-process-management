@@ -1,16 +1,17 @@
 package org.chenile.orchestrator.process.configuration.controller;
 
 import org.chenile.orchestrator.process.model.Process;
+import org.chenile.orchestrator.process.model.ProcessDto;
+import org.chenile.orchestrator.process.model.ProcessCompletedEvent;
 import jakarta.servlet.http.HttpServletRequest;
 
 import org.chenile.base.response.GenericResponse;
 import org.chenile.http.annotation.BodyTypeSelector;
 import org.chenile.http.annotation.ChenileController;
 import org.chenile.http.annotation.ChenileParamType;
+import org.chenile.http.annotation.EventsSubscribedTo;
 import org.chenile.http.handler.ControllerSupport;
 import org.springframework.http.ResponseEntity;
-
-import org.chenile.stm.StateEntity;
 
 import org.springframework.web.bind.annotation.*;
 import org.chenile.workflow.dto.StateEntityServiceResponse;
@@ -30,14 +31,24 @@ public class ProcessController extends ControllerSupport{
 	}
 
 	@PostMapping("/process")
+	@EventsSubscribedTo("ProcessCreate")
 	public ResponseEntity<GenericResponse<StateEntityServiceResponse<Process>>> create(
 			HttpServletRequest httpServletRequest,
-			@ChenileParamType(StateEntity.class)
-			@RequestBody Process entity){
-		return process(httpServletRequest,entity);
+			@ChenileParamType(ProcessDto.class)
+			@RequestBody ProcessDto processDto){
+		return process(httpServletRequest,processDto);
 	}
 
 	
+	@PostMapping("/process/completed")
+	@EventsSubscribedTo("ProcessCompleted")
+	public ResponseEntity<GenericResponse<List<StateEntityServiceResponse<Process>>>> processCompleted(
+			HttpServletRequest httpServletRequest,
+			@ChenileParamType(ProcessCompletedEvent.class)
+			@RequestBody ProcessCompletedEvent event){
+		return process(httpServletRequest,event);
+	}
+
 	@PatchMapping("/process/{id}/{eventID}")
 	@BodyTypeSelector("processBodyTypeSelector")
 	public ResponseEntity<GenericResponse<StateEntityServiceResponse<Process>>> processById(

@@ -3,6 +3,7 @@ package org.chenile.orchestrator.delegate;
 import org.chenile.orchestrator.process.api.ProcessManager;
 import org.chenile.orchestrator.process.model.Constants;
 import org.chenile.orchestrator.process.model.Process;
+import org.chenile.orchestrator.process.model.ProcessDto;
 import org.chenile.orchestrator.process.model.payload.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,8 +17,8 @@ public class ProcessManagerClientImpl implements ProcessManagerClient {
     @Autowired  @Qualifier("processServiceProxy") private ProcessManager processServiceProxy;
 
     @Override
-    public Process start(Process process) {
-        return callCreate(process);
+    public Process start(ProcessDto processDto) {
+        return callCreate(processDto);
     }
 
     @Override
@@ -60,8 +61,8 @@ public class ProcessManagerClientImpl implements ProcessManagerClient {
         return process(id, Constants.Events.AGGREGATION_DONE_WITH_ERRORS, payload);
     }
 
-    private Process callCreate(Process process) {
-        return processServiceProxy.create(process).getMutatedEntity();
+    private Process callCreate(ProcessDto processDto) {
+        return processServiceProxy.create(processDto).getMutatedEntity();
     }
 
     public Process process(String id,  String event, Object payload) {

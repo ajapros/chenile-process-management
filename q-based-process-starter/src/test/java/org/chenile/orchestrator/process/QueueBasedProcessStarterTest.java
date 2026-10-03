@@ -19,7 +19,7 @@ import static org.mockito.Mockito.verify;
 
 /**
  * Verifies that {@link QueueBasedProcessStarter} publishes the worker to the topic named in the
- * process' execDef and that client isolation is preserved by forwarding the client id as the
+ * process' execDef and that tenant isolation is preserved by forwarding the persisted tenant as the
  * tenant header only when it is present.
  */
 public class QueueBasedProcessStarterTest {
@@ -39,7 +39,7 @@ public class QueueBasedProcessStarterTest {
 	}
 
 	@Test
-	public void omitsTenantHeaderWhenClientIdIsNull() {
+	public void omitsTenantHeaderWhenTenantIsNull() {
 		ChenilePub chenilePub = mock(ChenilePub.class);
 		QueueBasedProcessStarter starter = new QueueBasedProcessStarter();
 		starter.chenilePub = chenilePub;
@@ -52,11 +52,11 @@ public class QueueBasedProcessStarterTest {
 		Assert.assertFalse(propsCaptor.getValue().containsKey(HeaderUtils.TENANT_ID_KEY));
 	}
 
-	private WorkerDto workerDto(String queue, String clientId) {
+	private WorkerDto workerDto(String queue, String tenant) {
 		Process process = new Process();
 		process.id = "p1";
 		process.processType = "feed";
-		process.clientId = clientId;
+		process.tenant = tenant;
 		WorkerDto workerDto = new WorkerDto();
 		workerDto.process = process;
 		workerDto.workerType = WorkerType.SPLITTER;

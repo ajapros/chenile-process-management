@@ -15,7 +15,6 @@ import java.util.Map;
 public class ChunkExecutor implements WorkerStarter {
     @Autowired
     StateEntityService<Process> processManager ;
-    // Store the successor ID so that we can assert that a successor has been created.
     // This is useful for the test assertion.
     @Override
     public void start(WorkerDto workerDto) {

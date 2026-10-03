@@ -1,24 +1,36 @@
+%% Generated to match process-service/src/main/resources/org/chenile/orchestrator/process/process-states.xml
+%% (PROCESS_FLOW). Rectangles are manual states; <<choice>> nodes are the `if` decision states.
 stateDiagram-v2
-    state FINALIZER_PENDING
-    state CREATED
-    state areThereErrors <<choice>>
-    state PROCESSING
+    state isThisLeafNode <<choice>>
     state areAllSubProcessesDone <<choice>>
-    state PROCESSED
-    state PROCESSED_WITH_ERRORS
-    FINALIZER_PENDING --> areThereErrors : finalize
-    [*] --> CREATED
-    CREATED --> PROCESSING : startProcessing
-    areThereErrors --> PROCESSED : no
-    areThereErrors --> PROCESSED_WITH_ERRORS : yes
-    PROCESSING --> PROCESSED_WITH_ERRORS : doneWithErrors
-    PROCESSING --> PROCESSED : doneSuccessfully
-    PROCESSING --> areAllSubProcessesDone : subProcessDoneSuccessfully
-    PROCESSING --> areAllSubProcessesDone : subProcessDoneWithErrors
-    PROCESSING --> PROCESSING
-    areAllSubProcessesDone --> PROCESSING : no
-    areAllSubProcessesDone --> FINALIZER_PENDING : yes
+    state areThereErrors <<choice>>
+
+    [*] --> isThisLeafNode
+
+    isThisLeafNode --> EXECUTING : leaf == true
+    isThisLeafNode --> SPLIT_PENDING : leaf == false
+
+    EXECUTING --> EXECUTING : statusUpdate
+    EXECUTING --> PROCESSED : doneSuccessfully
+    EXECUTING --> PROCESSED_WITH_ERRORS : doneWithErrors
+
+    SPLIT_PENDING --> SUB_PROCESSES_PENDING : splitPartiallyDone
+    SPLIT_PENDING --> SUB_PROCESSES_PENDING : splitDone
+    SPLIT_PENDING --> PROCESSED_WITH_ERRORS : splitDoneWithErrors
+
+    SUB_PROCESSES_PENDING --> SUB_PROCESSES_PENDING : splitPartiallyDone
+    SUB_PROCESSES_PENDING --> areAllSubProcessesDone : splitDone
+    SUB_PROCESSES_PENDING --> areAllSubProcessesDone : subProcessDoneSuccessfully
+    SUB_PROCESSES_PENDING --> areAllSubProcessesDone : subProcessDoneWithErrors
+
+    areAllSubProcessesDone --> AGGREGATION_PENDING : numSubProcesses == numCompletedSubProcesses && splitCompleted
+    areAllSubProcessesDone --> SUB_PROCESSES_PENDING : otherwise
+
+    AGGREGATION_PENDING --> areThereErrors : aggregationDone
+    AGGREGATION_PENDING --> PROCESSED_WITH_ERRORS : aggregationDoneWithErrors
+
+    areThereErrors --> PROCESSED_WITH_ERRORS : errors.size() > 0
+    areThereErrors --> PROCESSED : errors.size() == 0
+
     PROCESSED --> [*]
     PROCESSED_WITH_ERRORS --> [*]
-
-

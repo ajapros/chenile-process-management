@@ -22,8 +22,8 @@ public class QueueBasedProcessStarter implements WorkerStarter{
         topic = workerDto.execDef.get("queue");
         logger.info("start(): Posting the following message to topic " + topic + " WorkerDto.type is {}", workerDto.workerType);
         Map<String,Object> props = new HashMap<>();
-        if (workerDto.process.clientId != null) {
-            props.put(HeaderUtils.TENANT_ID_KEY, workerDto.process.clientId);
+        if (workerDto.process.tenant != null) {
+            props.put(HeaderUtils.TENANT_ID_KEY, workerDto.process.tenant);
         }
         try{
             String s = objectMapper.writeValueAsString(workerDto);

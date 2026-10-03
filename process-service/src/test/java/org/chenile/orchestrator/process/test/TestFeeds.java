@@ -52,11 +52,6 @@ public class TestFeeds {
         assertState(fileId,Constants.States.PROCESSED);
         assertState(fileId + "CHUNK1",Constants.States.PROCESSED);
 
-        // Make sure that the all successor processes are created and have been successfully processed.
-        List<Process> allPredecessorList= processRepository.findByPredecessorIdIsNotNull();
-        for(Process p: allPredecessorList){
-            assertState(p.getId(),Constants.States.PROCESSED);
-        }
     }
 
     @Test
@@ -83,11 +78,6 @@ public class TestFeeds {
                 """;
         assertStateArgs(fileId,Constants.States.PROCESSED,expectedArgs);
         assertState(fileId + "CHUNK1",Constants.States.PROCESSED);
-        // Make sure that the successor process is created and have been successfully processed.
-        List<Process> allPredecessorList= processRepository.findByPredecessorIdIsNotNull();
-        for(Process p: allPredecessorList){
-            assertState(p.getId(),Constants.States.PROCESSED);
-        }
     }
 
     @Test
@@ -125,11 +115,6 @@ public class TestFeeds {
         // Is the chunk corresponding to file 2 processed correctly.
         assertState(fileId + "CHUNK1",Constants.States.PROCESSED);
 
-        // Make sure that the successor process is created and have been successfully processed.
-        List<Process> allPredecessorList= processRepository.findByPredecessorIdIsNotNull();
-        for(Process p: allPredecessorList){
-            assertState(p.getId(),Constants.States.PROCESSED);
-        }
     }
 
     @Test
@@ -145,12 +130,8 @@ public class TestFeeds {
         unblock("FEED1-SPLITTER");
         assertState(process.id,Constants.States.SUB_PROCESSES_PENDING);
         unblock("FEED1FILE1-SPLITTER");
-        assertState("FEED1FILE1fileSuccessor",Constants.States.DORMANT);
         unblock("FEED1FILE1CHUNK1-EXECUTOR");
         unblock("FEED1FILE1-AGGREGATOR");
-        assertState("FEED1FILE1fileSuccessor",Constants.States.EXECUTING);
-        unblock("FEED1FILE1fileSuccessor-EXECUTOR");
-        assertState("FEED1FILE1fileSuccessor",Constants.States.PROCESSED);
         assertState(process.id,Constants.States.AGGREGATION_PENDING);
         unblock("FEED1-AGGREGATOR");
         assertState(process.id,Constants.States.PROCESSED);
@@ -174,10 +155,7 @@ public class TestFeeds {
         unblock("FEED1FILE2CHUNK1-EXECUTOR");
         unblock("FEED1FILE1-AGGREGATOR");
         unblock("FEED1FILE2-AGGREGATOR");
-        unblock("FEED1FILE1fileSuccessor-EXECUTOR");
-        unblock("FEED1FILE2fileSuccessor-EXECUTOR");
         System.out.println("Done with all the count down LATCHES");
-        assertState("FEED1FILE1fileSuccessor",Constants.States.PROCESSED);
         assertState(process.id,Constants.States.AGGREGATION_PENDING);
         unblock("FEED1-AGGREGATOR");
         assertState(process.id,Constants.States.PROCESSED);

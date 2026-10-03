@@ -11,8 +11,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * If subprocess is done successfully, then we should increment the num of completed sub processes.
- * We should also activate the successors for this sub process. (These would have been created in a
- * dormant state when this subprocess was created)
+ * Completion is reported to the parent so it can continue aggregation. Any
+ * follow-on process is now an application-defined subscriber to ProcessCompleted.
 */
 public class SubProcessDoneSuccessfullyAction extends AbstractSTMTransitionAction<Process,
 		DoneSuccessfullyPayload>{
@@ -27,7 +27,6 @@ public class SubProcessDoneSuccessfullyAction extends AbstractSTMTransitionActio
 			logger.error("Received the sub process Processing event when the numCompletedSubProcesses = numSubProcesses ("+ process.numSubProcesses + ")");
 			return; // discard this event
 		}
-		process.childIdToActivateSuccessors = payload.childId;
 		process.numCompletedSubProcesses++;
 	}
 }

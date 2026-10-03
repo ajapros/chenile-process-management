@@ -16,9 +16,16 @@ public class ProcessEntityStore implements EntityStore<Process>{
 	}
 
 	@Override
+	@org.springframework.transaction.annotation.Transactional(readOnly = true)
 	public Process retrieve(String id) {
         Optional<Process> entity = processRepository.findById(id);
-        if (entity.isPresent()) return entity.get();
+        if (entity.isPresent()) {
+            Process process = entity.get();
+            // Inline transitions serialize worker/completion snapshots after the read session closes.
+            for (var error : process.errors)
+                if (error.errors != null) error.errors.size();
+            return process;
+        }
         throw new NotFoundException("1500","Unable to find Process with ID " + id);
 	}
 

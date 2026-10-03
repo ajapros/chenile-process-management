@@ -5,8 +5,8 @@ import org.chenile.orchestrator.process.config.reader.ProcessConfigurator;
 import org.chenile.orchestrator.process.configuration.dao.ProcessDefinitionRepository;
 import org.chenile.orchestrator.process.model.Process;
 import org.chenile.orchestrator.process.service.cmds.*;
+import org.chenile.orchestrator.process.service.defs.DatabaseProcessConfigurator;
 import org.chenile.orchestrator.process.service.defs.PostSaveHook;
-import org.chenile.orchestrator.process.service.entry.NotifyParent;
 import org.chenile.orchestrator.process.service.entry.ProcessEntryAction;
 import org.chenile.orchestrator.process.service.healthcheck.ProcessHealthChecker;
 import org.chenile.orchestrator.process.service.impl.ProcessManagerImpl;
@@ -24,17 +24,19 @@ import org.chenile.workflow.service.stmcmds.BaseTransitionAction;
 import org.chenile.workflow.service.stmcmds.GenericExitAction;
 import org.chenile.workflow.service.stmcmds.STMTransitionActionResolver;
 import org.chenile.workflow.service.stmcmds.StmBodyTypeSelector;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.chenile.trigger.configuration.ChenileTriggerConfiguration;
 
 
 /**
  Process related workflow configurations in Spring
  */
 @Configuration
+@Import({ChenileTriggerConfiguration.class, ProcessCommandConfiguration.class, ProcessOutboxConfiguration.class})
 public class ProcessConfiguration {
     private static final String FLOW_DEFINITION_FILE = "org/chenile/orchestrator/process/process-states.xml";
     public static final String PREFIX_FOR_PROPERTIES = "Process";
@@ -189,11 +191,6 @@ public class ProcessConfiguration {
 
     @Bean ConfigProviderImpl processConfigProvider() {
         return new ConfigProviderImpl();
-    }
-
-    @Bean
-    NotifyParent notifyParent(@Qualifier("_processStateEntityService_") StateEntityService<Process> stateEntityService){
-        return new NotifyParent(stateEntityService);
     }
 
     @Bean ConfigBasedEnablementStrategy processConfigBasedEnablementStrategy(

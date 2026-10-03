@@ -1,6 +1,7 @@
 package org.chenile.orchestrator.process.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import org.chenile.jpautils.entity.AbstractJpaStateEntity;
 import org.chenile.orchestrator.process.model.payload.SubProcessError;
@@ -10,6 +11,8 @@ import java.util.List;
 
 @Entity
 @Table(name = "process_table")
+// Older queued WorkerDto/child snapshots still contain this retired field.
+@JsonIgnoreProperties("dormant")
 public class Process extends AbstractJpaStateEntity
 {
 	public Process(){
@@ -22,30 +25,13 @@ public class Process extends AbstractJpaStateEntity
 		this(isLeaf);
 		this.processType = processType;
 	}
-	public Process(String processType, String tenantId, boolean isLeaf){
-		this(processType,isLeaf);
-		this.tenantId = tenantId;
-	}
-
-	/**
-	 * Tenant ID is required to be stored in a multi-tenant implementation. This can be null if Process
-	 * Manager runs in a single tenant mode.
-	 */
-	public String tenantId;
 	/**
 	 * is this leaf process.
 	 */
 	public boolean leaf;
-	/**
-	 * is this a dormant process
-	 */
-	public boolean dormant = false;
-	/**
-	 * the client is stored as part of the process.<br/>
-	 * this enables us to use the client ID to enable client isolation.
-	 */
-	public String clientId;
 	public String processType;
+	/** Correlates a root process with the external trigger that created it. */
+	public String triggerId;
 	/**
 	 * Has the split completed? Split will be completed only after the splitDone event is
 	 * called.
@@ -53,8 +39,6 @@ public class Process extends AbstractJpaStateEntity
 	public boolean splitCompleted;
 	public int completedPercent = 0;
 	public String parentId;
-	@Transient @JsonIgnore
-	public String childIdToActivateSuccessors;
 	/**
 	 * Primarily FYI
 	 */

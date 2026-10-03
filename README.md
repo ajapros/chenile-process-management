@@ -11,6 +11,75 @@ as complete.
 Chenile Process Manager addresses this need. 
 It is super flexible and can be controlled using a JSON file. 
 
+## Creating and observing processes
+
+A [React operations UI and tenant-scoped management API](docs/process-management-ui.md)
+now supports cron schedules, trigger history, process definitions, process/subprocess
+drill-downs, completion-event inspection and end-to-end execution graphs. See the guide
+for the opt-in administrator API, required history migration and local UI startup.
+
+The [standalone API launcher](process-admin-server/README.md) can now run directly from this repository:
+
+```sh
+export PROCESS_MANAGEMENT_API_KEY="$(openssl rand -hex 32)"
+mvn install -q -pl process-admin-server -am -DskipTests
+java -jar process-admin-server/target/process-admin-server-exec.jar --spring.profiles.active=dev
+```
+
+It listens on localhost:8080, persists local development data in H2, and enqueues JDBC
+worker jobs. Business worker execution requires your application's worker implementations.
+
+`POST /process` and the `ProcessCreate` event accept a `ProcessDto`:
+
+```json
+{"processDefName":"feed","args":{"file":"input.csv"},"triggerId":"run-123"}
+```
+
+`chenile-trigger` schedules crontabs and dispatches events; its `x-chenile-trigger-id`
+header supplies correlation when the payload omits `triggerId`. `TriggerLog` in
+`chenile-trigger` stores only trigger dispatch idempotency and status. Its table is
+`trigger_log`, with a unique constraint on `(trigger_id, event_name)`.
+Direct process creation is not deduplicated using this table and does not write to it.
+Tenant identity comes from `x-chenile-tenant-id`, and terminal processes emit
+`ProcessCompleted` with the tenant header for subscribers.
+
+The process manager subscribes to `ProcessCompleted` and exposes `POST /process/completed`.
+`ProcessCompletedEvent` extends `ProcessDto`, so it can be used as the creation DTO.
+A definition such as the following starts an `index` process after an `import` completion:
+
+```json
+{"processMap":{"index":{"leaf":true,"predecessorProcessType":"import","predecessorArgs":"BOTH","config":{}}}}
+```
+
+Every matching definition starts a new root, for both successful and failed completions.
+No match starts none. The new process retains the trigger and tenant and records the
+completed process ID as `predecessorId`. Set `predecessorArgs` on each successor definition
+to choose `INPUT`, `OUTPUT`, or `BOTH` (the default when omitted or null).
+`INPUT` supplies only the `input` key; `OUTPUT` supplies only the `output` key;
+`BOTH` supplies both keys:
+
+```json
+{"input":{"batch":7},"output":{"rows":100}}
+```
+
+Valid JSON values are decoded; plain text stays a string and absent values become null.
+The completion event is not mutated when starting processes. Chaining does not consult
+`TriggerLog`; repeated completion ingress can create additional processes unless durable mode is enabled.
+
+Every splitter, executor, and aggregator receives a copy of `ProcessDef.config`.
+Use this single map for all worker settings for a process type.
+
+See [the process-management guide](docs/process-management.md) for the lifecycle,
+module wiring, tests, and remaining durability limitations.
+
+## Opt-in durable process consequences
+
+Set `chenile.process.outbox.enabled=true` after migrating the PostgreSQL outbox and receipt schema.
+State saves and child/parent/worker/chaining commands commit atomically. The poller retries failures;
+receipts prevent repeated parent counting and successor creation. The default remains synchronous.
+Framework chaining is durable; arbitrary application completion listeners remain best-effort.
+See [setup, monitoring, replay, and PostgreSQL tests](docs/process-outbox.md).
+
 ## Database-backed process definitions
 
 `process-service` can load the same `ProcessDef` JSON structure from a database
@@ -31,12 +100,15 @@ create table process_definition (
 );
 
 insert into process_definition (process_type, definition) values
-('chunk', '{"leaf":true,"executorConfig":{"batchSize":"100"}}');
+('chunk', '{"leaf":true,"config":{"batchSize":"100"}}');
 ```
 
-The database value is read for every lookup, so a changed row is used by the
-next process operation. If the property is absent, the existing classpath JSON
-`ProcessConfigurator` remains the default for backward compatibility.
+`DatabaseProcessConfigurator` caches definitions and missing names in a synchronized
+`HashMap`. Named lookups load on demand; the first predecessor lookup loads all
+definitions, and subsequent lookups use that same cache. After changing database
+definitions, call `clearCache()` on each configurator instance to reload on the next
+lookup. If the property is absent, the classpath JSON `ProcessConfigurator` remains
+the default.
 
 ## Production Worker Execution
 

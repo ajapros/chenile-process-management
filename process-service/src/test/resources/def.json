@@ -1,27 +1,18 @@
 {
   "processMap": {
     "feed": {
-      "splitterConfig": {
-        "splitter_key": "splitter_value"
-      },
-      "aggregatorConfig": {
+      "config": {
+        "splitter_key": "splitter_value",
         "aggregator_key": "aggregator_value"
       }
     },
     "file": {
-      "parentProcessType": "feed",
-      "successors": ["fileSuccessor"]
+      "parentProcessType": "feed"
     },
     "chunk": {
       "leaf": true,
       "parentProcessType": "file",
-      "executorConfig": {
-        "executor_key": "executor_value"
-      }
-    },
-    "fileSuccessor": {
-      "leaf": true,
-      "executorConfig": {
+      "config": {
         "executor_key": "executor_value"
       }
     }

@@ -1,7 +1,5 @@
 package org.chenile.orchestrator.process.service.cmds;
 
-import org.chenile.orchestrator.process.config.model.ProcessDef;
-import org.chenile.orchestrator.process.config.reader.ProcessConfigurator;
 import org.chenile.orchestrator.process.model.Constants;
 import org.chenile.orchestrator.process.model.Process;
 import org.chenile.orchestrator.process.model.payload.StartProcessingPayload;
@@ -16,20 +14,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
  * SplitDoneAction handles both splitPartiallyDone and splitDone events. This initializes a transient
  * variable {@link Process#subProcesses} to the processes that need to be created. This is used in the
- * post processor to start all the sub process workers.
+ * post save hook to start all the sub process workers.
  *
 */
 public class SplitDoneAction extends AbstractSTMTransitionAction<Process,
 		StartProcessingPayload>{
 	Logger logger = LoggerFactory.getLogger(this.getClass());
-	@Autowired
-	ProcessConfigurator processConfigurator;
 	@Override
 	public void transitionTo(Process process,
 							 StartProcessingPayload payload,
@@ -52,53 +47,12 @@ public class SplitDoneAction extends AbstractSTMTransitionAction<Process,
 			if(p.childId != null) subProcess.id = p.childId;
 			if(p.processType != null)subProcess.processType = p.processType;
 			subProcess.parentId = process.id;
+			subProcess.triggerId = process.triggerId;
 			subProcess.input = p.args;
 			subProcess.leaf = p.leaf;
-			subProcess.clientId = process.clientId;
-			addSuccessors(subProcess,list);
 			list.add(subProcess);
 		}
 		return list;
-	}
-
-	/**
-	 * Add a successor if configured for this subprocess. For every subprocess instance, successors will
-	 * be created using the same input as that of the subprocess. We do not support different inputs for
-	 * successors.
-	 * @param subProcess - the sub process to which we need to add successors
-	 * @param list - list of Processes that got created.
-	 */
-	private void addSuccessors(Process subProcess, List<Process> list) {
-		ProcessDef childProcessDef = processConfigurator.processes.processMap.get(subProcess.processType);
-		if (childProcessDef == null || childProcessDef.successors == null ||
-				childProcessDef.successors.isEmpty()) {
-			return;
-		}
-		// Ensure that the sub process has an ID. Else, it is not possible to track the successors.
-		if (subProcess.id == null || subProcess.id.isEmpty()){
-			subProcess.id = String.valueOf(UUID.randomUUID());
-		}
-		int index = 1;
-		for (String successor: childProcessDef.successors) {
-
-			Process successorProcess = new Process();
-			successorProcess.id = subProcess.id + successor;
-			logger.info("Creating Successor for process ID = " + subProcess.id +
-					" Processing successor type = " + successor + " successor process ID is " +
-					successorProcess.id);
-			successorProcess.processType = successor;
-			ProcessDef successorProcessDef = processConfigurator.processes.processMap.get(successor);
-			if (successorProcessDef == null){
-				logger.warn("Not starting successor " + successor + " since its ProcessDef not configured");
-				continue;
-			}
-			successorProcess.leaf = successorProcessDef.leaf;
-			successorProcess.input = subProcess.input;
-			successorProcess.dormant = true;
-			successorProcess.parentId = subProcess.parentId;
-			successorProcess.predecessorId = subProcess.id;
-			list.add(successorProcess);
-		}
 	}
 
 }

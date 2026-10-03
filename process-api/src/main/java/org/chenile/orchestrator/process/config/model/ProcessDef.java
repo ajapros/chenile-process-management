@@ -1,8 +1,6 @@
 package org.chenile.orchestrator.process.config.model;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -10,12 +8,15 @@ import java.util.Map;
  * This is optional but highly desirable to give.
  */
 public class ProcessDef {
-    public List<String> successors = new ArrayList<>();
     public String parentProcessType;
+    /** Start this process when a process of this type completes. */
+    public String predecessorProcessType;
+    /** Select predecessor input, output, or both; omitted values default to BOTH. */
+    public PredecessorArgs predecessorArgs = PredecessorArgs.BOTH;
     public String processType;
     public String args;
-    public boolean leaf; // Is this leaf node - i.e. it does not have sub processes
-    public Map<String,String> splitterConfig = new HashMap<>();
-    public Map<String,String> aggregatorConfig = new HashMap<>();
-    public Map<String,String> executorConfig = new HashMap<>();
+    public boolean leaf;
+
+    /** Configuration passed to every splitter, executor, and aggregator for this process type. */
+    public Map<String,String> config = new HashMap<>();
 }

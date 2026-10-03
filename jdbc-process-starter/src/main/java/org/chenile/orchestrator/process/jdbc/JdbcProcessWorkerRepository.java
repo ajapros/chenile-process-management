@@ -1,7 +1,6 @@
 package org.chenile.orchestrator.process.jdbc;
 
 import org.chenile.orchestrator.process.model.WorkerDto;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -25,11 +24,11 @@ public class JdbcProcessWorkerRepository {
 
 	public boolean enqueue(WorkerDto workerDto, String payload) {
 		Instant now = Instant.now();
-		try {
-			jdbcTemplate.update("""
+		return transactionTemplate.execute(tx -> jdbcTemplate.update("""
 					insert into chenile_process_work_item
 					(id, process_id, process_type, worker_type, idempotency_key, payload, status, attempt, created_at, updated_at)
 					values (?, ?, ?, ?, ?, ?, 'PENDING', 0, ?, ?)
+					on conflict do nothing
 					""",
 					UUID.randomUUID().toString(),
 					workerDto.process.getId(),
@@ -38,11 +37,7 @@ public class JdbcProcessWorkerRepository {
 					idempotencyKey(workerDto),
 					payload,
 					Timestamp.from(now),
-					Timestamp.from(now));
-			return true;
-		} catch (DuplicateKeyException e) {
-			return false;
-		}
+					Timestamp.from(now)) == 1);
 	}
 
 	public Optional<JdbcProcessWorkItem> claimNext(String workerId, int lockSeconds, int maxAttempts) {
