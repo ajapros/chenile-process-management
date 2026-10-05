@@ -16,12 +16,12 @@ import static org.quartz.JobBuilder.newJob;
 import static org.quartz.TriggerBuilder.newTrigger;
 
 public class CrontabScheduler {
-    private final CrontabRepository repository;
+    private final CrontabReader repository;
     private final TriggerService triggerService;
     private final Scheduler scheduler;
     private final ObjectMapper mapper = new ObjectMapper();
 
-    public CrontabScheduler(CrontabRepository repository, TriggerService triggerService, Scheduler scheduler) {
+    public CrontabScheduler(CrontabReader repository, TriggerService triggerService, Scheduler scheduler) {
         this.repository = repository;
         this.triggerService = triggerService;
         this.scheduler = scheduler;
@@ -71,13 +71,7 @@ public class CrontabScheduler {
     }
 
     void validate(Crontab crontab) {
-        if (crontab.name == null || crontab.name.isBlank() || crontab.cronExpression == null || crontab.eventName == null)
-            throw new IllegalArgumentException("Crontab name, cronExpression and eventName are required");
-        if (!CronExpression.isValidExpression(crontab.cronExpression))
-            throw new IllegalArgumentException("Invalid cronExpression " + crontab.cronExpression);
-        ZoneId.of(crontab.timezone);
-        map(crontab.headersJson);
-        object(crontab.eventPayloadJson);
+        CrontabValidator.validate(crontab);
     }
 
     private Map<String, String> map(String json) {

@@ -27,11 +27,25 @@ public class ProcessConfigurator extends ProcessConfiguratorBase {
         }
     }
     public void read(InputStream inputStream) throws IOException{
-        processes = new ObjectMapper().readValue(inputStream, Processes.class);
-        for (Map.Entry<String,ProcessDef> entry: processes.processMap.entrySet()){
+        read(inputStream, Processes.class);
+    }
+
+    /** Read a typed extension of the standard process document, retaining normal lookup behavior. */
+    public <T extends Processes> T read(InputStream inputStream, Class<T> documentType) throws IOException {
+        T document = new ObjectMapper().readerFor(documentType)
+                .without(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .with(com.fasterxml.jackson.core.JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
+                .readValue(inputStream);
+        for (Map.Entry<String,ProcessDef> entry: document.processMap.entrySet()){
             String key = entry.getKey();
             ProcessDef processDef = entry.getValue();
             processDef.processType = key;
         }
+        validate(document);
+        processes = document;
+        return document;
     }
+
+    /** Subclasses validate extended documents before replacing the active configuration. */
+    protected void validate(Processes document) {}
 }
