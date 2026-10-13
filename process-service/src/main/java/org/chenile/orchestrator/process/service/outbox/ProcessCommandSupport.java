@@ -33,6 +33,7 @@ public class ProcessCommandSupport {
     private final EventProcessor events;
     @jakarta.persistence.PersistenceContext
     private jakarta.persistence.EntityManager entityManager;
+    ;
 
     public ProcessCommandSupport(ProcessOutboxRepository outbox, ObjectProvider<ProcessManager> managers,
             ProcessRepository processes, PostSaveHook workers,
@@ -43,7 +44,9 @@ public class ProcessCommandSupport {
         independent.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
-    public boolean durable() { return outbox != null; }
+    public boolean durable() {
+        return outbox != null;
+    }
 
     /** JPA callbacks derive tenant from thread context; flush before a command restores that context. */
     void flushTenantScopedChanges() {

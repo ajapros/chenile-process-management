@@ -14,8 +14,9 @@ import org.springframework.test.context.ActiveProfiles;
 @PropertySource("classpath:org/chenile/orchestrator/process/TestService.properties")
 @SpringBootApplication(scanBasePackages = { "org.chenile.configuration", "org.chenile.orchestrator.**.configuration" })
 @ActiveProfiles("unittest")
-@EntityScan({"org.chenile.orchestrator.**.model"})
-@EnableJpaRepositories(basePackages = {"org.chenile.orchestrator.**.configuration.dao"})
+@EntityScan({"org.chenile.orchestrator.**.model", "org.chenile.trigger.model", "org.chenile.trigger.cron"})
+@EnableJpaRepositories(basePackages = {"org.chenile.orchestrator.**.configuration.dao",
+        "org.chenile.trigger.store", "org.chenile.trigger.cron"})
 public class SpringTestConfig extends SpringBootServletInitializer{
 	
 }

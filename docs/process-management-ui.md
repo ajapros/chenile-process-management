@@ -53,6 +53,17 @@ Hosts using explicit imports instead of Chenile configuration-package scanning m
 `ProcessConfiguration`, entity scans and repository scans. Include
 `org.chenile.orchestrator.process.configuration.model` and `.configuration.dao` in those scans.
 
+Hosts must include `trigger-service` and `crontab-trigger` explicitly, because these dependencies
+are optional in `process-service`. Scan `org.chenile.configuration.trigger` and
+`org.chenile.configuration.crontab`, or import `ChenileTriggerConfiguration` and
+`CrontabTriggerConfiguration` respectively. The standalone admin host already does this.
+
+The application owns persistence discovery; framework configuration classes do not declare
+entity or repository scans. Include `org.chenile.trigger.model` and `org.chenile.trigger.cron`
+in the application's entity scan, and `org.chenile.trigger.store` and `org.chenile.trigger.cron`
+in its repository scan, alongside the process packages above. This also applies to hosts
+using Chenile configuration-package scanning.
+
 Apply `process-service/src/main/resources/chenile-process-management-history-schema.sql`
 before deploying the updated libraries, even if the management API is disabled: history
 capture is part of trigger/completion production and independent of the optional UI API.

@@ -15,6 +15,8 @@
 	<name>Process Service Implementations</name>
 
 	<dependencies>
+        <dependency><groupId>org.chenile.orchestrator.process</groupId><artifactId>trigger-api</artifactId><version>${revision}</version></dependency>
+        <dependency><groupId>org.chenile.orchestrator.process</groupId><artifactId>crontab-trigger</artifactId><version>${revision}</version><optional>true</optional></dependency>
 
         <dependency><groupId>org.chenile.orchestrator.process</groupId><artifactId>process-outbox</artifactId><version>${revision}</version></dependency>
         <dependency><groupId>org.postgresql</groupId><artifactId>postgresql</artifactId><scope>test</scope></dependency>
@@ -25,7 +27,8 @@
 		</dependency>
 		<dependency>
 			<groupId>org.chenile.orchestrator.process</groupId>
-			<artifactId>chenile-trigger</artifactId>
+			<artifactId>trigger-service</artifactId>
+            <optional>true</optional>
 			<version>${revision}</version>
 		</dependency>
 	

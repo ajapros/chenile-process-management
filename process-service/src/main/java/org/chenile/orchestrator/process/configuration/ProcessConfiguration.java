@@ -29,14 +29,13 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.chenile.trigger.configuration.ChenileTriggerConfiguration;
 
 
 /**
  Process related workflow configurations in Spring
  */
 @Configuration
-@Import({ChenileTriggerConfiguration.class, ProcessCommandConfiguration.class, ProcessOutboxConfiguration.class})
+@Import({ProcessCommandConfiguration.class, ProcessOutboxConfiguration.class})
 public class ProcessConfiguration {
     private static final String FLOW_DEFINITION_FILE = "org/chenile/orchestrator/process/process-states.xml";
     public static final String PREFIX_FOR_PROPERTIES = "Process";

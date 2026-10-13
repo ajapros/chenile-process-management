@@ -56,8 +56,11 @@ independent and database-only so that it can be depended on without creating a c
 `invm-process-starter`, `q-based-process-starter`, and `jdbc-process-starter` are the three
 interchangeable worker launch strategies.
 
-`chenile-trigger` is the activation layer: durable Quartz crontabs and in-JVM trigger events, including
-the `ProcessCreate` event that starts a root process.
+`trigger-api` contains trigger contracts and input/result DTOs without runtime dependencies.
+`trigger-service` supplies in-JVM event dispatch, trigger idempotency and execution history.
+`crontab-trigger` owns durable Quartz crontabs and depends on `trigger-api`, not the trigger
+implementation. Its events include `ProcessCreate`, which starts a root process. The two
+implementation dependencies are optional in `process-service`; applications select them explicitly.
 
 ## The domain model
 
@@ -253,7 +256,7 @@ for the design rationale.
 
 ## Triggering
 
-`chenile-trigger` converts an external activation into a synchronously dispatched in-JVM Chenile event; it
+`trigger-service` converts an external activation into a synchronously dispatched in-JVM Chenile event; it
 does not introduce another event bus. A `TriggerInput` (trigger id, event id, payload, headers, time) is
 recorded, converted to the declared Java event type, and passed to `EventProcessor`. The trigger id plus
 event id form an idempotency claim.
@@ -264,11 +267,30 @@ Idempotency is enforced by `TriggerLog` (the `trigger_log` table), whose only co
 and suppressed in every status, and failed claims are not automatically retried. Claims and status updates
 run in independent transactions so they survive the surrounding event transaction.
 
-The shipped adapter is a durable Quartz crontab (`chenile_crontab`, managed through `CrontabService`;
+The shipped adapter in `crontab-trigger` is a durable Quartz crontab (`chenile_crontab`, managed through `CrontabService`;
 saving or deleting a row registers or removes its Quartz job, and enabled crontabs are rescheduled on
 application start). Each firing supplies a stable trigger id of the form
 `crontab:{id}:{quartzFireInstanceId}`, so duplicate dispatches are suppressed while each scheduled run
 remains distinct. A `ProcessCreate` crontab stores its `ProcessDto` as the event payload.
+
+### Trigger execution history (`TriggerObserver`)
+
+Idempotency (`TriggerLog`) and execution history are deliberately separate concerns. `EventTriggerService`
+calls a `TriggerObserver` at the start and end of every accepted dispatch — `started(executionId, input)`
+and `finished(executionId, failure)` — so that a durable, queryable record of *what actually ran* is kept
+without overloading the minimal idempotency claim.
+
+The default implementation, `DatabaseTriggerObserver`, writes to the `chenile_trigger_execution` table:
+start and finish times, status (`RUNNING` → `COMPLETED` / `FAILED`), error message, source (`CRON` vs
+external), crontab id, tenant, and payload. This is the operator-facing "what happened, when, how long, did
+it succeed" view that an idempotency claim cannot provide.
+
+The observer is pluggable and non-intrusive: `EventTriggerService` depends only on the interface, the
+wiring is `@ConditionalOnMissingBean(TriggerObserver.class)` so an application can substitute its own
+(metrics/APM, event emission, a different store) or disable history with the no-op `TriggerObserver.NONE`;
+`started` / `finished` run in `REQUIRES_NEW` transactions so history commits independently (a failed
+dispatch is still recorded); and a failure thrown by `finished` is suppressed into the original exception
+so observing can never mask or change the dispatch outcome.
 
 ## Multi-tenancy
 
@@ -303,8 +325,9 @@ Integration tests (`TestFeeds`, `TestFile`, `TestChunks`) drive the full recursi
 with fake workers resolved by naming convention, in both synchronous and latch-stepped asynchronous modes.
 `ProcessManagerImplTriggerTest` covers `ProcessDto` creation and trigger correlation. BDD/REST suites drive
 the transition matrix over the REST surface. `DatabaseProcessConfiguratorTest` checks the database
-configurator. The `chenile-trigger` tests cover dispatch, typed payloads, and the `trigger_log` uniqueness
-guarantee. The `process-outbox` tests cover rollback-together, idempotent enqueue, `SKIP LOCKED`, backoff,
+configurator. The `trigger-service` tests cover dispatch, typed payloads, and the `trigger_log` uniqueness
+guarantee. The `crontab-trigger` tests cover JSON loading, Quartz dispatch, transactional schedule updates,
+and wiring with an application-defined trigger implementation. The `process-outbox` tests cover rollback-together, idempotent enqueue, `SKIP LOCKED`, backoff,
 retry-then-DEAD, dead-letter compensation, and replay-safe parent counting, with an opt-in suite that runs
 the same guarantees against a real PostgreSQL instance. The durable integration tests in `process-service`
 exercise the outbox end to end.

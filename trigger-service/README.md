@@ -1,7 +1,18 @@
-# Chenile Trigger
+# Trigger service
 
-`chenile-trigger` converts an external activation into a synchronously dispatched, in-JVM
+`trigger-service` implements the contracts in [trigger-api](../trigger-api/README.md).
+It converts an external activation into a synchronously dispatched, in-JVM
 Chenile event. It uses the existing `EventProcessor`; it does not introduce another event bus.
+
+It owns trigger claim persistence and execution history, with no dependency on Quartz,
+`crontab-trigger`, or the process manager. Cron support is provided separately by
+[crontab-trigger](../crontab-trigger/README.md), which depends only on the trigger API.
+Applications select these modules explicitly. `process-service` marks both implementation
+dependencies optional; the admin server selects both.
+
+Scan `org.chenile.configuration.trigger` or import `ChenileTriggerConfiguration` to wire
+the implementation. Applications own entity scanning of `org.chenile.trigger.model` and
+repository scanning of `org.chenile.trigger.store`; configuration classes do not declare scans.
 
 ## Fully formed trigger events
 
@@ -18,7 +29,7 @@ trigger adapter.
 
 ## Durable crontabs
 
-Quartz schedules are stored in `chenile_crontab`. The entity is managed through
+The separate `crontab-trigger` module stores Quartz schedules in `chenile_crontab`. The entity is managed through
 `CrontabService`; saving, disabling, or deleting a row registers, removes, or reschedules its
 Quartz job. The runtime schema is generated through JPA; an equivalent schema must include:
 

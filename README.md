@@ -35,11 +35,14 @@ worker jobs. Business worker execution requires your application's worker implem
 {"processDefName":"feed","args":{"file":"input.csv"},"triggerId":"run-123"}
 ```
 
-`chenile-trigger` schedules crontabs and dispatches events; its `x-chenile-trigger-id`
+`crontab-trigger` schedules crontabs through the contracts in `trigger-api`;
+`trigger-service` dispatches events. Its `x-chenile-trigger-id`
 header supplies correlation when the payload omits `triggerId`. `TriggerLog` in
-`chenile-trigger` stores only trigger dispatch idempotency and status. Its table is
+`trigger-service` stores only trigger dispatch idempotency and status. Its table is
 `trigger_log`, with a unique constraint on `(trigger_id, event_name)`.
 Direct process creation is not deduplicated using this table and does not write to it.
+`crontab-trigger` depends on `trigger-api`, not `trigger-service`. Applications choose
+the dispatcher implementation; the admin host explicitly includes both implementation modules.
 Tenant identity comes from `x-chenile-tenant-id`, and terminal processes emit
 `ProcessCompleted` with the tenant header for subscribers.
 

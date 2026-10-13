@@ -12,6 +12,8 @@
     <name>Process Administration Server</name>
     <description>Runnable Chenile process management API with JDBC worker delivery.</description>
     <dependencies>
+        <dependency><groupId>org.chenile.orchestrator.process</groupId><artifactId>trigger-service</artifactId><version>${revision}</version></dependency>
+        <dependency><groupId>org.chenile.orchestrator.process</groupId><artifactId>crontab-trigger</artifactId><version>${revision}</version></dependency>
         <dependency>
             <groupId>org.chenile.orchestrator.process</groupId>
             <artifactId>jdbc-process-starter</artifactId>

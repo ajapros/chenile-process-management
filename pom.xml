@@ -5,7 +5,9 @@
 	<modules>
 		<module>process-api</module>
 		<module>process-outbox</module>
-		<module>chenile-trigger</module>
+		<module>trigger-api</module>
+		<module>trigger-service</module>
+		<module>crontab-trigger</module>
 		<module>process-service</module>
 		<module>process-delegate</module>
 		<module>process-utils</module>
