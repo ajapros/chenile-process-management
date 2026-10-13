@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Master Liquibase changelog aggregating every Chenile Process Management schema module. OPT-IN: nothing
+  runs this unless a host adds the Liquibase dependency and sets, for example:
+
+    spring.liquibase.change-log=classpath:db/changelog/db.changelog-master.xml
+    spring.liquibase.contexts=chenile-process-outbox,chenile-process-history
+
+  Contexts select which tables to apply:
+    chenile-process-jdbc       -> chenile_process_work_item
+    chenile-process-outbox     -> chenile_process_outbox, chenile_process_receipt
+    chenile-process-history    -> chenile_trigger_execution, chenile_process_completion_event, process_table indexes
+    chenile-process-reference  -> trigger_log, process_definition
+
+  Running with no contexts applies all four. Every changeset no-ops if its table already exists, so this is
+  safe alongside Hibernate-created tables. The included files resolve on the classpath, so the owning module
+  jars (jdbc-process-starter, process-outbox, process-service) must be on the runtime classpath — they are
+  for process-admin-server. A library host may instead point change-log at a single module's changelog.
+-->
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <include file="db/changelog/chenile-process-work.changelog.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/chenile-process-outbox.changelog.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/chenile-process-history.changelog.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/chenile-process-reference.changelog.xml" relativeToChangelogFile="false"/>
+</databaseChangeLog>

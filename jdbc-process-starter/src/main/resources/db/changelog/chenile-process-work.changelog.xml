@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Optional Liquibase changelog for the JDBC worker queue (chenile_process_work_item).
+  Opt-in: nothing runs this unless a host adds the Liquibase dependency and points
+  spring.liquibase.change-log at this file (or at db.changelog-master.xml) and selects the
+  "chenile-process-jdbc" context. Equivalent to chenile-process-work-schema.sql.
+  Each changeset is guarded so it no-ops if the table already exists (e.g. created by Hibernate).
+-->
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="chenile-process-work-item" author="chenile-process" context="chenile-process-jdbc">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="chenile_process_work_item"/></not>
+        </preConditions>
+        <createTable tableName="chenile_process_work_item">
+            <column name="id" type="VARCHAR(128)"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="process_id" type="VARCHAR(128)"><constraints nullable="false"/></column>
+            <column name="process_type" type="VARCHAR(200)"><constraints nullable="false"/></column>
+            <column name="worker_type" type="VARCHAR(32)"><constraints nullable="false"/></column>
+            <column name="idempotency_key" type="VARCHAR(512)"><constraints nullable="false"/></column>
+            <column name="payload" type="CLOB"><constraints nullable="false"/></column>
+            <column name="status" type="VARCHAR(32)"><constraints nullable="false"/></column>
+            <column name="attempt" type="INTEGER" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="locked_by" type="VARCHAR(200)"/>
+            <column name="locked_until" type="TIMESTAMP"/>
+            <column name="created_at" type="TIMESTAMP"><constraints nullable="false"/></column>
+            <column name="updated_at" type="TIMESTAMP"><constraints nullable="false"/></column>
+            <column name="finished_at" type="TIMESTAMP"/>
+            <column name="error_message" type="VARCHAR(4000)"/>
+        </createTable>
+        <addUniqueConstraint tableName="chenile_process_work_item" columnNames="idempotency_key"
+                             constraintName="uk_chenile_process_work_idempotency"/>
+        <createIndex tableName="chenile_process_work_item" indexName="idx_chenile_process_work_backlog">
+            <column name="status"/>
+            <column name="locked_until"/>
+        </createIndex>
+        <createIndex tableName="chenile_process_work_item" indexName="idx_chenile_process_work_process">
+            <column name="process_id"/>
+            <column name="worker_type"/>
+            <column name="status"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

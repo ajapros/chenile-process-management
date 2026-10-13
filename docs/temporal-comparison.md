@@ -55,7 +55,7 @@ successor to Uber's Cadence).
 | Retries / backoff / dead-letter | Exponential backoff, max attempts, `DEAD`, compensation, `replayDead` | Per-activity retry policies |
 | Durable timers / `sleep` / in-flow cron | `visible_after` + entry-level Quartz crontabs | Native |
 | Signals / queries | Events via REST/STM + durable parent signalling | First-class signals and queries |
-| Visibility | SQL over outbox / process / trigger tables | Web UI + searchable history |
+| Visibility | Admin console + management API (dashboard, execution history, causal trace graph); SQL over the tables | Web UI + searchable per-workflow event history |
 | Scaling | `FOR UPDATE SKIP LOCKED` + database backlog (KEDA) | Task queues + workers |
 | Scope | Splitter/aggregator + process chaining | General-purpose workflows |
 
@@ -102,8 +102,12 @@ REST/STM and signals parents durably, but has no "query the running instance" be
 Temporal configures retry intervals, timeouts, and non-retryable error types per activity. Chenile applies
 one policy across commands, plus the START_WORKER compensation.
 
-Temporal ships a Web UI over full event history for live debugging. Chenile's history is the outbox,
-process, and trigger tables — queryable by SQL, but you build your own views.
+Temporal ships a Web UI over full per-workflow event history for live debugging — every step of a single
+execution, replayable. Chenile ships an administrator console and management API (a process dashboard with
+filters, trigger-execution history, process definition editing, and a causal trace graph across the
+trigger→process→successor chain), plus the underlying outbox/process/trigger/completion tables for SQL. That
+closes much of the operational-visibility gap, but it is an operations view over current state and recorded
+events rather than a replayable, step-by-step history of one workflow's code execution.
 
 ## Where Chenile is more suitable
 

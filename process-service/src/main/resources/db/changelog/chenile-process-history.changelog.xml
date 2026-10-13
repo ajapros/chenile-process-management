@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Optional Liquibase changelog for trigger execution history and process completion history, plus the
+  management query indexes on process_table. Opt-in via the "chenile-process-history" context. Equivalent
+  to chenile-process-management-history-schema.sql. Changesets no-op if the objects already exist; the
+  process_table index changeset is skipped unless process_table is present.
+-->
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="chenile-trigger-execution" author="chenile-process" context="chenile-process-history">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="chenile_trigger_execution"/></not>
+        </preConditions>
+        <createTable tableName="chenile_trigger_execution">
+            <column name="id" type="VARCHAR(255)"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="tenant" type="VARCHAR(255)"/>
+            <column name="trigger_id" type="VARCHAR(255)"><constraints nullable="false"/></column>
+            <column name="event_name" type="VARCHAR(255)"><constraints nullable="false"/></column>
+            <column name="source" type="VARCHAR(255)"/>
+            <column name="crontab_id" type="VARCHAR(255)"/>
+            <column name="trigger_time" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="started_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="finished_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="status" type="VARCHAR(255)"/>
+            <column name="error" type="CLOB"/>
+            <column name="payload" type="CLOB"/>
+        </createTable>
+        <createIndex tableName="chenile_trigger_execution" indexName="idx_trigger_execution_tenant_time">
+            <column name="tenant"/>
+            <column name="started_at"/>
+        </createIndex>
+        <createIndex tableName="chenile_trigger_execution" indexName="idx_trigger_execution_trigger">
+            <column name="tenant"/>
+            <column name="trigger_id"/>
+        </createIndex>
+        <createIndex tableName="chenile_trigger_execution" indexName="idx_trigger_execution_crontab">
+            <column name="tenant"/>
+            <column name="crontab_id"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="chenile-process-completion-event" author="chenile-process" context="chenile-process-history">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="chenile_process_completion_event"/></not>
+        </preConditions>
+        <createTable tableName="chenile_process_completion_event">
+            <column name="process_id" type="VARCHAR(255)"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="tenant" type="VARCHAR(255)"/>
+            <column name="trigger_id" type="VARCHAR(255)"/>
+            <column name="generated_at" type="VARCHAR(255)"><constraints nullable="false"/></column>
+            <column name="payload" type="CLOB"><constraints nullable="false"/></column>
+        </createTable>
+        <createIndex tableName="chenile_process_completion_event" indexName="idx_completion_event_tenant_trigger">
+            <column name="tenant"/>
+            <column name="trigger_id"/>
+        </createIndex>
+    </changeSet>
+
+    <!--
+      Management query indexes on the Hibernate-owned process_table. Only created when process_table
+      exists; column names assume Spring snake_case physical naming (adjust for a different strategy).
+    -->
+    <changeSet id="chenile-process-management-indexes" author="chenile-process" context="chenile-process-history">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="process_table"/>
+                <not><indexExists indexName="idx_process_management_tenant_created"/></not>
+            </and>
+        </preConditions>
+        <createIndex tableName="process_table" indexName="idx_process_management_tenant_created">
+            <column name="tenant"/>
+            <column name="created_time"/>
+            <column name="id"/>
+        </createIndex>
+        <createIndex tableName="process_table" indexName="idx_process_management_tenant_trigger">
+            <column name="tenant"/>
+            <column name="trigger_id"/>
+        </createIndex>
+        <createIndex tableName="process_table" indexName="idx_process_management_tenant_parent">
+            <column name="tenant"/>
+            <column name="parent_id"/>
+        </createIndex>
+        <createIndex tableName="process_table" indexName="idx_process_management_tenant_predecessor">
+            <column name="tenant"/>
+            <column name="predecessor_id"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

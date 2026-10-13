@@ -58,9 +58,17 @@ interchangeable worker launch strategies.
 
 `trigger-api` contains trigger contracts and input/result DTOs without runtime dependencies.
 `trigger-service` supplies in-JVM event dispatch, trigger idempotency and execution history.
-`crontab-trigger` owns durable Quartz crontabs and depends on `trigger-api`, not the trigger
-implementation. Its events include `ProcessCreate`, which starts a root process. The two
-implementation dependencies are optional in `process-service`; applications select them explicitly.
+`crontab-trigger` owns durable Quartz crontabs (via `chenile-scheduler`) and depends on `trigger-api`, not
+the trigger implementation. Schedules are read through a `CrontabReader` abstraction with two backends —
+database (`CrontabRepository`) and JSON (`JsonCrontabRepository`) — and validated by `CrontabValidator`.
+Its events include `ProcessCreate`, which starts a root process. The two implementation dependencies
+(`trigger-service`, `crontab-trigger`) are optional in `process-service`; applications select them
+explicitly.
+
+`process-admin-server` is a runnable Spring Boot host that bundles the process controllers, the trigger and
+crontab modules, the JDBC worker starter, the management API, and the scheduler into one deployable
+administration server. `process-ui` is a React + Vite administrator console that consumes the management API.
+Both are described under "Management API and the admin console" below.
 
 ## The domain model
 
@@ -271,7 +279,15 @@ The shipped adapter in `crontab-trigger` is a durable Quartz crontab (`chenile_c
 saving or deleting a row registers or removes its Quartz job, and enabled crontabs are rescheduled on
 application start). Each firing supplies a stable trigger id of the form
 `crontab:{id}:{quartzFireInstanceId}`, so duplicate dispatches are suppressed while each scheduled run
-remains distinct. A `ProcessCreate` crontab stores its `ProcessDto` as the event payload.
+remains distinct. A `ProcessCreate` crontab stores its `ProcessDto` as the event payload. Cron expressions
+use Quartz syntax (with seconds), not five-field Unix cron.
+
+Schedules can come from the database or from a classpath JSON resource (`JsonCrontabRepository`), both behind
+the `CrontabReader` interface; `CrontabValidator` enforces a valid cron expression, timezone, tenant format,
+and JSON headers/payload for either source. The JSON form accepts structured `headers` / `payload` objects as
+an alternative to pre-encoded `headersJson` / `eventPayloadJson` strings, and derives a stable id from
+`tenant:name` when none is given. Cron ownership assumes a single scheduler instance; distributed Quartz
+job-store coordination is out of scope.
 
 ### Trigger execution history (`TriggerObserver`)
 
@@ -302,10 +318,147 @@ carried on completion events so chained processes and subscribers run under the 
 
 When a process reaches a terminal state it emits a transport-neutral `ProcessCompletedEvent` carrying
 `processId`, `processType`, `tenantId`, `triggerId`, `state`, `input`, `output`, and a `successful` flag.
-A process definition declares a predecessor relationship (`predecessorProcessType`, `predecessorArgs`), and
-on completion the matching successors are created as new processes — the mechanism for composing one
-process after another. Under durable execution this chaining is part of the completion command's
-transaction, while delivery to arbitrary application subscribers is best-effort after commit.
+A process definition declares a predecessor relationship (`predecessorProcessType`, `predecessorArgs` —
+`INPUT` / `OUTPUT` / `BOTH`), and on completion the matching successors are created as new processes — the
+mechanism for composing one process after another. Predecessor cycles are rejected. Under durable execution
+this chaining is part of the completion command's transaction, while delivery to arbitrary application
+subscribers is best-effort after commit.
+
+The completion command also records each `ProcessCompletedEvent` into `chenile_process_completion_event`
+before dispatch, so there is a durable, queryable history of terminal events (and the causal edges to
+chained successors). Under durable execution this record participates in the process transaction and rolls
+back with it; it is also written when the outbox is disabled. Recording a completion event does not by
+itself prove delivery to every subscriber.
+
+## Management API and the admin console
+
+`process-service` exposes an optional administration API at `/process-management/api`
+(`ProcessManagementController`, gated by `chenile.process.management.enabled=true`). It returns plain JSON
+DTOs (not the Chenile `GenericResponse` envelope) and covers: `GET /info`; paginated `GET /processes` (with
+`processType` / `status` / `triggerId` / `parentId` / `predecessorId` filters) and `GET /processes/{id}`;
+`GET /executions` (trigger history); `GET`/`POST`/`PUT` `/crontabs`; `POST /triggers` (manual `ProcessCreate`
+through the normal trigger ingress, with optional idempotency key); `GET`/`POST`/`PUT` `/definitions` plus
+`POST /definitions/refresh` (clear this instance's database-configurator cache); and
+`GET /trace?processId=…|triggerId=…`, which returns the tenant-scoped causal execution graph
+(`PROCESS_CREATE` / `SUBPROCESS` / `EMITS` / `SUCCESSOR` edges, built from stored `triggerId` / `parentId` /
+`predecessorId`, refusing graphs above 1000 nodes with HTTP 413).
+
+Access control is a deliberately separate, opt-in administrator surface. `ManagementApiFilter` requires an
+`X-Process-Management-Key` header (compared with a constant-time check against a configured key of at least
+32 characters) and an `x-chenile-tenant-id` header matching `[A-Za-z0-9_.-]{1,128}`; it scopes and restores
+the thread-local tenant context around each call. The key grants administration across **all** tenants — the
+tenant header selects the view, it is not an authorization claim — and with
+`chenile.process.management.protect-all-http-routes=true` the filter guards every route (`/*`), not just the
+management API, so there is no unauthenticated process ingress. Definitions are global; execution and process
+queries are tenant-scoped with parameterized JPA criteria.
+
+`process-admin-server` packages all of this as a runnable host. It fails fast at startup unless the
+management API is enabled, a ≥32-character key is set, all routes are protected, and (outside the `dev`
+profile) a PostgreSQL datasource is configured; an `ApplicationRunner` also verifies the required delivery
+tables exist (`ddl-auto=validate`, `sql.init.mode=never` — operators apply the schema). It defaults to the
+database configurator, the outbox enabled, and the JDBC worker starter with `run-worker=false` (business
+workers remain application-provided), and binds to `127.0.0.1` with external-API logging and Swagger off. The
+history/management schema is `process-service/src/main/resources/chenile-process-management-history-schema.sql`
+(additive, re-runnable). The `process-ui` console (React + Vite) talks only to `/process-management/api`,
+holds the key in memory (never in a Vite env file or bundle), and should sit behind a same-origin HTTPS
+reverse proxy. Full setup, security, and the complete API contract are in
+[process-management-ui.md](process-management-ui.md).
+
+## Data model (tables)
+
+The schema divides into infrastructure tables that the framework ships as explicit SQL (and as optional
+Liquibase changelogs — see "Schema management" below) and entity tables that Hibernate maps from JPA
+classes. PostgreSQL is the reference database. Entity tables also carry the columns of their Chenile base
+class (`AbstractJpaStateEntity` / `BaseJpaEntity`): an `id` primary key, `tenant`, created/modified
+timestamps, an optimistic-lock `version`, and — for `AbstractJpaStateEntity` — the current STM state; those
+inherited column names follow the host's Hibernate physical-naming strategy (Spring's snake_case here).
+
+### Core orchestration state
+
+`process_table` (entity `Process`) — one row per process in the tree. Beyond the inherited base columns:
+`leaf` (boolean), `process_type`, `trigger_id`, `split_completed` (boolean), `completed_percent` (int),
+`parent_id`, `predecessor_id`, `description`, `num_sub_processes` / `num_completed_sub_processes` (int),
+`input` (TEXT), `output` (TEXT). `subProcesses` and `skipPostWorkerCreation` are transient. The management
+history migration adds indexes on `(tenant, created_time, id)`, `(tenant, trigger_id)`, `(tenant, parent_id)`
+and `(tenant, predecessor_id)`.
+
+`subprocess_error` (entity `SubProcessError`) — rows of a process's `errors` collection: `process_id`,
+`time_of_completion`, `exception_message` (TEXT), `stack_trace` (TEXT), plus base columns. Its
+`@ElementCollection` of validation strings is stored in `subprocess_error_validation_errors`
+(`subprocess_error_id`, `error` TEXT), and the `@OneToMany` from `process_table` is linked by a
+Hibernate-generated join table (default `process_table_errors`).
+
+`process_definition` (entity `ProcessDefinition`, used by the database configurator) — `process_type`
+(varchar PK) and `definition` (TEXT, the JSON of a `ProcessDef`, preserving its extensible `config` map).
+
+### Delivery and durability (explicit SQL)
+
+`chenile_process_work_item` — the JDBC worker queue: `id` (PK), `process_id`, `process_type`, `worker_type`,
+`idempotency_key` (unique), `payload` (TEXT, serialized `WorkerDto`), `status`
+(PENDING/RUNNING/SUCCESS/DEAD), `attempt` (int), `locked_by`, `locked_until`, `created_at`, `updated_at`,
+`finished_at`, `error_message`. Indexes: `(status, locked_until)`, `(process_id, worker_type, status)`.
+
+`chenile_process_outbox` — the transactional outbox: `id` (PK), `process_id`, `command_type` (registry
+discriminator), `payload` (TEXT, command-owned JSON), `idempotency_key` (unique), `status`
+(PENDING/RUNNING/DONE/DEAD), `attempt` (int), `visible_after` (timestamp — durable timer + backoff),
+`locked_by`, `claim_token`, `tenant_id`, `locked_until`, `created_at`, `updated_at`, `finished_at`,
+`error_message`. Indexes: `(status, visible_after, locked_until)`, `(process_id)`.
+
+`chenile_process_receipt` — consumer-effect idempotency, composite PK `(consumer, receipt_key)` plus
+`received_at`; a receipt commits with the effect and acknowledgement so redelivery is a no-op.
+
+### Triggering
+
+`trigger_log` (entity `TriggerLog`, idempotency only) — `id` (PK), `trigger_id`, `event_name`,
+`trigger_time`, `status` (RECEIVED/COMPLETED/FAILED), with a unique constraint on
+`(trigger_id, event_name)`.
+
+`chenile_trigger_execution` (explicit SQL, execution history) — `id` (PK), `tenant`, `trigger_id`,
+`event_name`, `source` (CRON/external), `crontab_id`, `trigger_time`, `started_at`, `finished_at`, `status`
+(RUNNING/COMPLETED/FAILED), `error` (TEXT), `payload` (TEXT). Indexes on `(tenant, started_at)`,
+`(tenant, trigger_id)`, `(tenant, crontab_id)`.
+
+`chenile_crontab` (entity `Crontab`, durable schedules) — `name` (unique), `enabled` (boolean, indexed),
+`cron_expression`, `timezone`, `event_name`, `headers_json` (TEXT), `event_payload_json` (TEXT), plus base
+columns. (JSON-file schedules via `JsonCrontabRepository` use the same shape without a table.)
+
+### Completion history (explicit SQL)
+
+`chenile_process_completion_event` — `process_id` (PK), `tenant`, `trigger_id`, `generated_at`, `payload`
+(TEXT, the full `ProcessCompletedEvent` JSON). Index on `(tenant, trigger_id)`. Written by the
+`EMIT_COMPLETED` command before dispatch; under durable execution it commits inside the process transaction.
+
+Three log-like tables are deliberately distinct and must not be merged: `trigger_log` (idempotency claim),
+`chenile_trigger_execution` (trigger history), and `chenile_process_completion_event` (completion history).
+
+### Schema management (explicit SQL or optional Liquibase)
+
+Each owning module ships raw-SQL scripts you can apply with any tool:
+`jdbc-process-starter/.../chenile-process-work-schema.sql`,
+`process-outbox/.../chenile-process-outbox-schema.sql` (plus `...-json-migration.sql` for the one-time
+upgrade of an older outbox layout), and
+`process-service/.../chenile-process-management-history-schema.sql`.
+
+The same infrastructure and the base-less reference entities are also provided as **opt-in Liquibase
+changelogs** under each module's `src/main/resources/db/changelog/`, with
+`process-admin-server/.../db/changelog/db.changelog-master.xml` including them all. Nothing runs Liquibase by
+default — it is wired on only if you add the Liquibase dependency and point `spring.liquibase.change-log` at
+the master (or a single module's changelog). Each changeset is tagged with a **context** so you choose which
+to apply, and guarded by a `not tableExists` precondition (`onFail=MARK_RAN`) so it is safe alongside tables
+Hibernate may already have created:
+
+| Context | Tables |
+|---|---|
+| `chenile-process-jdbc` | `chenile_process_work_item` |
+| `chenile-process-outbox` | `chenile_process_outbox`, `chenile_process_receipt` |
+| `chenile-process-history` | `chenile_trigger_execution`, `chenile_process_completion_event`, the management indexes on `process_table` |
+| `chenile-process-reference` | `trigger_log`, `process_definition` |
+
+Example: `spring.liquibase.contexts=chenile-process-outbox,chenile-process-history`. The STM/base-entity
+tables (`process_table`, `subprocess_error`, `chenile_crontab`) are intentionally left to Hibernate or to a
+`liquibase diff` you generate against your own Chenile version, because their inherited base-class and STM
+columns are framework-owned and version-specific; hand-authored DDL for them would risk diverging from
+`ddl-auto=validate`.
 
 ## Configuration reference
 
@@ -318,6 +471,10 @@ transaction, while delivery to arbitrary application subscribers is best-effort 
 | `chenile.process.outbox.lock-seconds` | `300` | outbox command lease duration |
 | `chenile.process.outbox.max-attempts` | `5` | retries before a command is `DEAD` |
 | `chenile.process.outbox.worker-id` | hostname | claimant identity for leases |
+| `chenile.process.management.enabled` | `false` | expose the `/process-management/api` administration API |
+| `chenile.process.management.api-key` | — | administrator key (≥32 chars) for `X-Process-Management-Key` |
+| `chenile.process.management.protect-all-http-routes` | `false` | apply the management filter to every route, not just the API |
+| `chenile.process.worker.jdbc.run-worker` | `false` | run the JDBC worker runner on this instance |
 
 ## Testing
 
