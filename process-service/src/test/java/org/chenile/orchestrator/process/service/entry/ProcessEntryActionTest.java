@@ -1,5 +1,6 @@
 package org.chenile.orchestrator.process.service.entry;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chenile.core.context.HeaderUtils;
 import org.chenile.core.event.EventProcessor;
 import org.chenile.orchestrator.process.model.Constants;
@@ -64,11 +65,11 @@ class ProcessEntryActionTest {
         ProcessEntryAction action = new ProcessEntryAction(store, mock(STMActionsInfoProvider.class));
         EventProcessor processor = mock(EventProcessor.class);
         ObjectProvider<ProcessManager> managers = mock(ObjectProvider.class);
-        ProcessCommandSupport support = new ProcessCommandSupport(null, managers, mock(ProcessRepository.class),
-                processor, mock(PlatformTransactionManager.class));
+        var mapper = new ObjectMapper();
+        var transactions = mock(PlatformTransactionManager.class);
         var commands = new OutboxCommandRegistry<ProcessTransition>(List.of(
-                new CreateSubProcessCommand(support), new SignalParentCommand(support),
-                new EmitCompletedCommand(support), new StartWorkerCommand(support, mock(IProcessConfigurator.class), mock(ObjectProvider.class))));
+                new CreateSubProcessCommand(null, managers, mapper, transactions, mock(ProcessRepository.class)), new SignalParentCommand(null, managers, mapper, transactions),
+                new EmitCompletedCommand(null, managers, mapper, transactions, null, processor), new StartWorkerCommand(null, managers, mapper, transactions, mock(IProcessConfigurator.class), mock(ObjectProvider.class))));
         ReflectionTestUtils.setField(action, "commands", commands);
         Process process = new Process("feed", false);
         process.setId("process-1");

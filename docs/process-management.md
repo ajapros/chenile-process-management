@@ -228,7 +228,7 @@ drains and executes them. State change and its scheduled consequences therefore 
 all.
 
 The entry action uses the same registered commands whether durability is enabled or not: it saves the
-process and passes a `ProcessTransition` directly to `OutboxCommandRegistry`. `ProcessCommandSupport` either persists the command as JSON for
+process and passes a `ProcessTransition` directly to `OutboxCommandRegistry`. `AbstractProcessOutboxCommand` either persists the command as JSON for
 durable dispatch or, when durability is disabled, invokes it immediately with a live typed body — inline
 mode needs no outbox schema or receipts and preserves synchronous cascades. Parent notification is a
 `SignalParentCommand`, and worker planning and launch use a prepare/dispatch split.

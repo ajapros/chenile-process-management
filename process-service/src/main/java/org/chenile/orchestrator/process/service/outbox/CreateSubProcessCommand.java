@@ -1,13 +1,26 @@
 package org.chenile.orchestrator.process.service.outbox;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.chenile.orchestrator.process.api.ProcessManager;
+import org.chenile.orchestrator.process.outbox.ProcessOutboxRepository;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.transaction.PlatformTransactionManager;
+
 import org.chenile.orchestrator.process.model.Constants;
 import org.chenile.orchestrator.process.model.Process;
 import org.chenile.orchestrator.process.outbox.OutboxCommand;
 import java.util.UUID;
 
+import org.chenile.orchestrator.process.configuration.dao.ProcessRepository;
+
 public class CreateSubProcessCommand extends AbstractProcessOutboxCommand {
     public static final String TYPE = "CREATE_SUBPROCESS";
-    public CreateSubProcessCommand(ProcessCommandSupport support) { super(support); }
+    private final ProcessRepository processes;
+    public CreateSubProcessCommand(ProcessOutboxRepository outbox, ObjectProvider<ProcessManager> managers,
+            ObjectMapper mapper, PlatformTransactionManager transactionManager, ProcessRepository processes) {
+        super(outbox, managers, mapper, transactionManager);
+        this.processes = processes;
+    }
     @Override public String type() { return TYPE; }
 
     @Override public void enqueue(ProcessTransition transition) throws Exception {
@@ -22,7 +35,7 @@ public class CreateSubProcessCommand extends AbstractProcessOutboxCommand {
 
     @Override protected void dispatchCommand(OutboxCommand entry) throws Exception {
         Process child = read(entry, Process.class);
-        if (!support.receive("CREATE", entry.idempotencyKey)) return;
-        if (!support.durable() || !support.processes.existsById(child.getId())) support.managers.getObject().create(child);
+        if (!receive("CREATE", entry.idempotencyKey)) return;
+        if (!durable() || !processes.existsById(child.getId())) managers.getObject().create(child);
     }
 }

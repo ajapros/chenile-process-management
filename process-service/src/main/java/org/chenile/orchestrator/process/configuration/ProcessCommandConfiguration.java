@@ -1,5 +1,6 @@
 package org.chenile.orchestrator.process.configuration;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chenile.core.event.EventProcessor;
 import org.chenile.orchestrator.process.api.ProcessManager;
 import org.chenile.orchestrator.process.configuration.dao.ProcessRepository;
@@ -17,21 +18,30 @@ import java.util.List;
 /** Commands are always available; only their delivery transport is optional. */
 @Configuration
 public class ProcessCommandConfiguration {
-    @Bean ProcessCommandSupport processCommandSupport(ObjectProvider<ProcessOutboxRepository> repositories,
-            ObjectProvider<ProcessManager> managers, ProcessRepository processes,
-            EventProcessor events, PlatformTransactionManager transactionManager) {
-        return new ProcessCommandSupport(repositories.getIfAvailable(), managers, processes, events, transactionManager);
-    }
+    // Retain the shared, command-specific JSON configuration without adding an application mapper bean.
+    private final ObjectMapper mapper = new ObjectMapper();
 
-    @Bean @Order(0) CreateSubProcessCommand createSubProcessCommand(ProcessCommandSupport support) { return new CreateSubProcessCommand(support); }
-    @Bean @Order(1) SignalParentCommand signalParentCommand(ProcessCommandSupport support) { return new SignalParentCommand(support); }
-    @Bean @Order(2) EmitCompletedCommand emitCompletedCommand(ProcessCommandSupport support,
-            org.chenile.orchestrator.process.configuration.dao.CompletionEventRepository history) {
-        return new EmitCompletedCommand(support, history);
+    @Bean @Order(0) CreateSubProcessCommand createSubProcessCommand(
+            ObjectProvider<ProcessOutboxRepository> repositories, ObjectProvider<ProcessManager> managers,
+            PlatformTransactionManager transactionManager, ProcessRepository processes) {
+        return new CreateSubProcessCommand(repositories.getIfAvailable(), managers, mapper, transactionManager, processes);
     }
-    @Bean @Order(3) StartWorkerCommand startWorkerCommand(ProcessCommandSupport support,
-            IProcessConfigurator configurator, ObjectProvider<WorkerStarter> starters) {
-        return new StartWorkerCommand(support, configurator, starters);
+    @Bean @Order(1) SignalParentCommand signalParentCommand(
+            ObjectProvider<ProcessOutboxRepository> repositories, ObjectProvider<ProcessManager> managers,
+            PlatformTransactionManager transactionManager) {
+        return new SignalParentCommand(repositories.getIfAvailable(), managers, mapper, transactionManager);
+    }
+    @Bean @Order(2) EmitCompletedCommand emitCompletedCommand(
+            ObjectProvider<ProcessOutboxRepository> repositories, ObjectProvider<ProcessManager> managers,
+            PlatformTransactionManager transactionManager,
+            org.chenile.orchestrator.process.configuration.dao.CompletionEventRepository history, EventProcessor events) {
+        return new EmitCompletedCommand(repositories.getIfAvailable(), managers, mapper, transactionManager, history, events);
+    }
+    @Bean @Order(3) StartWorkerCommand startWorkerCommand(
+            ObjectProvider<ProcessOutboxRepository> repositories, ObjectProvider<ProcessManager> managers,
+            PlatformTransactionManager transactionManager, IProcessConfigurator configurator,
+            ObjectProvider<WorkerStarter> starters) {
+        return new StartWorkerCommand(repositories.getIfAvailable(), managers, mapper, transactionManager, configurator, starters);
     }
 
     @Bean OutboxCommandRegistry<ProcessTransition> processOutboxCommands(List<OutboxCommandLifecycle<ProcessTransition>> commands) {

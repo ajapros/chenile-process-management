@@ -1,5 +1,6 @@
 package org.chenile.orchestrator.process.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import org.chenile.core.context.ContextContainer;
 import org.chenile.orchestrator.process.outbox.OutboxCommand;
@@ -17,13 +18,12 @@ class ProcessCommandTenantTest {
         var context=ContextContainer.getInstance(); var snapshot=context.snapshot();
         boolean active=TransactionSynchronizationManager.isActualTransactionActive();
         var manager=mock(EntityManager.class);
-        var support=new ProcessCommandSupport(null,null,null,null,mock(PlatformTransactionManager.class));
-        ReflectionTestUtils.setField(support,"entityManager",manager);
-        var command=new AbstractProcessOutboxCommand(support) {
+        var command=new AbstractProcessOutboxCommand(null, null, new ObjectMapper(), mock(PlatformTransactionManager.class)) {
             @Override public String type() { return "TEST"; }
             @Override public void enqueue(ProcessTransition transition) { }
             @Override protected void dispatchCommand(OutboxCommand entry) { assertEquals("worker-tenant",context.getTenant()); }
         };
+        ReflectionTestUtils.setField(command,"entityManager",manager);
         doAnswer(call -> { assertEquals("worker-tenant",context.getTenant()); return null; }).when(manager).flush();
         try {
             context.setTenant("caller-tenant"); TransactionSynchronizationManager.setActualTransactionActive(true);
@@ -35,13 +35,12 @@ class ProcessCommandTenantTest {
     @Test void failedCommandRestoresTenantWithoutFlushingPartialWork() {
         var context=ContextContainer.getInstance(); var snapshot=context.snapshot();
         var manager=mock(EntityManager.class);
-        var support=new ProcessCommandSupport(null,null,null,null,mock(PlatformTransactionManager.class));
-        ReflectionTestUtils.setField(support,"entityManager",manager);
-        var command=new AbstractProcessOutboxCommand(support) {
+        var command=new AbstractProcessOutboxCommand(null, null, new ObjectMapper(), mock(PlatformTransactionManager.class)) {
             @Override public String type() { return "TEST"; }
             @Override public void enqueue(ProcessTransition transition) { }
             @Override protected void dispatchCommand(OutboxCommand entry) { throw new IllegalStateException("fail"); }
         };
+        ReflectionTestUtils.setField(command,"entityManager",manager);
         try {
             context.setTenant("caller-tenant");
             var entry=OutboxCommand.create("process","TEST","key",null); entry.tenantId="worker-tenant";

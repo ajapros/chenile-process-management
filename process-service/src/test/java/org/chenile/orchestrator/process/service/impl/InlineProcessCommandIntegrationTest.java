@@ -33,7 +33,6 @@ class InlineProcessCommandIntegrationTest {
     @Autowired ProcessConfigurator configurator;
     @Autowired ProcessRepository processes;
     @MockitoBean WorkerStarter workers;
-    @Autowired ProcessCommandSupport support;
     @Autowired OutboxCommandRegistry<ProcessTransition> commands;
     @Autowired ApplicationContext application;
     @Autowired JdbcTemplate jdbc;
@@ -58,14 +57,12 @@ class InlineProcessCommandIntegrationTest {
             assertFalse(processes.findById(process.getId()).orElseThrow().errors.isEmpty());
             for (String type : List.of(CreateSubProcessCommand.TYPE, SignalParentCommand.TYPE, EmitCompletedCommand.TYPE))
                 assertDoesNotThrow(() -> commands.resolve(type).onDead(entry));
-            assertFalse(support.durable());
         } finally {
             configurator.processes = original;
         }
     }
 
     @Test void allFourCommandsRunSynchronouslyWithoutAnOutboxRepositoryOrSchema() throws Exception {
-        assertFalse(support.durable());
         assertEquals(0, application.getBeanNamesForType(ProcessOutboxRepository.class).length);
         assertEquals(0, application.getBeanNamesForType(OutboxDispatcher.class).length);
         for (String type : List.of(CreateSubProcessCommand.TYPE, SignalParentCommand.TYPE,

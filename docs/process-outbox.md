@@ -49,11 +49,13 @@ retry and eventually become DEAD rather than being silently acknowledged.
 Add a Spring bean implementing `OutboxCommandLifecycle<ProcessTransition>` (or subclass
 `AbstractProcessOutboxCommand`) to register another process command automatically. Its enqueue
 method decides whether the transition needs that effect. Use the abstract base's `store(...)` helper
-or `ProcessCommandSupport.enqueue(...)` to choose durable persistence or immediate execution centrally;
+to choose durable persistence or immediate execution centrally;
 use `read(...)` for the typed body and `receive(...)` for mode-aware receipts. Do not bypass this
 support by writing directly to the repository if the command must also work in inline mode.
-The abstract base provides delivery and tenant restoration; each implementation provides its dispatch
-and optional dead behavior.
+The abstract base provides delivery, JSON reading, receipts, tenant restoration, and independent
+transaction support; each implementation provides its dispatch and optional dead behavior.
+`ProcessCommandSupport` has been removed. Custom subclasses pass their shared dependencies to the base
+constructor; direct lifecycle implementations must provide their own delivery support.
 No new database columns are needed.
 
 The four commands and registry are wired in both modes. With the outbox disabled (the default),

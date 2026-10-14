@@ -35,8 +35,8 @@ class StartWorkerCommandTest {
     }
 
     private StartWorkerCommand command(ProcessOutboxRepository outbox) {
-        var support = new ProcessCommandSupport(outbox, null, null, null, mock(PlatformTransactionManager.class));
-        return new StartWorkerCommand(support, configurator, beans.getBeanProvider(WorkerStarter.class));
+        return new StartWorkerCommand(outbox, null, new ObjectMapper(), mock(PlatformTransactionManager.class),
+                configurator, beans.getBeanProvider(WorkerStarter.class));
     }
 
     private ProcessDef definition(Map<String, String> config) {
