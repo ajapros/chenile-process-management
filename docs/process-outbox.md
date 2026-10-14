@@ -41,7 +41,7 @@ transaction that created work. Durable create returns before its workers, childr
 `dispatch(entry)`, and `onDead(entry)`, plus a stable `type()` discriminator.
 `CreateSubProcessCommand`, `SignalParentCommand`, `EmitCompletedCommand`, and
 `StartWorkerCommand` each own their JSON schema, idempotency identity, and behavior.
-`ProcessEntryAction` always delegates to `ProcessEffects`, which passes a `ProcessTransition` to the registry; the dispatcher
+`ProcessEntryAction` passes a `ProcessTransition` directly to `OutboxCommandRegistry`; the dispatcher
 resolves the entry's type and calls the same command's dispatch/dead method. There is no central enum
 or switch to extend. Duplicate type registration fails at startup; unregistered persisted types
 retry and eventually become DEAD rather than being silently acknowledged.

@@ -1,19 +1,33 @@
 package org.chenile.orchestrator.process.service.outbox;
 
 import org.chenile.orchestrator.process.model.Constants;
+import org.chenile.orchestrator.process.WorkerStarter;
+import org.chenile.orchestrator.process.config.reader.IProcessConfigurator;
+import org.chenile.orchestrator.process.model.Process;
 import org.chenile.orchestrator.process.model.WorkerDto;
+import org.chenile.orchestrator.process.model.WorkerType;
 import org.chenile.orchestrator.process.model.payload.DoneWithErrorsPayload;
 import org.chenile.orchestrator.process.outbox.OutboxCommand;
+import org.springframework.beans.factory.ObjectProvider;
+import java.util.HashMap;
 
 public class StartWorkerCommand extends AbstractProcessOutboxCommand {
     private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(StartWorkerCommand.class);
     public static final String TYPE = "START_WORKER";
-    public StartWorkerCommand(ProcessCommandSupport support) { super(support); }
+    private final IProcessConfigurator configurator;
+    private final ObjectProvider<WorkerStarter> starters;
+
+    public StartWorkerCommand(ProcessCommandSupport support, IProcessConfigurator configurator,
+                              ObjectProvider<WorkerStarter> starters) {
+        super(support);
+        this.configurator = configurator;
+        this.starters = starters;
+    }
     @Override public String type() { return TYPE; }
 
     @Override public void enqueue(ProcessTransition transition) throws Exception {
-        if (!support.durable() && !support.workers.hasWorkerStarter()) return;
-        WorkerDto worker = support.workers.prepare(transition.process());
+        if (!support.durable() && starters.getIfAvailable() == null) return;
+        WorkerDto worker = prepare(transition.process());
         if (worker == null) return;
         worker.dispatchId = transition.process().getId() + ":" + worker.workerType;
         store(transition.process(), worker.dispatchId, worker);
@@ -21,7 +35,32 @@ public class StartWorkerCommand extends AbstractProcessOutboxCommand {
 
     @Override protected void dispatchCommand(OutboxCommand entry) throws Exception {
         WorkerDto worker = read(entry, WorkerDto.class);
-        if (support.receive("WORKER", entry.idempotencyKey)) support.workers.dispatch(worker);
+        if (support.receive("WORKER", entry.idempotencyKey)) {
+            WorkerStarter starter = starters.getIfAvailable();
+            if (starter == null) throw new IllegalStateException("No WorkerStarter configured for durable dispatch");
+            starter.start(worker);
+        }
+    }
+
+    /** Snapshot the work definition before durable delivery; inline execution retains the live process. */
+    private WorkerDto prepare(Process process) {
+        if (process.skipPostWorkerCreation) return null;
+        var definition = configurator.findByName(process.processType);
+        if (definition == null) return null;
+        WorkerType type = switch (process.getCurrentState().getStateId()) {
+            case Constants.States.SPLIT_PENDING -> WorkerType.SPLITTER;
+            case Constants.States.EXECUTING -> WorkerType.EXECUTOR;
+            case Constants.States.AGGREGATION_PENDING -> WorkerType.AGGREGATOR;
+            default -> null;
+        };
+        if (type == null) return null;
+        LOG.info("State = {}. Starting worker type = {}", process.getCurrentState().getStateId(), type);
+        WorkerDto worker = new WorkerDto();
+        worker.process = process;
+        worker.workerType = type;
+        worker.execDef = new HashMap<>();
+        if (definition.config != null) worker.execDef.putAll(definition.config);
+        return worker;
     }
 
     @Override protected void deadCommand(OutboxCommand entry) throws Exception {

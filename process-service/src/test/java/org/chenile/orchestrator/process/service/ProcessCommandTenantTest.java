@@ -17,7 +17,7 @@ class ProcessCommandTenantTest {
         var context=ContextContainer.getInstance(); var snapshot=context.snapshot();
         boolean active=TransactionSynchronizationManager.isActualTransactionActive();
         var manager=mock(EntityManager.class);
-        var support=new ProcessCommandSupport(null,null,null,null,null,mock(PlatformTransactionManager.class));
+        var support=new ProcessCommandSupport(null,null,null,null,mock(PlatformTransactionManager.class));
         ReflectionTestUtils.setField(support,"entityManager",manager);
         var command=new AbstractProcessOutboxCommand(support) {
             @Override public String type() { return "TEST"; }
@@ -35,7 +35,7 @@ class ProcessCommandTenantTest {
     @Test void failedCommandRestoresTenantWithoutFlushingPartialWork() {
         var context=ContextContainer.getInstance(); var snapshot=context.snapshot();
         var manager=mock(EntityManager.class);
-        var support=new ProcessCommandSupport(null,null,null,null,null,mock(PlatformTransactionManager.class));
+        var support=new ProcessCommandSupport(null,null,null,null,mock(PlatformTransactionManager.class));
         ReflectionTestUtils.setField(support,"entityManager",manager);
         var command=new AbstractProcessOutboxCommand(support) {
             @Override public String type() { return "TEST"; }

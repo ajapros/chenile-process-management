@@ -6,7 +6,8 @@ import org.chenile.orchestrator.process.model.Constants;
 import org.chenile.orchestrator.process.model.Process;
 import org.chenile.orchestrator.process.model.ProcessCompletedEvent;
 import org.chenile.orchestrator.process.model.ProcessDto;
-import org.chenile.orchestrator.process.service.defs.PostSaveHook;
+import org.chenile.orchestrator.process.WorkerStarter;
+import org.chenile.orchestrator.process.config.reader.IProcessConfigurator;
 import org.chenile.orchestrator.process.service.outbox.*;
 import org.chenile.orchestrator.process.outbox.OutboxCommandRegistry;
 import org.chenile.orchestrator.process.api.ProcessManager;
@@ -29,6 +30,24 @@ import static org.mockito.Mockito.*;
 
 class ProcessEntryActionTest {
     @Test
+    @SuppressWarnings("unchecked")
+    void savesProcessBeforeEnqueuingItsTransition() throws Exception {
+        EntityStore<Process> store = mock(EntityStore.class);
+        OutboxCommandRegistry<ProcessTransition> commands = mock(OutboxCommandRegistry.class);
+        ProcessEntryAction action = new ProcessEntryAction(store, mock(STMActionsInfoProvider.class));
+        ReflectionTestUtils.setField(action, "commands", commands);
+        Process process = new Process("feed", false);
+        State destination = new State(Constants.States.EXECUTING, "process");
+        process.setCurrentState(destination);
+
+        action.execute(null, destination, process);
+
+        var order = inOrder(store, commands);
+        order.verify(store).store(process);
+        order.verify(commands).enqueue(new ProcessTransition(process, destination));
+    }
+
+    @Test
     void completionSubscribersReceiveTheProcessTenantAndTrigger() throws Exception {
         assertCompletion(Constants.States.PROCESSED, "tenant-1", true);
         assertCompletion(Constants.States.PROCESSED_WITH_ERRORS, "tenant-2", false);
@@ -46,11 +65,11 @@ class ProcessEntryActionTest {
         EventProcessor processor = mock(EventProcessor.class);
         ObjectProvider<ProcessManager> managers = mock(ObjectProvider.class);
         ProcessCommandSupport support = new ProcessCommandSupport(null, managers, mock(ProcessRepository.class),
-                mock(PostSaveHook.class), processor, mock(PlatformTransactionManager.class));
+                processor, mock(PlatformTransactionManager.class));
         var commands = new OutboxCommandRegistry<ProcessTransition>(List.of(
                 new CreateSubProcessCommand(support), new SignalParentCommand(support),
-                new EmitCompletedCommand(support), new StartWorkerCommand(support)));
-        ReflectionTestUtils.setField(action, "effects", new ProcessEffects(commands));
+                new EmitCompletedCommand(support), new StartWorkerCommand(support, mock(IProcessConfigurator.class), mock(ObjectProvider.class))));
+        ReflectionTestUtils.setField(action, "commands", commands);
         Process process = new Process("feed", false);
         process.setId("process-1");
         process.tenant = tenant;

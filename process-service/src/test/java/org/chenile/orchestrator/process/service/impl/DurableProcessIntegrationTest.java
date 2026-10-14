@@ -13,7 +13,10 @@ import org.chenile.orchestrator.process.model.payload.SubProcessPayload;
 import org.chenile.orchestrator.process.model.payload.DoneWithErrorsPayload;
 import org.chenile.orchestrator.process.outbox.*;
 import org.chenile.orchestrator.process.service.outbox.*;
-import org.chenile.orchestrator.process.service.defs.PostSaveHook;
+import org.chenile.orchestrator.process.WorkerStarter;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.any;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,7 +46,7 @@ class DurableProcessIntegrationTest {
     @Autowired ProcessOutboxRepository outbox;
     @Autowired OutboxDispatcher dispatcher;
     @Autowired OutboxCommandRegistry<ProcessTransition> commands;
-    @Autowired PostSaveHook workers;
+    @MockitoBean WorkerStarter workers;
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager transactionManager;
     final List<String> dispatches = new CopyOnWriteArrayList<>();
@@ -55,7 +58,7 @@ class DurableProcessIntegrationTest {
             jdbc.update("delete from chenile_process_receipt");
         });
         dispatches.clear();
-        workers.setWorkerStarter(worker -> dispatches.add(worker.dispatchId));
+        doAnswer(call -> { dispatches.add(((org.chenile.orchestrator.process.model.WorkerDto) call.getArgument(0)).dispatchId); return null; }).when(workers).start(any());
         configurator.read(new ByteArrayInputStream("""
             {"processMap":{"parent":{"leaf":false},"child":{"leaf":true},"source":{"leaf":true},"successor":{"leaf":true,
              "predecessorProcessType":"source","predecessorArgs":"OUTPUT"}}}
@@ -89,7 +92,7 @@ class DurableProcessIntegrationTest {
     }
 
     @Test void deadWorkerUsesItsJsonPayloadToCompensateTheProcess() {
-        workers.setWorkerStarter(worker -> { throw new IllegalStateException("dispatch unavailable"); });
+        doThrow(new IllegalStateException("dispatch unavailable")).when(workers).start(any());
         String id = create();
         OutboxRetryPolicy policy = OutboxRetryPolicy.defaults(); policy.maxAttempts = 1;
         var failingDispatcher = new OutboxDispatcher(outbox, commands, policy, "dead-worker-test", 300);
@@ -98,7 +101,7 @@ class DurableProcessIntegrationTest {
         assertEquals(Constants.States.PROCESSED_WITH_ERRORS, process.getCurrentState().getStateId());
         assertFalse(process.errors.isEmpty());
         assertEquals(1L, outbox.deadCount());
-        workers.setWorkerStarter(worker -> dispatches.add(worker.dispatchId));
+        doAnswer(call -> { dispatches.add(((org.chenile.orchestrator.process.model.WorkerDto) call.getArgument(0)).dispatchId); return null; }).when(workers).start(any());
         dispatcher.drainAll(20);
         assertEquals(1, processes.findByPredecessorId(id).size());
         assertEquals(0L, outbox.backlogCount());

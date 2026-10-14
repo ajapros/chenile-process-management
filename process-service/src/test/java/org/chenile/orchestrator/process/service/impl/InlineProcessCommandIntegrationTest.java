@@ -7,7 +7,10 @@ import org.chenile.orchestrator.process.configuration.dao.ProcessRepository;
 import org.chenile.orchestrator.process.model.*;
 import org.chenile.orchestrator.process.model.payload.*;
 import org.chenile.orchestrator.process.outbox.*;
-import org.chenile.orchestrator.process.service.defs.PostSaveHook;
+import org.chenile.orchestrator.process.WorkerStarter;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.any;
 import org.chenile.orchestrator.process.service.outbox.*;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,7 +32,7 @@ class InlineProcessCommandIntegrationTest {
     @Autowired ProcessManager manager;
     @Autowired ProcessConfigurator configurator;
     @Autowired ProcessRepository processes;
-    @Autowired PostSaveHook workers;
+    @MockitoBean WorkerStarter workers;
     @Autowired ProcessCommandSupport support;
     @Autowired OutboxCommandRegistry<ProcessTransition> commands;
     @Autowired ApplicationContext application;
@@ -42,7 +45,7 @@ class InlineProcessCommandIntegrationTest {
             configurator.read(new ByteArrayInputStream("""
                 {"processMap":{"leaf":{"leaf":true}}}
                 """.getBytes(StandardCharsets.UTF_8)));
-            workers.setWorkerStarter(dispatched::add);
+            doAnswer(call -> { dispatched.add(call.getArgument(0)); return null; }).when(workers).start(any());
             ProcessDto dto = new ProcessDto(); dto.processDefName = "leaf";
             var process = manager.create(dto).getMutatedEntity();
             OutboxCommand entry = OutboxCommand.create(process.getId(), StartWorkerCommand.TYPE,
@@ -58,7 +61,6 @@ class InlineProcessCommandIntegrationTest {
             assertFalse(support.durable());
         } finally {
             configurator.processes = original;
-            workers.setWorkerStarter(null);
         }
     }
 
@@ -80,7 +82,7 @@ class InlineProcessCommandIntegrationTest {
                 {"processMap":{"parent":{"leaf":false},"child":{"leaf":true},
                  "index":{"leaf":true,"predecessorProcessType":"parent","predecessorArgs":"OUTPUT"}}}
                 """.getBytes(StandardCharsets.UTF_8)));
-            workers.setWorkerStarter(dispatched::add);
+            doAnswer(call -> { dispatched.add(call.getArgument(0)); return null; }).when(workers).start(any());
             ProcessDto dto = new ProcessDto(); dto.processDefName = "parent"; dto.triggerId = "inline-trigger";
             var parent = manager.create(dto).getMutatedEntity();
             String id = parent.getId();
@@ -113,7 +115,6 @@ class InlineProcessCommandIntegrationTest {
             assertEquals(5, dispatched.size());
         } finally {
             configurator.processes = original;
-            workers.setWorkerStarter(null);
         }
     }
 }

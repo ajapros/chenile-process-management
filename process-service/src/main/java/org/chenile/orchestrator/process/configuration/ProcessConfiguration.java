@@ -6,7 +6,6 @@ import org.chenile.orchestrator.process.configuration.dao.ProcessDefinitionRepos
 import org.chenile.orchestrator.process.model.Process;
 import org.chenile.orchestrator.process.service.cmds.*;
 import org.chenile.orchestrator.process.service.defs.DatabaseProcessConfigurator;
-import org.chenile.orchestrator.process.service.defs.PostSaveHook;
 import org.chenile.orchestrator.process.service.entry.ProcessEntryAction;
 import org.chenile.orchestrator.process.service.healthcheck.ProcessHealthChecker;
 import org.chenile.orchestrator.process.service.impl.ProcessManagerImpl;
@@ -210,11 +209,6 @@ public class ProcessConfiguration {
     @ConditionalOnProperty(name = "chenile.process.configurator", havingValue = "database")
     ProcessConfigurator databaseProcessConfigurator(ProcessDefinitionRepository processDefinitionRepository) {
         return new DatabaseProcessConfigurator(processDefinitionRepository);
-    }
-
-    @Bean
-    PostSaveHook postSaveHook(){
-        return new PostSaveHook();
     }
 
 }

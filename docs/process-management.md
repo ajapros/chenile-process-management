@@ -42,7 +42,7 @@ with the `WorkerStarter` interface and the configuration abstraction (`IProcessC
 `ProcessDef`).
 
 `process-service` is the running service: the STM definition, the transition-action commands,
-`ProcessManagerImpl`, `ProcessController`, `ProcessEntryAction`, `PostSaveHook`, the configurators, the
+`ProcessManagerImpl`, `ProcessController`, `ProcessEntryAction`, `StartWorkerCommand`, the configurators, the
 durable-execution wiring, and the Spring configuration.
 
 `process-utils` provides the worker base classes (`SplitterBase`, `ExecutorBase`, `AggregatorBase`,
@@ -177,7 +177,7 @@ chaining.
 
 ## Workers and launch modes
 
-Each work-pending state has a corresponding worker. `PostSaveHook` resolves the worker type and its
+Each work-pending state has a corresponding worker. `StartWorkerCommand` resolves the worker type and its
 configuration for the current state and hands a `WorkerDto` to the configured `WorkerStarter`:
 
 | State | Worker | Configuration |
@@ -187,7 +187,13 @@ configuration for the current state and hands a `WorkerDto` to the configured `W
 | `AGGREGATION_PENDING` | `AGGREGATOR` | `ProcessDef.config` |
 
 Every worker type for a process receives the same `config` map from the process definition (copied, never
-mutated). Three interchangeable `WorkerStarter` implementations decide where work actually runs:
+mutated). Worker preparation happens at enqueue time, so durable commands retain their original
+configuration snapshot. `StartWorkerCommand` resolves the application's `WorkerStarter` lazily at dispatch;
+inline execution without a starter remains a no-op, while durable dispatch without one fails and retries.
+Starter configurations expose beans directly; they no longer inject or mutate a `PostSaveHook` bean.
+Applications previously calling `postSaveHook.setWorkerStarter(...)` must instead supply a `WorkerStarter`
+bean. With multiple candidates, select one using `@Primary`; otherwise resolution fails as ambiguous.
+Three interchangeable `WorkerStarter` implementations decide where work actually runs:
 
 - **in-VM** dispatches the `WorkerDto` to the in-JVM `EventProcessor` — simplest, good for tests and small
   flows.
@@ -222,7 +228,7 @@ drains and executes them. State change and its scheduled consequences therefore 
 all.
 
 The entry action uses the same registered commands whether durability is enabled or not: it saves the
-process and delegates to `ProcessEffects`. `ProcessCommandSupport` either persists the command as JSON for
+process and passes a `ProcessTransition` directly to `OutboxCommandRegistry`. `ProcessCommandSupport` either persists the command as JSON for
 durable dispatch or, when durability is disabled, invokes it immediately with a live typed body — inline
 mode needs no outbox schema or receipts and preserves synchronous cascades. Parent notification is a
 `SignalParentCommand`, and worker planning and launch use a prepare/dispatch split.

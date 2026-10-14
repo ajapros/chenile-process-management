@@ -11,7 +11,6 @@ import org.chenile.orchestrator.process.outbox.ProcessOutboxRepository;
 import org.chenile.orchestrator.process.outbox.OutboxCommand;
 import org.chenile.orchestrator.process.outbox.OutboxCommandLifecycle;
 import org.chenile.orchestrator.process.model.Process;
-import org.chenile.orchestrator.process.service.defs.PostSaveHook;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -27,7 +26,6 @@ public class ProcessCommandSupport {
     final ProcessOutboxRepository outbox;
     final ObjectProvider<ProcessManager> managers;
     final ProcessRepository processes;
-    final PostSaveHook workers;
     final ObjectMapper mapper = new ObjectMapper();
     final TransactionTemplate independent;
     private final EventProcessor events;
@@ -36,10 +34,10 @@ public class ProcessCommandSupport {
     ;
 
     public ProcessCommandSupport(ProcessOutboxRepository outbox, ObjectProvider<ProcessManager> managers,
-            ProcessRepository processes, PostSaveHook workers,
+            ProcessRepository processes,
             EventProcessor events, PlatformTransactionManager manager) {
         this.outbox = outbox; this.managers = managers; this.processes = processes;
-        this.workers = workers; this.events = events;
+        this.events = events;
         independent = new TransactionTemplate(manager);
         independent.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }

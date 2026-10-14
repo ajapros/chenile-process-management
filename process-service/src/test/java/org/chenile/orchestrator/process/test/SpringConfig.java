@@ -1,11 +1,11 @@
 package org.chenile.orchestrator.process.test;
 
 import org.chenile.orchestrator.process.config.reader.ProcessConfigurator;
-import org.chenile.orchestrator.process.service.defs.PostSaveHook;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.persistence.autoconfigure.EntityScan;
 import org.springframework.boot.web.servlet.support.SpringBootServletInitializer;
+import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.PropertySource;
@@ -21,19 +21,17 @@ import org.springframework.test.context.ActiveProfiles;
 @ActiveProfiles("unittest")
 public class SpringConfig extends SpringBootServletInitializer{
 
-    @Bean
+    @Bean @Primary
     InVMWorkerStarterDelegator inVMProcessStarterDelegator(
-            @Qualifier("postSaveHook") PostSaveHook postSaveHook,
 		    @Qualifier("processConfigurator") ProcessConfigurator processConfigurator){
         InVMWorkerStarterDelegator workerStarter = new InVMWorkerStarterDelegator();
-        postSaveHook.setWorkerStarter(workerStarter);
         processConfigurator.read("def.json");
         return workerStarter;
     }
 
     /*
      * The beans below are named appropriately so they can be auto discovered as
-     * Process Starters. These are invoked by the post save hook AFTER the Process is
+     * Process Starters. These are invoked by StartWorkerCommand AFTER the Process is
      * saved in the DB with the given state.
      */
 

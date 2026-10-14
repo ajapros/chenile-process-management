@@ -5,12 +5,10 @@ import org.chenile.orchestrator.process.jdbc.JdbcProcessWorkerProperties;
 import org.chenile.orchestrator.process.jdbc.JdbcProcessWorkerRepository;
 import org.chenile.orchestrator.process.jdbc.JdbcProcessWorkerRunner;
 import org.chenile.orchestrator.process.jdbc.JdbcProcessWorkerStarter;
-import org.chenile.orchestrator.process.service.defs.PostSaveHook;
 import org.chenile.orchestrator.process.utils.api.BatchService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -46,11 +44,9 @@ public class JdbcProcessStarterConfiguration {
 	}
 
 	@Bean
-	JdbcProcessWorkerStarter jdbcProcessWorkerStarter(@Qualifier("postSaveHook") PostSaveHook postSaveHook,
-			JdbcProcessWorkerRepository repository, ObjectMapper objectMapper) {
+	JdbcProcessWorkerStarter jdbcProcessWorkerStarter(JdbcProcessWorkerRepository repository, ObjectMapper objectMapper) {
 		logger.info("Initializing JDBC process worker starter");
 		JdbcProcessWorkerStarter workerStarter = new JdbcProcessWorkerStarter(repository, objectMapper);
-		postSaveHook.setWorkerStarter(workerStarter);
 		return workerStarter;
 	}
 

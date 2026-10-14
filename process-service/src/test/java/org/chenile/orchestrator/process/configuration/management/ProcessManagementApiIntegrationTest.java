@@ -11,7 +11,10 @@ import org.chenile.orchestrator.process.model.*;
 import org.chenile.orchestrator.process.model.Process;
 import org.chenile.orchestrator.process.model.payload.*;
 import org.chenile.orchestrator.process.outbox.OutboxDispatcher;
-import org.chenile.orchestrator.process.service.defs.PostSaveHook;
+import org.chenile.orchestrator.process.WorkerStarter;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.any;
 import org.chenile.trigger.cron.CrontabRepository;
 import org.chenile.trigger.store.*;
 import org.junit.jupiter.api.*;
@@ -51,7 +54,7 @@ class ProcessManagementApiIntegrationTest {
     @Autowired TriggerLogRepository claims;
     @Autowired CrontabRepository crontabs;
     @Autowired ProcessManager manager;
-    @Autowired PostSaveHook workers;
+    @MockitoBean WorkerStarter workers;
     @Autowired ObjectProvider<OutboxDispatcher> dispatchers;
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager transactions;
@@ -69,9 +72,8 @@ class ProcessManagementApiIntegrationTest {
             }
         });
         ((org.chenile.orchestrator.process.service.defs.DatabaseProcessConfigurator) configurator).clearCache();
-        workers.setWorkerStarter(worker -> {});
     }
-    @AfterEach void clearContext() { ContextContainer.CONTEXT_CONTAINER.clear(); workers.setWorkerStarter(null); }
+    @AfterEach void clearContext() { ContextContainer.CONTEXT_CONTAINER.clear(); }
     MockHttpServletRequestBuilder authorized(MockHttpServletRequestBuilder request, String tenant) {
         return request.header("X-Process-Management-Key", KEY).header(HeaderUtils.TENANT_ID_KEY, tenant)
                 .contentType("application/json");
