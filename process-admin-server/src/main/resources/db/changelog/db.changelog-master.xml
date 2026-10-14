@@ -9,7 +9,7 @@
   Contexts select which tables to apply:
     chenile-process-jdbc       -> chenile_process_work_item
     chenile-process-outbox     -> chenile_process_outbox, chenile_process_receipt
-    chenile-process-history    -> chenile_trigger_execution, chenile_process_completion_event, process_table indexes
+    chenile-process-history    -> chenile_trigger_execution, process_table indexes (removes the retired completion snapshot table)
     chenile-process-reference  -> trigger_log, process_definition
 
   Running with no contexts applies all four. Every changeset no-ops if its table already exists, so this is

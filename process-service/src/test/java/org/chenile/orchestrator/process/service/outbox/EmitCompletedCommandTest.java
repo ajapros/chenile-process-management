@@ -31,7 +31,7 @@ class EmitCompletedCommandTest {
         var status = new SimpleTransactionStatus();
         when(transactions.getTransaction(any())).thenReturn(status);
         EventProcessor events = mock(EventProcessor.class);
-        var command = new EmitCompletedCommand(mock(ProcessOutboxRepository.class), managers, new ObjectMapper(), transactions, null, events);
+        var command = new EmitCompletedCommand(mock(ProcessOutboxRepository.class), managers, new ObjectMapper(), transactions, events);
         var event = new ProcessCompletedEvent();
         event.processId = "process-1";
         event.tenantId = "tenant-1";

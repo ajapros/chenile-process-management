@@ -15,10 +15,10 @@ import org.springframework.context.annotation.*;
 @Configuration
 @ConditionalOnProperty(name = "chenile.process.management.enabled", havingValue = "true")
 public class ProcessManagementConfiguration {
-    @Bean ProcessManagementService processManagementService(ProcessRepository processes, CompletionEventRepository completions,
+    @Bean ProcessManagementService processManagementService(ProcessRepository processes,
             ProcessDefinitionRepository definitions, ProcessConfigurator configurator, CrontabRepository crontabs,
             ObjectProvider<CrontabService> cronServices, TriggerExecutionRepository executions, TriggerService triggers) {
-        return new ProcessManagementService(processes, completions, definitions, configurator, crontabs, cronServices, executions, triggers);
+        return new ProcessManagementService(processes, definitions, configurator, crontabs, cronServices, executions, triggers);
     }
     @Bean FilterRegistrationBean<ManagementApiFilter> managementApiFilter(
             @Value("${chenile.process.management.api-key:}") String key,

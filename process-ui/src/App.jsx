@@ -36,7 +36,7 @@ function Notice({ resource }) {
 }
 function Badge({ children }) {
   const value = String(children || 'UNKNOWN');
-  const style = /ERROR|FAIL|DEAD/.test(value) ? 'bad' : /PROCESSED$|COMPLETED|GENERATED/.test(value) ? 'good' : 'active';
+  const style = /ERROR|FAIL|DEAD/.test(value) ? 'bad' : /PROCESSED$|COMPLETED/.test(value) ? 'good' : 'active';
   return <span className={`badge ${style}`}>{value.replaceAll('_', ' ')}</span>;
 }
 function Json({ value }) { return <pre>{typeof value === 'string' ? value : pretty(value)}</pre>; }
@@ -139,9 +139,9 @@ function ProcessDetail({ api, revision, id, inspect, close, trace }) {
         <button className="link" onClick={() => trace({ processId: id })}>View end-to-end execution →</button></div>
       <div className="json-grid"><div><h3>Input arguments</h3><Json value={p.input}/></div><div><h3>Output arguments</h3><Json value={p.output}/></div></div>
       {p.errors?.length > 0 && <details><summary>Process errors ({p.errors.length})</summary><Json value={p.errors}/></details>}
-      <h3>Completion events</h3>{!detail.data.completionEvents.length && <p className="muted">No recorded completion event. Older executions may predate event history.</p>}
-      {detail.data.completionEvents.map(e => <div className="event" key={e.processId}><strong>ProcessCompleted</strong><span>Generated {time(e.generatedAt)}</span>
-        <details><summary>Event payload</summary><Json value={e.payload}/></details></div>)}
+      <h3>Completion</h3>{/^PROCESSED(?:_WITH_ERRORS)?$/.test(p.status)
+        ? <p>{p.completedAt ? `Completed ${time(p.completedAt)}` : 'Completed; time not recorded.'}</p>
+        : <p className="muted">Process has not completed.</p>}
       {related('Subprocesses', children, childrenPage, setChildrenPage)}{related('Successors from ProcessCompleted', successors, successorsPage, setSuccessorsPage)}
     </>}</section>;
 }
@@ -253,8 +253,8 @@ function Execution({ api, revision, filters, setFilters, inspect, history }) {
   const positioned = layoutGraph(resource.data?.nodes || [], resource.data?.edges || []);
   const positions = new Map(positioned.map(n => [n.id, n]));
   const width = Math.max(760, ...positioned.map(n => n.x + 240)), height = Math.max(160, ...positioned.map(n => n.y + 104));
-  const open = n => { if (n.kind === 'PROCESS') inspect(n.data.id); else if (n.kind === 'COMPLETION') inspect(n.data.processId); else history({ triggerId: n.data.triggerId }); };
-  return <><div className="section-heading"><div><h2>End-to-end execution</h2><p className="muted">Trigger → root process → subprocesses → completion event → successors. Select any node to inspect it.</p></div></div>
+  const open = n => { if (n.kind === 'PROCESS') inspect(n.data.id); else history({ triggerId: n.data.triggerId }); };
+  return <><div className="section-heading"><div><h2>End-to-end execution</h2><p className="muted">Trigger → root process → subprocesses and successors. Select any node to inspect it.</p></div></div>
     <form className="trace-search" onSubmit={e => { e.preventDefault(); setFilters({ [kind]: value.trim() }); }}>
       <select aria-label="Trace identifier type" value={kind} onChange={e => setKind(e.target.value)}><option value="processId">Process ID</option><option value="triggerId">Trigger ID</option></select>
       <input aria-label="Trace identifier" required placeholder="Enter an identifier, or open a trace from a process" value={value} onChange={e => setValue(e.target.value)}/><button className="primary">Trace execution</button></form>
@@ -269,9 +269,9 @@ function Execution({ api, revision, filters, setFilters, inspect, history }) {
         <rect x={n.x} y={n.y} width="222" height="88" rx="10"/><text x={n.x + 14} y={n.y + 22} className="node-kind">{n.kind}</text>
         <text x={n.x + 14} y={n.y + 44}>{n.label.length > 25 ? `${n.label.slice(0, 24)}…` : n.label}</text>
         <text x={n.x + 14} y={n.y + 68} className="node-status">{n.status?.replaceAll('_', ' ')}</text><title>{n.id}</title></g>)}
-    </svg></div><div className="legend"><span>● Trigger</span><span>● Process</span><span>● Completion event</span><span>{positioned.length} nodes · {resource.data.edges.length} causal links</span></div>
+    </svg></div><div className="legend"><span>● Trigger</span><span>● Process</span><span>{positioned.length} nodes · {resource.data.edges.length} causal links</span></div>
       <h3>Execution timeline</h3><ol className="timeline">{timelineNodes(positioned).map(n => <li key={n.id}><span className="timeline-time">{time(n.time)}</span>
         <button className="link" onClick={() => open(n)}>{n.label}</button><small>{n.kind} · {n.status} · {n.id}</small></li>)}</ol>
-      <p className="muted">Completion timestamps reflect generation, not subscriber delivery. Legacy executions may have lineage without recorded event history.</p></>}
+      <p className="muted">Terminal process timestamps show completion; other process timestamps show creation.</p></>}
   </>;
 }

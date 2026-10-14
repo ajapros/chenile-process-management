@@ -5,6 +5,7 @@ import org.chenile.orchestrator.process.config.model.ProcessDef;
 import org.chenile.orchestrator.process.config.reader.ProcessConfigurator;
 import org.chenile.orchestrator.process.configuration.dao.*;
 import org.chenile.orchestrator.process.configuration.model.*;
+import org.chenile.orchestrator.process.model.Constants;
 import org.chenile.orchestrator.process.model.Process;
 import org.chenile.orchestrator.process.model.ProcessDto;
 import org.chenile.orchestrator.process.service.defs.DatabaseProcessConfigurator;
@@ -25,7 +26,6 @@ import java.util.*;
 /** Administration queries: definitions are global; execution data is always tenant-scoped. */
 public class ProcessManagementService {
     private final ProcessRepository processes;
-    private final CompletionEventRepository completions;
     private final ProcessDefinitionRepository definitions;
     private final ProcessConfigurator configurator;
     private final CrontabRepository crontabs;
@@ -33,25 +33,29 @@ public class ProcessManagementService {
     private final TriggerExecutionRepository executions;
     private final TriggerService triggers;
     private final ObjectMapper json = new ObjectMapper();
-    public ProcessManagementService(ProcessRepository processes, CompletionEventRepository completions,
+    public ProcessManagementService(ProcessRepository processes,
             ProcessDefinitionRepository definitions, ProcessConfigurator configurator,
             CrontabRepository crontabs, ObjectProvider<CrontabService> cronServices,
             TriggerExecutionRepository executions, TriggerService triggers) {
-        this.processes = processes; this.completions = completions; this.definitions = definitions;
+        this.processes = processes; this.definitions = definitions;
         this.configurator = configurator; this.crontabs = crontabs; this.cronServices = cronServices;
         this.executions = executions; this.triggers = triggers;
     }
 
     public record ProcessView(String id, String processType, String status, boolean leaf,
             int completedPercent, String parentId, String predecessorId, String triggerId,
-            String description, Instant createdAt, Instant stateEnteredAt, String input, String output,
+            String description, Instant createdAt, Instant stateEnteredAt, Instant completedAt, String input, String output,
             int numSubProcesses, int numCompletedSubProcesses, Object errors) {
         static ProcessView of(Process p) {
+            String status = p.getCurrentState() == null ? null : p.getCurrentState().getStateId();
+            Instant enteredAt = p.getStateEntryTime() == null ? null : p.getStateEntryTime().toInstant();
+            boolean terminal = Constants.States.PROCESSED.equals(status) || Constants.States.PROCESSED_WITH_ERRORS.equals(status);
             return new ProcessView(p.id, p.processType,
-                p.getCurrentState() == null ? null : p.getCurrentState().getStateId(), p.leaf,
+                status, p.leaf,
                 p.completedPercent, p.parentId, p.predecessorId, p.triggerId, p.description,
                 p.createdTime == null ? null : p.createdTime.toInstant(),
-                p.getStateEntryTime() == null ? null : p.getStateEntryTime().toInstant(), p.input, p.output,
+                enteredAt, terminal ? enteredAt : null,
+                p.input, p.output,
                 p.numSubProcesses, p.numCompletedSubProcesses, p.errors);
         }
     }
@@ -60,7 +64,7 @@ public class ProcessManagementService {
             return new PageResult<>(p.getContent(), p.getTotalElements(), p.getNumber(), p.getSize(), p.getTotalPages());
         }
     }
-    public record ProcessDetail(ProcessView process, List<CompletionEventRecord> completionEvents) {}
+    public record ProcessDetail(ProcessView process) {}
     public record Node(String id, String kind, String label, String status, String time, Object data) {}
     public record Edge(String source, String target, String kind) {}
     public record Trace(List<Node> nodes, List<Edge> edges) {}
@@ -85,7 +89,7 @@ public class ProcessManagementService {
     public ProcessDetail process(String tenant, String id) {
         Process p = processes.findOne(ProcessManagementService.<Process>tenant(tenant)
                 .and((r,q,c) -> c.equal(r.get("id"), id))).orElseThrow(ProcessManagementService::notFound);
-        return new ProcessDetail(ProcessView.of(p), completions.findByTenantAndProcessIdIn(tenant, List.of(id)));
+        return new ProcessDetail(ProcessView.of(p));
     }
     public PageResult<TriggerExecution> executions(String tenant, String triggerId, String crontabId,
             String status, int page, int size) {
@@ -210,21 +214,14 @@ public class ProcessManagementService {
         }
         for (var p : found.values()) {
             String id = "process:" + p.id; var view = ProcessView.of(p);
-            nodes.add(new Node(id, "PROCESS", p.processType, view.status(), view.createdAt() == null ? null : view.createdAt().toString(), view));
+            Instant time = view.completedAt() == null ? view.createdAt() : view.completedAt();
+            nodes.add(new Node(id, "PROCESS", p.processType, view.status(), time == null ? null : time.toString(), view));
             if (found.containsKey(p.parentId)) edges.add(new Edge("process:" + p.parentId, id, "SUBPROCESS"));
             if (!present(p.parentId) && !present(p.predecessorId) && triggerNodes.containsKey(p.triggerId))
                 edges.add(new Edge(triggerNodes.get(p.triggerId), id, "PROCESS_CREATE"));
         }
-        var events = found.isEmpty() ? List.<CompletionEventRecord>of() : completions.findByTenantAndProcessIdIn(tenant, found.keySet());
-        Set<String> eventProcesses = new HashSet<>();
-        for (var e : events) {
-            eventProcesses.add(e.processId);
-            nodes.add(new Node("completion:" + e.processId, "COMPLETION", "ProcessCompleted", "GENERATED", e.generatedAt, e));
-            edges.add(new Edge("process:" + e.processId, "completion:" + e.processId, "EMITS"));
-        }
         for (var p : found.values()) if (found.containsKey(p.predecessorId))
-            edges.add(new Edge((eventProcesses.contains(p.predecessorId) ? "completion:" : "process:") + p.predecessorId,
-                    "process:" + p.id, eventProcesses.contains(p.predecessorId) ? "SUCCESSOR" : "LEGACY_SUCCESSOR"));
+            edges.add(new Edge("process:" + p.predecessorId, "process:" + p.id, "SUCCESSOR"));
         if (nodes.isEmpty()) throw notFound();
         return new Trace(nodes, edges);
     }

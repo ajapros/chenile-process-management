@@ -14,13 +14,28 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class ProcessManagementServiceTest {
+    @Test void completionTimeComesOnlyFromTerminalStateEntryAndPreservesUnknownLegacyTimes() {
+        var process = new org.chenile.orchestrator.process.model.Process();
+        var entered = java.time.Instant.parse("2026-10-14T00:00:00Z");
+        process.setStateEntryTime(java.util.Date.from(entered));
+        for (String state : java.util.List.of("PROCESSED", "PROCESSED_WITH_ERRORS")) {
+            process.setCurrentState(new org.chenile.stm.State(state, "process"));
+            assertEquals(entered, ProcessManagementService.ProcessView.of(process).completedAt());
+        }
+        process.setCurrentState(new org.chenile.stm.State("EXECUTING", "process"));
+        assertNull(ProcessManagementService.ProcessView.of(process).completedAt());
+        process.setCurrentState(new org.chenile.stm.State("PROCESSED", "process"));
+        process.setStateEntryTime(null);
+        assertNull(ProcessManagementService.ProcessView.of(process).completedAt());
+    }
+
     @Test void jsonDefinitionsRemainInspectableButNeverPretendDatabaseWritesAreEffective() {
         var configurator = new ProcessConfigurator();
         var definition = new ProcessDef(); definition.processType = "source"; definition.leaf = true;
         configurator.processes.processMap.put("source", definition);
         var definitions = mock(ProcessDefinitionRepository.class);
         @SuppressWarnings("unchecked") ObjectProvider<CrontabService> cron = mock(ObjectProvider.class);
-        var service = new ProcessManagementService(mock(ProcessRepository.class), mock(CompletionEventRepository.class),
+        var service = new ProcessManagementService(mock(ProcessRepository.class),
                 definitions, configurator, mock(CrontabRepository.class), cron,
                 mock(TriggerExecutionRepository.class), mock(TriggerService.class));
         assertEquals("json", service.info().get("definitionSource"));

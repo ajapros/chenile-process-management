@@ -2,10 +2,9 @@ import { test, expect } from '@playwright/test';
 
 const date = '2026-10-02T10:00:00Z';
 const root = { id: 'import-1', processType: 'Import', status: 'PROCESSED', completedPercent: 100,
-  createdAt: date, numSubProcesses: 2, numCompletedSubProcesses: 2, input: '{"source":"feed-A"}', output: '{"rows":100}', errors: [] };
+  createdAt: date, completedAt: '2026-10-02T10:01:00Z', numSubProcesses: 2, numCompletedSubProcesses: 2, input: '{"source":"feed-A"}', output: '{"rows":100}', errors: [] };
 const children = [1, 2].map(n => ({ ...root, id: `chunk-${n}`, processType: 'Chunk', parentId: root.id, numSubProcesses: 0, numCompletedSubProcesses: 0 }));
-const successor = { ...root, id: 'index-1', processType: 'Index', predecessorId: root.id, status: 'EXECUTING', createdAt:'2026-10-02T10:01:01Z', completedPercent: 20, numSubProcesses: 0, numCompletedSubProcesses: 0 };
-const event = { processId: root.id, generatedAt: '2026-10-02T10:01:00Z', payload: '{"processId":"import-1","successful":true}' };
+const successor = { ...root, id: 'index-1', processType: 'Index', predecessorId: root.id, status: 'EXECUTING', completedAt: null, createdAt:'2026-10-02T10:01:01Z', completedPercent: 20, numSubProcesses: 0, numCompletedSubProcesses: 0 };
 const history = { id: 'run-1', triggerId: 'cron:daily:run-1', source: 'CRON', eventName: 'ProcessCreate', status: 'COMPLETED',
   startedAt: date, triggerTime: date, finishedAt: '2026-10-02T10:00:01Z', payload: '{"processDefName":"Import"}' };
 const paged = content => ({ content, totalElements: content.length, page: 0, size: 25, totalPages: 1 });
@@ -30,16 +29,14 @@ test.beforeEach(async ({ page }) => {
     else if (path === '/triggers') body = { triggerId: 'manual:acme:one', eventId: 'ProcessCreate', dispatched: true, duplicate: false };
     else if (path === '/executions') body = paged([history]);
     else if (path === '/processes') body = paged(url.searchParams.has('parentId') ? children : url.searchParams.has('predecessorId') ? [successor] : [root, successor]);
-    else if (path.startsWith('/processes/')) body = { process: [root, ...children, successor].find(p => p.id === path.split('/').at(-1)), completionEvents: [event] };
+    else if (path.startsWith('/processes/')) body = { process: [root, ...children, successor].find(p => p.id === path.split('/').at(-1)) };
     else if (path === '/trace') body = { nodes: [
       { id:'trigger:run-1', kind:'TRIGGER', label:'ProcessCreate · CRON', status:'COMPLETED', time:date, data:history },
-      ...[root, ...children, successor].map(p => ({ id:`process:${p.id}`, kind:'PROCESS', label:p.processType, status:p.status, time:p.createdAt, data:p })),
-      { id:'completion:import-1', kind:'COMPLETION', label:'ProcessCompleted', status:'GENERATED', time:event.generatedAt, data:event },
+      ...[root, ...children, successor].map(p => ({ id:`process:${p.id}`, kind:'PROCESS', label:p.processType, status:p.status, time:p.completedAt || p.createdAt, data:p })),
     ], edges:[
       { source:'trigger:run-1', target:'process:import-1', kind:'PROCESS_CREATE' },
       ...children.map(p => ({ source:'process:import-1', target:`process:${p.id}`, kind:'SUBPROCESS' })),
-      { source:'process:import-1', target:'completion:import-1', kind:'EMITS' },
-      { source:'completion:import-1', target:'process:index-1', kind:'SUCCESSOR' },
+      { source:'process:import-1', target:'process:index-1', kind:'SUCCESSOR' },
     ] };
     await route.fulfill({ status: method === 'POST' && (path === '/definitions' || path === '/crontabs') ? 201 : 200, json: body });
   });
@@ -50,18 +47,18 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Process dashboard' })).toBeVisible();
 });
 
-test('inspects children, completion events, successors and a complete execution', async ({ page }, testInfo) => {
+test('inspects children, process completion, successors and a complete execution', async ({ page }, testInfo) => {
   const errors = []; page.on('pageerror', e => errors.push(e.message));
   await page.getByRole('button', { name:'Import', exact:true }).click();
-  await expect(page.getByRole('heading', { name:'Completion events' })).toBeVisible();
+  await expect(page.getByRole('heading', { name:'Completion' })).toBeVisible();
   await expect(page.getByRole('button', { name:'Chunk · chunk-1' })).toBeVisible();
   await expect(page.getByRole('button', { name:'Index · index-1' })).toBeVisible();
   await page.getByRole('button', { name:'View end-to-end execution →' }).click();
-  await expect(page.getByRole('button', { name:'COMPLETION: ProcessCompleted' })).toBeVisible();
+  await expect(page.getByRole('button', { name:'PROCESS: Import' })).toBeVisible();
   await expect(page.getByRole('heading', { name:'Execution timeline' })).toBeVisible();
   await page.screenshot({ path: `/private/tmp/chenile-process-ui-${testInfo.project.name}.png`, fullPage:true });
-  await page.getByRole('button', { name:'COMPLETION: ProcessCompleted' }).click();
-  await expect(page.getByRole('heading', { name:'Completion events' })).toBeVisible();
+  await page.getByRole('button', { name:'PROCESS: Import' }).click();
+  await expect(page.getByRole('heading', { name:'Completion' })).toBeVisible();
   expect(errors).toEqual([]);
 });
 

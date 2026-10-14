@@ -81,11 +81,12 @@ class ProcessAdminServerTest {
         dispatch();
         var detail = ok("GET", api + "/processes/" + id, null, 200);
         assertEquals("PROCESSED", detail.get("process").get("status").asText());
-        assertEquals(1, detail.get("completionEvents").size());
+        assertFalse(detail.has("completionEvents"));
+        assertEquals(detail.get("process").get("stateEnteredAt"), detail.get("process").get("completedAt"));
         var next = ok("GET", api + "/processes?predecessorId=" + id, null, 200);
         assertEquals(1, next.get("totalElements").asInt());
         var trace = ok("GET", api + "/trace?processId=" + id, null, 200);
-        assertEquals(4, trace.get("nodes").size());
+        assertEquals(3, trace.get("nodes").size());
         assertEquals(404, request("GET", api + "/processes/" + id, null, KEY, "beta").statusCode());
     }
 }

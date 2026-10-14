@@ -109,7 +109,7 @@ Filters are exact matches and combined with AND.
 | PUT `/definitions/{name}` | Update an existing database-backed definition |
 | POST `/definitions/refresh` | Clear this instance's database configurator cache |
 | GET `/processes` | Filters `processType`, `status`, `triggerId`, `parentId`, `predecessorId`, `page`, `size` |
-| GET `/processes/{id}` | Process input/output, errors, status and persisted completion events |
+| GET `/processes/{id}` | Process input/output, errors, status and terminal completion time |
 | GET `/trace?processId=...` or `?triggerId=...` | Tenant-scoped connected execution graph; exactly one identifier required |
 
 Create/update cron body:
@@ -175,19 +175,15 @@ RUNNING may remain after a host crash; this is an observation, not a liveness gu
 Non-API external callers should supply `x-chenile-tenant-id` for tenant-visible history.
 Cron events propagate their persisted tenant, overriding any conflicting configured header.
 
-The shared EmitCompleted command writes `chenile_process_completion_event`, recording the
-ProcessCompleted payload and its ISO generation time before inline dispatch or durable enqueue.
-With outbox delivery the record participates in the process transaction and rolls back with it.
-History survives outbox acknowledgement/cleanup and is also available when outbox is disabled.
-Generation does not prove delivery to every application-defined subscriber; existing best-effort
-publication semantics remain unchanged. No unrelated business event audit is added.
+Completion is read from terminal process state. Process views expose `completedAt` from the
+terminal state-entry timestamp; nonterminal processes return null. There is no separate completion
+snapshot table or `completionEvents` array in process detail responses. Durable outbox commands
+retain their delivery payload until cleanup; process completion does not prove subscriber delivery.
 
 Graph edges use stored `triggerId`, `parentId` and `predecessorId`, not timestamp guesses:
-PROCESS_CREATE, SUBPROCESS, EMITS and SUCCESSOR. Starting from a child/successor walks upstream
-and downstream, including legacy branches missing correlation IDs. Historical events cannot be
-backfilled truthfully: old relationships without stored completion history use LEGACY_SUCCESSOR
-edges, and absent timestamps are shown as not recorded. The graph refuses executions above
-1000 processes/events with HTTP 413 rather than silently presenting an incomplete execution;
+PROCESS_CREATE, SUBPROCESS and direct process-to-process SUCCESSOR. Starting from a child/successor walks upstream
+and downstream, including legacy branches missing correlation IDs. Stored predecessor relationships work for older process rows too; absent timestamps are shown as not recorded. The graph refuses executions above
+1000 processes or trigger records with HTTP 413 rather than silently presenting an incomplete execution;
 use paginated process queries to inspect those branches. No archival/retention policy is imposed;
 operators must choose one appropriate for argument data, errors and audit/privacy requirements.
 

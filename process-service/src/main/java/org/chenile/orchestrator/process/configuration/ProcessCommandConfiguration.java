@@ -33,9 +33,8 @@ public class ProcessCommandConfiguration {
     }
     @Bean @Order(2) EmitCompletedCommand emitCompletedCommand(
             ObjectProvider<ProcessOutboxRepository> repositories, ObjectProvider<ProcessManager> managers,
-            PlatformTransactionManager transactionManager,
-            org.chenile.orchestrator.process.configuration.dao.CompletionEventRepository history, EventProcessor events) {
-        return new EmitCompletedCommand(repositories.getIfAvailable(), managers, mapper, transactionManager, history, events);
+            PlatformTransactionManager transactionManager, EventProcessor events) {
+        return new EmitCompletedCommand(repositories.getIfAvailable(), managers, mapper, transactionManager, events);
     }
     @Bean @Order(3) StartWorkerCommand startWorkerCommand(
             ObjectProvider<ProcessOutboxRepository> repositories, ObjectProvider<ProcessManager> managers,

@@ -16,22 +16,18 @@ import org.chenile.orchestrator.process.outbox.OutboxCommand;
 import org.chenile.orchestrator.process.model.Process;
 import org.chenile.orchestrator.process.model.Constants;
 import org.chenile.orchestrator.process.service.CompletionArguments;
-import org.chenile.orchestrator.process.configuration.dao.CompletionEventRepository;
-import org.chenile.orchestrator.process.configuration.model.CompletionEventRecord;
 import org.chenile.stm.State;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 public class EmitCompletedCommand extends AbstractProcessOutboxCommand {
     private static final Logger LOG = LoggerFactory.getLogger(EmitCompletedCommand.class);
-    private final CompletionEventRepository history;
     private final EventProcessor events;
     public static final String TYPE = "EMIT_COMPLETED";
     public EmitCompletedCommand(ProcessOutboxRepository outbox, ObjectProvider<ProcessManager> managers,
             ObjectMapper mapper, PlatformTransactionManager transactionManager,
-            CompletionEventRepository history, EventProcessor events) {
+            EventProcessor events) {
         super(outbox, managers, mapper, transactionManager);
-        this.history = history;
         this.events = events;
     }
     @Override public String type() { return TYPE; }
@@ -39,21 +35,7 @@ public class EmitCompletedCommand extends AbstractProcessOutboxCommand {
     @Override public void enqueue(ProcessTransition transition) throws Exception {
         if (!terminal(transition)) return;
         var event = completedEvent(transition.process(), transition.state());
-        if (history != null) {
-            var existing = history.findById(event.processId);
-            if (existing.isPresent()) {
-                event = mapper.readValue(existing.get().payload, ProcessCompletedEvent.class);
-                store(transition.process(), transition.process().getId() + ":completed", event);
-                return;
-            }
-            var record = new CompletionEventRecord();
-            record.processId = event.processId;
-            record.tenant = event.tenantId;
-            record.triggerId = event.triggerId;
-            record.generatedAt = event.generatedAt;
-            record.payload = mapper.writeValueAsString(event);
-            history.saveAndFlush(record);
-        }
+
         store(transition.process(), transition.process().getId() + ":completed", event);
     }
 
@@ -67,7 +49,8 @@ public class EmitCompletedCommand extends AbstractProcessOutboxCommand {
     }
     public static ProcessCompletedEvent completedEvent(Process process, State terminalState) {
         ProcessCompletedEvent event = new ProcessCompletedEvent();
-        event.generatedAt = java.time.Instant.now().toString();
+        event.generatedAt = (process.getStateEntryTime() == null ? java.time.Instant.now()
+                : process.getStateEntryTime().toInstant()).toString();
         event.processId = process.getId();
         event.processType = process.processType;
         event.processDefName = process.processType;

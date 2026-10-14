@@ -69,7 +69,7 @@ class ProcessEntryActionTest {
         var transactions = mock(PlatformTransactionManager.class);
         var commands = new OutboxCommandRegistry<ProcessTransition>(List.of(
                 new CreateSubProcessCommand(null, managers, mapper, transactions, mock(ProcessRepository.class)), new SignalParentCommand(null, managers, mapper, transactions),
-                new EmitCompletedCommand(null, managers, mapper, transactions, null, processor), new StartWorkerCommand(null, managers, mapper, transactions, mock(IProcessConfigurator.class), mock(ObjectProvider.class))));
+                new EmitCompletedCommand(null, managers, mapper, transactions, processor), new StartWorkerCommand(null, managers, mapper, transactions, mock(IProcessConfigurator.class), mock(ObjectProvider.class))));
         ReflectionTestUtils.setField(action, "commands", commands);
         Process process = new Process("feed", false);
         process.setId("process-1");

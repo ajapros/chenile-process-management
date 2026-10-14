@@ -47,7 +47,6 @@ class ProcessManagementApiIntegrationTest {
     @Autowired WebApplicationContext application;
     @Autowired FilterRegistrationBean<ManagementApiFilter> filter;
     @Autowired ProcessRepository processes;
-    @Autowired CompletionEventRepository completions;
     @Autowired ProcessDefinitionRepository definitions;
     @Autowired ProcessConfigurator configurator;
     @Autowired TriggerExecutionRepository executions;
@@ -65,7 +64,7 @@ class ProcessManagementApiIntegrationTest {
         ContextContainer.CONTEXT_CONTAINER.clear();
         mvc = MockMvcBuilders.webAppContextSetup(application).addFilters(filter.getFilter()).build();
         new TransactionTemplate(transactions).executeWithoutResult(tx -> {
-            completions.deleteAll(); executions.deleteAll(); claims.deleteAll(); crontabs.deleteAll();
+            executions.deleteAll(); claims.deleteAll(); crontabs.deleteAll();
             processes.deleteAll(); definitions.deleteAll();
             if (dispatchers.getIfAvailable() != null) {
                 jdbc.update("delete from chenile_process_outbox"); jdbc.update("delete from chenile_process_receipt");
@@ -153,7 +152,7 @@ class ProcessManagementApiIntegrationTest {
         response(get(BASE + "/processes").param("page", "-1"), "alpha", 400);
         assertTrue(response(get(BASE + "/processes").param("page", "not-a-number"), "alpha", 400).has("message"));
     }
-    @Test void linksTriggerToCompletionAndSuccessorWithGenerationTimestamp() throws Exception {
+    @Test void linksTriggerToTerminalProcessAndSuccessorWithCompletionTimestamp() throws Exception {
         definition("source", true, ""); definition("successor", true, "source");
         var accepted = generate("alpha", "chain", "source");
         String triggerId = accepted.get("triggerId").asText();
@@ -162,15 +161,16 @@ class ProcessManagementApiIntegrationTest {
         assertEquals("alpha", successor.tenant); assertEquals(triggerId, successor.triggerId);
         var detail = response(get(BASE + "/processes/" + root.id), "alpha", 200);
         assertEquals("PROCESSED", detail.get("process").get("status").asText());
-        var event = detail.get("completionEvents").get(0);
-        assertDoesNotThrow(() -> java.time.Instant.parse(event.get("generatedAt").asText()));
-        assertEquals(root.id, json.readTree(event.get("payload").asText()).get("processId").asText());
+        assertFalse(detail.has("completionEvents"));
+        assertEquals(detail.get("process").get("stateEnteredAt"), detail.get("process").get("completedAt"));
+        assertDoesNotThrow(() -> java.time.Instant.parse(detail.get("process").get("completedAt").asText()));
         var trace = response(get(BASE + "/trace").param("processId", successor.id), "alpha", 200);
-        assertEquals(4, trace.get("nodes").size());
+        assertEquals(3, trace.get("nodes").size());
         Set<String> kinds = new HashSet<>(); trace.get("edges").forEach(e -> kinds.add(e.get("kind").asText()));
-        assertEquals(Set.of("PROCESS_CREATE", "EMITS", "SUCCESSOR"), kinds);
+        assertEquals(Set.of("PROCESS_CREATE", "SUCCESSOR"), kinds);
         var filtered = response(get(BASE + "/processes").param("status", "EXECUTING").param("processType", "successor"), "alpha", 200);
         assertEquals(1, filtered.get("totalElements").asInt());
+        assertTrue(filtered.get("content").get(0).get("completedAt").isNull());
         assertEquals(0, response(get(BASE + "/processes").param("status", "PROCESSED").param("processType", "successor"), "alpha", 200).get("totalElements").asInt());
     }
     @Test void subprocessQueriesAndLegacyTraceRemainTenantScoped() throws Exception {

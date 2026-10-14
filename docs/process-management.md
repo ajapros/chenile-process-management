@@ -330,11 +330,10 @@ mechanism for composing one process after another. Predecessor cycles are reject
 this chaining is part of the completion command's transaction, while delivery to arbitrary application
 subscribers is best-effort after commit.
 
-The completion command also records each `ProcessCompletedEvent` into `chenile_process_completion_event`
-before dispatch, so there is a durable, queryable history of terminal events (and the causal edges to
-chained successors). Under durable execution this record participates in the process transaction and rolls
-back with it; it is also written when the outbox is disabled. Recording a completion event does not by
-itself prove delivery to every subscriber.
+Completion is recorded by the process's terminal state. The management API exposes `completedAt`
+from its terminal `stateEntryTime`; a nonterminal process has no completion timestamp. The completion
+command publishes the event without a separate history row. Durable delivery retains the serialized
+payload in the outbox for its configured retention horizon; subscriber delivery remains best-effort.
 
 ## Management API and the admin console
 
@@ -346,7 +345,7 @@ DTOs (not the Chenile `GenericResponse` envelope) and covers: `GET /info`; pagin
 through the normal trigger ingress, with optional idempotency key); `GET`/`POST`/`PUT` `/definitions` plus
 `POST /definitions/refresh` (clear this instance's database-configurator cache); and
 `GET /trace?processId=…|triggerId=…`, which returns the tenant-scoped causal execution graph
-(`PROCESS_CREATE` / `SUBPROCESS` / `EMITS` / `SUCCESSOR` edges, built from stored `triggerId` / `parentId` /
+(`PROCESS_CREATE` / `SUBPROCESS` / `SUCCESSOR` edges, built from stored `triggerId` / `parentId` /
 `predecessorId`, refusing graphs above 1000 nodes with HTTP 413).
 
 Access control is a deliberately separate, opt-in administrator surface. `ManagementApiFilter` requires an
@@ -428,14 +427,9 @@ discriminator), `payload` (TEXT, command-owned JSON), `idempotency_key` (unique)
 `cron_expression`, `timezone`, `event_name`, `headers_json` (TEXT), `event_payload_json` (TEXT), plus base
 columns. (JSON-file schedules via `JsonCrontabRepository` use the same shape without a table.)
 
-### Completion history (explicit SQL)
-
-`chenile_process_completion_event` — `process_id` (PK), `tenant`, `trigger_id`, `generated_at`, `payload`
-(TEXT, the full `ProcessCompletedEvent` JSON). Index on `(tenant, trigger_id)`. Written by the
-`EMIT_COMPLETED` command before dispatch; under durable execution it commits inside the process transaction.
-
-Three log-like tables are deliberately distinct and must not be merged: `trigger_log` (idempotency claim),
-`chenile_trigger_execution` (trigger history), and `chenile_process_completion_event` (completion history).
+Completion has no separate table: terminal status, terminal state-entry time, and `predecessor_id`
+provide completion and successor lineage on `process_table`. Trigger claims and trigger dispatch
+history remain separate.
 
 ### Schema management (explicit SQL or optional Liquibase)
 
@@ -457,7 +451,7 @@ Hibernate may already have created:
 |---|---|
 | `chenile-process-jdbc` | `chenile_process_work_item` |
 | `chenile-process-outbox` | `chenile_process_outbox`, `chenile_process_receipt` |
-| `chenile-process-history` | `chenile_trigger_execution`, `chenile_process_completion_event`, the management indexes on `process_table` |
+| `chenile-process-history` | `chenile_trigger_execution`, the management indexes on `process_table` |
 | `chenile-process-reference` | `trigger_log`, `process_definition` |
 
 Example: `spring.liquibase.contexts=chenile-process-outbox,chenile-process-history`. The STM/base-entity
@@ -465,6 +459,13 @@ tables (`process_table`, `subprocess_error`, `chenile_crontab`) are intentionall
 `liquibase diff` you generate against your own Chenile version, because their inherited base-class and STM
 columns are framework-owned and version-specific; hand-authored DDL for them would risk diverging from
 `ddl-auto=validate`.
+
+For installations with the retired completion snapshot table, stop or upgrade all older writers,
+then apply `process-service/src/main/resources/chenile-process-completion-event-removal.sql`.
+The optional Liquibase history changelog includes the equivalent guarded removal. This deletes the
+old event snapshots; process rows, trigger history, receipts, and outbox delivery remain intact.
+The process detail API now returns `{ "process": ... }` without `completionEvents`, and traces use
+process-to-process `SUCCESSOR` edges instead of completion-event nodes.
 
 ## Configuration reference
 

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Optional Liquibase changelog for trigger execution history and process completion history, plus the
+  Optional Liquibase changelog for trigger execution history, plus the
   management query indexes on process_table. Opt-in via the "chenile-process-history" context. Equivalent
   to chenile-process-management-history-schema.sql. Changesets no-op if the objects already exist; the
   process_table index changeset is skipped unless process_table is present.
@@ -43,21 +43,12 @@
         </createIndex>
     </changeSet>
 
-    <changeSet id="chenile-process-completion-event" author="chenile-process" context="chenile-process-history">
+    <!-- Remove the retired snapshot table from existing installations; new installations skip this. -->
+    <changeSet id="chenile-process-completion-event-removal" author="chenile-process" context="chenile-process-history">
         <preConditions onFail="MARK_RAN">
-            <not><tableExists tableName="chenile_process_completion_event"/></not>
+            <tableExists tableName="chenile_process_completion_event"/>
         </preConditions>
-        <createTable tableName="chenile_process_completion_event">
-            <column name="process_id" type="VARCHAR(255)"><constraints primaryKey="true" nullable="false"/></column>
-            <column name="tenant" type="VARCHAR(255)"/>
-            <column name="trigger_id" type="VARCHAR(255)"/>
-            <column name="generated_at" type="VARCHAR(255)"><constraints nullable="false"/></column>
-            <column name="payload" type="CLOB"><constraints nullable="false"/></column>
-        </createTable>
-        <createIndex tableName="chenile_process_completion_event" indexName="idx_completion_event_tenant_trigger">
-            <column name="tenant"/>
-            <column name="trigger_id"/>
-        </createIndex>
+        <dropTable tableName="chenile_process_completion_event"/>
     </changeSet>
 
     <!--

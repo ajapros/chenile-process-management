@@ -105,7 +105,7 @@ one policy across commands, plus the START_WORKER compensation.
 Temporal ships a Web UI over full per-workflow event history for live debugging — every step of a single
 execution, replayable. Chenile ships an administrator console and management API (a process dashboard with
 filters, trigger-execution history, process definition editing, and a causal trace graph across the
-trigger→process→successor chain), plus the underlying outbox/process/trigger/completion tables for SQL. That
+trigger→process→successor chain), plus the underlying outbox/process/trigger tables for SQL. That
 closes much of the operational-visibility gap, but it is an operations view over current state and recorded
 events rather than a replayable, step-by-step history of one workflow's code execution.
 
