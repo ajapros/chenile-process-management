@@ -261,8 +261,8 @@ Key properties of the mechanism:
   expired and was reclaimed cannot run the handler, acknowledge, or fail the reclaimed work. Claims use
   `FOR UPDATE SKIP LOCKED`.
 - **Consumer receipts.** A `chenile_process_receipt` row is committed atomically with the effect and the
-  acknowledgement, so redelivery is a no-op. Parent counting uses a receipt on parent/child identity so a
-  child is counted exactly once regardless of redelivery.
+  acknowledgement, so a redelivered command is a no-op — this is the effect-level idempotency guard, detailed
+  under "Idempotency guards" below.
 - **Retries and dead-letter.** Failures retry with exponential backoff up to a maximum attempt count, then
   become `DEAD`, surfaced through `deadCount()` and available for operator `replayDead(id)`. `DEAD` triggers
   the command's own `onDead` hook (default: leave it for operator replay); `START_WORKER` overrides it to
@@ -272,6 +272,49 @@ Key properties of the mechanism:
 - **Draining.** A scheduled poller drains due commands (`drainAll`); it can also be driven explicitly in
   tests. Durable creation does not promise the whole cascade has finished when the call returns — the
   cascade completes as the poller drains.
+
+### Idempotency guards
+
+Durable delivery is at-least-once, so correctness rests on three *distinct* guards, each solving a different
+problem. They are easy to confuse, so they are spelled out here:
+
+1. **Enqueue de-duplication — the outbox `idempotency_key` (unique).** Prevents the *same consequence of the
+   same transition* from being enqueued twice. It dedupes rows at insert time; it says nothing about how many
+   times a row is executed.
+2. **Claim-token fencing — `claim_token` + lease on `chenile_process_outbox`.** Guarantees exactly one
+   *winning claimant per attempt*: when a slow claimant's lease expires and another node reclaims the row, the
+   loser cannot acknowledge, fail, or keep its effect — its whole transaction (effect included) rolls back
+   when it tries to ack with a stale token. This makes re-delivery of a *single row* safe, but it does not
+   make a non-idempotent effect safe across *different* rows that represent the same business fact.
+3. **Effect-level idempotency — `receive(consumer, key)` against `chenile_process_receipt`.** This is the
+   actual idempotency check. It is an atomic insert-or-skip:
+
+   ```sql
+   insert into chenile_process_receipt (consumer, receipt_key, received_at)
+   values (?, ?, ?) on conflict do nothing
+   -- returns true if a row was inserted (first time → run the effect),
+   -- false if the key already existed (already done → skip)
+   ```
+
+   First caller wins: exactly one delivery ever sees `true` for a given `(consumer, receipt_key)`. Because the
+   receipt is inserted in the *same transaction* as the effect and the DONE acknowledgement, the "I did this"
+   marker and the effect commit together or roll back together — there is no window where one exists without
+   the other. The check is atomic (the unique constraint arbitrates races), so there is no check-then-act gap.
+
+   `receive` engages only in durable mode; inline mode short-circuits to `true`
+   (`!durable() || outbox.receive(...)`) and never touches the table, because inline execution does not
+   redeliver. The receipt keys are business identities, not the outbox row id, which is what lets it dedupe
+   across distinct-but-equivalent commands and across `replayDead`:
+
+   | Consumer | Receipt key | Why it is load-bearing |
+   |---|---|---|
+   | `PARENT` | `[parentId, childId]` (event name excluded) | `numCompletedSubProcesses` is a counter, not idempotent; this counts each child's completion exactly once even across a success-then-error pair or a replay — without it the aggregation guard breaks |
+   | `CHAIN` | `[predecessorId, successorType]` | successors get fresh ids (`existsById` cannot catch a duplicate); prevents a replayed `EMIT_COMPLETED` from creating duplicate successor processes |
+   | `CREATE` | `create:{childId}` | de-dupes child creation (also backed by the deterministic child id + `existsById`) |
+   | `WORKER` | `{processId}:{workerType}` | de-dupes worker dispatch (receivers should also dedupe on `WorkerDto.dispatchId`) |
+
+   These guards are why `chenile_process_receipt` is retained. Because it is append-only, prune it on a
+   retention horizon no shorter than the maximum time a `DEAD` command could still be replayed.
 
 Effects that cannot be committed on the shared datasource — a broker publish from the queue-based starter,
 or the after-commit subscriber fan-out — are at-least-once; their receivers must deduplicate (workers on
@@ -414,8 +457,9 @@ discriminator), `payload` (TEXT, command-owned JSON), `idempotency_key` (unique)
 `locked_by`, `claim_token`, `tenant_id`, `locked_until`, `created_at`, `updated_at`, `finished_at`,
 `error_message`. Indexes: `(status, visible_after, locked_until)`, `(process_id)`.
 
-`chenile_process_receipt` — consumer-effect idempotency, composite PK `(consumer, receipt_key)` plus
-`received_at`; a receipt commits with the effect and acknowledgement so redelivery is a no-op.
+`chenile_process_receipt` — the effect-level idempotency ledger behind `receive(consumer, key)` (see
+"Idempotency guards"), composite PK `(consumer, receipt_key)` plus `received_at`; a receipt commits with the
+effect and acknowledgement so a redelivered command is a no-op. Append-only — prune on a retention horizon.
 
 ### Triggering
 
