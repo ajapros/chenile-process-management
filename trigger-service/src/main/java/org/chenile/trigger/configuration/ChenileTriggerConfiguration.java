@@ -20,7 +20,7 @@ public class ChenileTriggerConfiguration {
         return new EventTriggerService(triggerLogStore, eventProcessor, configuration, observer);
     }
     @Bean @ConditionalOnMissingBean(TriggerObserver.class)
-    public TriggerObserver triggerObserver(TriggerExecutionRepository repository) {
-        return new DatabaseTriggerObserver(repository);
+    public TriggerObserver triggerObserver() {
+        return TriggerObserver.NONE;
     }
 }

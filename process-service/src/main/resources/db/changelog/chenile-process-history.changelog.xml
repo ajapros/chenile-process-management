@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Optional Liquibase changelog for trigger execution history, plus the
-  management query indexes on process_table. Opt-in via the "chenile-process-history" context. Equivalent
+  Optional Liquibase changelog for the management query indexes on process_table. Opt-in via the "chenile-process-history" context. Equivalent
   to chenile-process-management-history-schema.sql. Changesets no-op if the objects already exist; the
   process_table index changeset is skipped unless process_table is present.
 -->
@@ -10,38 +9,6 @@
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
                             http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
-
-    <changeSet id="chenile-trigger-execution" author="chenile-process" context="chenile-process-history">
-        <preConditions onFail="MARK_RAN">
-            <not><tableExists tableName="chenile_trigger_execution"/></not>
-        </preConditions>
-        <createTable tableName="chenile_trigger_execution">
-            <column name="id" type="VARCHAR(255)"><constraints primaryKey="true" nullable="false"/></column>
-            <column name="tenant" type="VARCHAR(255)"/>
-            <column name="trigger_id" type="VARCHAR(255)"><constraints nullable="false"/></column>
-            <column name="event_name" type="VARCHAR(255)"><constraints nullable="false"/></column>
-            <column name="source" type="VARCHAR(255)"/>
-            <column name="crontab_id" type="VARCHAR(255)"/>
-            <column name="trigger_time" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
-            <column name="started_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
-            <column name="finished_at" type="TIMESTAMP WITH TIME ZONE"/>
-            <column name="status" type="VARCHAR(255)"/>
-            <column name="error" type="CLOB"/>
-            <column name="payload" type="CLOB"/>
-        </createTable>
-        <createIndex tableName="chenile_trigger_execution" indexName="idx_trigger_execution_tenant_time">
-            <column name="tenant"/>
-            <column name="started_at"/>
-        </createIndex>
-        <createIndex tableName="chenile_trigger_execution" indexName="idx_trigger_execution_trigger">
-            <column name="tenant"/>
-            <column name="trigger_id"/>
-        </createIndex>
-        <createIndex tableName="chenile_trigger_execution" indexName="idx_trigger_execution_crontab">
-            <column name="tenant"/>
-            <column name="crontab_id"/>
-        </createIndex>
-    </changeSet>
 
     <!-- Remove the retired snapshot table from existing installations; new installations skip this. -->
     <changeSet id="chenile-process-completion-event-removal" author="chenile-process" context="chenile-process-history">

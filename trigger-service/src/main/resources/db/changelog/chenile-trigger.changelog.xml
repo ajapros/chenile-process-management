@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+    <changeSet id="chenile-unified-trigger-log" author="chenile-trigger" context="chenile-process-history OR chenile-process-reference">
+        <preConditions onFail="MARK_RAN"><not><tableExists tableName="trigger_log"/></not></preConditions>
+        <createTable tableName="trigger_log">
+            <column name="id" type="VARCHAR(255)"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="trigger_id" type="VARCHAR(255)"><constraints nullable="false"/></column>
+            <column name="event_name" type="VARCHAR(255)"><constraints nullable="false"/></column>
+            <column name="trigger_time" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="status" type="VARCHAR(255)"><constraints nullable="false"/></column>
+            <column name="tenant" type="VARCHAR(255)"></column>
+            <column name="source" type="VARCHAR(255)"></column>
+            <column name="crontab_id" type="VARCHAR(255)"></column>
+            <column name="started_at" type="TIMESTAMP WITH TIME ZONE"></column>
+            <column name="finished_at" type="TIMESTAMP WITH TIME ZONE"></column>
+            <column name="error" type="CLOB"></column>
+            <column name="payload" type="CLOB"></column>
+        </createTable>
+        <addUniqueConstraint tableName="trigger_log" columnNames="trigger_id,event_name" constraintName="uk_trigger_log_trigger_event"/>
+        <createIndex tableName="trigger_log" indexName="idx_trigger_log_tenant_time"><column name="tenant"/><column name="started_at"/></createIndex>
+        <createIndex tableName="trigger_log" indexName="idx_trigger_log_tenant_trigger"><column name="tenant"/><column name="trigger_id"/></createIndex>
+        <createIndex tableName="trigger_log" indexName="idx_trigger_log_crontab"><column name="tenant"/><column name="crontab_id"/></createIndex>
+    </changeSet>
+    <changeSet id="chenile-trigger-unification" author="chenile-trigger" dbms="postgresql" context="chenile-process-history OR chenile-process-reference">
+        <sqlFile path="chenile-trigger-unification.sql" relativeToChangelogFile="false" splitStatements="false"/>
+    </changeSet>
+</databaseChangeLog>

@@ -205,11 +205,11 @@ function Executions({ api, revision, filters, reset, trace }) {
   const list = useResource(api, query('/executions', { ...filters, status, page }), revision);
   return <><div className="section-heading"><div><h2>Trigger history</h2><p className="muted">All trigger sources. Completion means event dispatch finished, not that the resulting process finished.</p></div></div>
     <div className="filters"><label>Dispatch status<select value={status} onChange={e => { setStatus(e.target.value); setPage(0); }}>
-      <option value="">All statuses</option>{['RUNNING', 'COMPLETED', 'FAILED'].map(s => <option key={s}>{s}</option>)}</select></label>
+      <option value="">All statuses</option>{['RECEIVED', 'RUNNING', 'COMPLETED', 'FAILED'].map(s => <option key={s}>{s}</option>)}</select></label>
       {Object.keys(filters).length > 0 && <button onClick={() => { reset(); setPage(0); }}>Clear schedule/trigger filter</button>}</div>
     <Notice resource={list}/>{list.data && <><Table rows={list.data.content} columns={[
       { label: 'Started', render: e => <>{time(e.startedAt)}<small>Finished: {time(e.finishedAt)}</small></> },
-      { label: 'Event / source', render: e => <><strong>{e.eventName}</strong><small>{e.source}</small></> },
+      { label: 'Event / source', render: e => <><strong>{e.eventName}</strong><small>{e.source || 'Unknown'}</small></> },
       { label: 'Trigger', render: e => <button className="link mono" onClick={() => setExpanded(expanded === e.id ? null : e.id)}>{e.triggerId}</button> },
       { label: 'Status', render: e => <Badge>{e.status}</Badge> },
       { label: 'Execution', render: e => <button className="link" onClick={() => trace({ triggerId: e.triggerId })}>Processes & trace →</button> },

@@ -45,7 +45,7 @@ public class SignalParentCommand extends AbstractProcessOutboxCommand {
     @Override protected void dispatchCommand(OutboxCommand entry) throws Exception {
         Data data = read(entry, Data.class);
         String receipt = mapper.writeValueAsString(List.of(data.parentId(), data.childId()));
-        if (!receive("PARENT", receipt)) return;
+        if (!checkIdempotency("PARENT", receipt)) return;
         Object payload;
         if (Constants.Events.SUB_PROCESS_DONE_SUCCESSFULLY.equals(data.eventName()))
             payload = mapper.treeToValue(data.payload(), DoneSuccessfullyPayload.class);

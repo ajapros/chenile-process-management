@@ -89,6 +89,12 @@ Provision the complete existing process/trigger/JPA schema first, plus:
 - `process-outbox/src/main/resources/chenile-process-outbox-schema.sql`
 - `jdbc-process-starter/src/main/resources/chenile-process-work-schema.sql`
 - `process-service/src/main/resources/chenile-process-management-history-schema.sql`
+- `trigger-service/src/main/resources/chenile-trigger-schema.sql` for fresh trigger storage
+
+To upgrade the former separate trigger claim/execution tables, stop all trigger producers and
+apply `trigger-service/src/main/resources/chenile-trigger-unification.sql` in one PostgreSQL
+transaction before starting the new server. The admin Liquibase master includes this guarded
+upgrade too. See [trigger-service](../trigger-service/README.md) for reconciliation and retention.
 
 The history migration assumes that `process_table` already exists. This server does not
 replace your schema migration tooling or automatically upgrade existing production tables.

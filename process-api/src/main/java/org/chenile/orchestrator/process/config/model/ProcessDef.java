@@ -5,7 +5,6 @@ import java.util.Map;
 
 /**
  * Information about a process type.
- * This is optional but highly desirable to give.
  */
 public class ProcessDef {
     public String parentProcessType;

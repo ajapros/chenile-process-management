@@ -31,6 +31,19 @@ database. Process JPA, outbox JDBC, and the JDBC starter must share a DataSource
 Provision at least two connections per concurrent dispatch thread plus request traffic, for independent
 handler and after-commit publication transactions. Use consistent UTC database/JDBC timezones for leases.
 
+`ProcessOutboxConfiguration` is supplied by `process-outbox` in the existing
+`org.chenile.orchestrator.process.configuration` package. The application's normal
+configuration scan discovers it; `ProcessConfiguration` does not import it.
+It activates only when `chenile.process.outbox.enabled=true` and accepts the generic
+command registry without depending on `process-service`.
+
+`OutboxDispatcher.poll()` owns each background cycle: it drains up to 100 commands
+and reports DEAD commands. The configured fixed-delay task is registered only when
+`run-dispatcher` is true (the default). Disabling it leaves the dispatcher available
+for manual `processOne()` and `drainAll(...)` calls without registering a polling task.
+`process-service` still depends on `process-outbox` for the shared command contracts;
+this configuration move does not make that artifact dependency optional.
+
 Every enabled replica polls concurrently using row locks. Set `run-dispatcher=false` only when another
 replica drains work or tests call `OutboxDispatcher.drainAll(100)` **after commit**. Never drain inside the
 transaction that created work. Durable create returns before its workers, children, and successors finish.
@@ -50,7 +63,7 @@ Add a Spring bean implementing `OutboxCommandLifecycle<ProcessTransition>` (or s
 `AbstractProcessOutboxCommand`) to register another process command automatically. Its enqueue
 method decides whether the transition needs that effect. Use the abstract base's `store(...)` helper
 to choose durable persistence or immediate execution centrally;
-use `read(...)` for the typed body and `receive(...)` for mode-aware receipts. Do not bypass this
+use `read(...)` for the typed body and `checkIdempotency(...)` for mode-aware receipt claims (true permits execution). Do not bypass this
 support by writing directly to the repository if the command must also work in inline mode.
 The abstract base provides delivery, JSON reading, receipts, tenant restoration, and independent
 transaction support; each implementation provides its dispatch and optional dead behavior.

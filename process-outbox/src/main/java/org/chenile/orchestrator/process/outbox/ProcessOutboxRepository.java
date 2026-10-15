@@ -114,8 +114,11 @@ public class ProcessOutboxRepository {
                 command.id, command.claimToken) == 1);
     }
 
-    /** Durable consumer receipt: caller commits this alongside the business mutation. */
-    public boolean receive(String consumer, String key) {
+    /**
+     * Atomically claims a consumer/key pair; true allows the first effect, false skips a duplicate.
+     * The caller commits this receipt alongside the business mutation.
+     */
+    public boolean checkIdempotency(String consumer, String key) {
         requireTransaction();
         return jdbc.update("""
                 insert into chenile_process_receipt (consumer, receipt_key, received_at)

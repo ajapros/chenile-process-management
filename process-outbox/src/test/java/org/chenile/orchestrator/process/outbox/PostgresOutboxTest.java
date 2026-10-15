@@ -96,8 +96,8 @@ class PostgresOutboxTest {
         transaction.executeWithoutResult(tx -> {
             assertTrue(repository.enqueue(OutboxTestSupport.emitCompleted("p1", "{}")));
             assertFalse(repository.enqueue(OutboxTestSupport.emitCompleted("p1", "{}")));
-            assertTrue(repository.receive("CHAIN", "receipt"));
-            assertFalse(repository.receive("CHAIN", "receipt"));
+            assertTrue(repository.checkIdempotency("CHAIN", "receipt"));
+            assertFalse(repository.checkIdempotency("CHAIN", "receipt"));
             assertTrue(repository.enqueue(OutboxTestSupport.emitCompleted("p2", "{}")));
         });
         assertEquals(2, repository.backlogCount());
@@ -108,14 +108,14 @@ class PostgresOutboxTest {
         enqueue("p1");
         OutboxCommand command = repository.claimNext("worker", 300, 3).orElseThrow();
         assertThrows(IllegalStateException.class, () -> repository.handleAndComplete(command, OutboxTestSupport.command(command.commandType, c -> {
-            assertTrue(repository.receive("test", c.idempotencyKey));
+            assertTrue(repository.checkIdempotency("test", c.idempotencyKey));
             jdbc.update("insert into business_effect values ('p1')");
             throw new IllegalStateException("crash before ack");
         })));
         assertEquals(0L, jdbc.queryForObject("select count(*) from business_effect", Long.class));
         assertEquals(0L, jdbc.queryForObject("select count(*) from chenile_process_receipt", Long.class));
         repository.handleAndComplete(command, OutboxTestSupport.command(command.commandType, c -> {
-            assertTrue(repository.receive("test", c.idempotencyKey));
+            assertTrue(repository.checkIdempotency("test", c.idempotencyKey));
             jdbc.update("insert into business_effect values ('p1')");
         }));
         assertEquals(1L, jdbc.queryForObject("select count(*) from business_effect", Long.class));

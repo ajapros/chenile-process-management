@@ -52,8 +52,9 @@ public abstract class AbstractProcessOutboxCommand implements OutboxCommandLifec
         return local == null ? mapper.readValue(entry.payload, type) : local;
     }
 
-    protected final boolean receive(String consumer, String key) {
-        return !durable() || outbox.receive(consumer, key);
+    /** True permits execution; durable mode also records the claim in the current transaction. */
+    protected final boolean checkIdempotency(String consumer, String key) {
+        return !durable() || outbox.checkIdempotency(consumer, key);
     }
 
     /** Flush tenant-derived JPA callbacks before returning to the caller's context. */

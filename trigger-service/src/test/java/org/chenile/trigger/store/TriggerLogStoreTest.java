@@ -16,7 +16,8 @@ import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest(classes = TriggerLogStoreTest.Config.class, properties = {
+@SpringBootTest(classes = TriggerLogStoreTest.Config.class,
+        webEnvironment = SpringBootTest.WebEnvironment.NONE, properties = {
         "spring.datasource.url=jdbc:h2:mem:trigger-log;DB_CLOSE_DELAY=-1",
         "spring.jpa.hibernate.ddl-auto=create-drop"})
 class TriggerLogStoreTest {
@@ -35,13 +36,16 @@ class TriggerLogStoreTest {
         assertNotNull(log.id);
         assertThrows(DataIntegrityViolationException.class,
                 () -> store.record(log("trigger-1", "EventA")));
+        assertNotNull(store.markRunning(log.id).startedAt);
         store.markCompleted(log.id);
-        assertEquals(TriggerLogStatus.COMPLETED,
-                store.findByTriggerIdAndEventName("trigger-1", "EventA").orElseThrow().status);
+        TriggerLog completed = store.findByTriggerIdAndEventName("trigger-1", "EventA").orElseThrow();
+        assertEquals(TriggerLogStatus.COMPLETED, completed.status);
+        assertNotNull(completed.finishedAt);
         TriggerLog otherEvent = store.record(log("trigger-1", "EventB"));
-        store.markFailed(otherEvent.id);
-        assertEquals(TriggerLogStatus.FAILED,
-                store.findByTriggerIdAndEventName("trigger-1", "EventB").orElseThrow().status);
+        store.markFailed(otherEvent.id, new IllegalStateException("failed"));
+        TriggerLog failed = store.findByTriggerIdAndEventName("trigger-1", "EventB").orElseThrow();
+        assertEquals(TriggerLogStatus.FAILED, failed.status);
+        assertEquals("failed", failed.error);
     }
 
     @Test

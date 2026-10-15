@@ -102,7 +102,7 @@ class StartWorkerCommandTest {
     @Test void durableWorkSnapshotsConfigurationAndMissingStarterFailsOnlyAtDispatch() throws Exception {
         var definition = definition(Map.of("topic", "original"));
         var outbox = mock(ProcessOutboxRepository.class);
-        when(outbox.receive(eq("WORKER"), anyString())).thenReturn(true);
+        when(outbox.checkIdempotency(eq("WORKER"), anyString())).thenReturn(true);
         var command = command(outbox);
         var process = process(Constants.States.EXECUTING);
         command.enqueue(new ProcessTransition(process, process.getCurrentState()));

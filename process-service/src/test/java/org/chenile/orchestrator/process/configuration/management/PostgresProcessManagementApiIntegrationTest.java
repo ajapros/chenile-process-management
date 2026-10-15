@@ -29,8 +29,8 @@ class PostgresProcessManagementApiIntegrationTest extends DurableProcessManageme
     }
     @Test void historyMigrationCreatesTablesAndIsRerunnable() throws Exception {
         // Only drop test-owned tables inside this test's randomly allocated schema.
-        jdbc.execute("drop table chenile_trigger_execution");
-        var migration = new ResourceDatabasePopulator(new ClassPathResource("chenile-process-management-history-schema.sql"));
+        jdbc.execute("drop table trigger_log");
+        var migration = new ResourceDatabasePopulator(new ClassPathResource("chenile-trigger-schema.sql"), new ClassPathResource("chenile-process-management-history-schema.sql"));
         migration.execute(jdbc.getDataSource()); migration.execute(jdbc.getDataSource());
         definition("source", true, ""); generate("alpha", "migration", "source");
         var root = processes.findAll().get(0); complete(root.id, "alpha");

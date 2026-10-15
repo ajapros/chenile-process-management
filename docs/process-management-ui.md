@@ -64,9 +64,10 @@ in the application's entity scan, and `org.chenile.trigger.store` and `org.cheni
 in its repository scan, alongside the process packages above. This also applies to hosts
 using Chenile configuration-package scanning.
 
-Apply `process-service/src/main/resources/chenile-process-management-history-schema.sql`
+Apply the trigger schema/upgrade from `trigger-service` (see its README), and
+`process-service/src/main/resources/chenile-process-management-history-schema.sql`
 before deploying the updated libraries, even if the management API is disabled: history
-capture is part of trigger/completion production and independent of the optional UI API.
+capture is part of trigger production and independent of the optional UI API.
 The migration is additive and re-runnable. It assumes existing process/trigger tables and
 Spring's snake_case physical naming; adjust the process-table indexes for a different strategy.
 Test environments with Hibernate create/update create the new entity tables automatically.
@@ -167,11 +168,11 @@ not implemented in this first version.
 
 ## History and execution relationships
 
-`TriggerLog` remains only an idempotency store. `chenile_trigger_execution` is a separate
-accepted-dispatch history with source, scheduled/received time, actual start/finish times,
+`TriggerLog` / `trigger_log` is the unified idempotency and
+accepted-dispatch record with source, scheduled/received time, actual start/finish times,
 event name, payload, failure details and cron ID. Duplicate claims do not create new history.
 COMPLETED means dispatch/subscriber handling returned, not that its processes completed.
-RUNNING may remain after a host crash; this is an observation, not a liveness guarantee.
+RECEIVED and RUNNING may remain after a host crash; this is an observation, not a liveness guarantee.
 Non-API external callers should supply `x-chenile-tenant-id` for tenant-visible history.
 Cron events propagate their persisted tenant, overriding any conflicting configured header.
 

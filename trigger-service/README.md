@@ -56,20 +56,42 @@ adapter, correlating each scheduled run with its trigger claim.
 Tenant identity is supplied through the standard `x-chenile-tenant-id` header and is persisted
 as the inherited `BaseJpaEntity.tenant` value.
 
-## Trigger idempotency storage
+## Unified trigger storage
 
-`TriggerLog` in this module maps to `trigger_log`. It contains only `id`, `trigger_id`,
-`event_name`, `trigger_time`, and `status` (`RECEIVED`, `COMPLETED`, or `FAILED`). The database
-uniquely constrains `(trigger_id, event_name)`; no concatenated key is needed. Claims and status
-updates commit independently of event dispatch. Existing claims suppress repeated dispatch,
-including failed or interrupted claims; there is no automatic retry.
+`TriggerLog` maps to `trigger_log`. One retained row owns both the unique
+`(trigger_id, event_name)` claim and dispatch metadata: tenant, source, crontab ID,
+payload, start/finish time and error. The lifecycle is `RECEIVED` → `RUNNING` →
+`COMPLETED` / `FAILED`; each write uses an independent transaction. Duplicate claims
+are suppressed in every state, including failures and interrupted dispatches.
+No automatic retry is introduced. `/executions` reads these same records.
 
-This store is used exclusively by `TriggerService`. Process creation, transitions, workers,
-and completion events do not write records here. A trigger may target `ProcessCreate`, but
-its record identifies the trigger dispatch, not the process creation operation. Direct
-process creation does not consult this table.
+Replace application references to `TriggerExecution` / `TriggerExecutionRepository` with
+`TriggerLog` / `TriggerLogRepository`. Custom `TriggerLogStore` implementations now provide
+`markRunning(id)` and accept the dispatch exception in `markFailed(id, failure)`.
 
-Existing installations must migrate trigger claims to `trigger_log` before switching dispatch:
-copy only former trigger rows, preserve their IDs and statuses, and use `logged_at` as
-`trigger_time`. Process lifecycle rows are excluded. The obsolete generic logger module has
-been removed; this change does not drop existing database tables.
+`TriggerObserver` is an optional extension for metrics or other observations. Its
+default is `NONE`; durable lifecycle writes occur regardless of the selected observer.
+Observer failures are logged and do not turn a successful dispatch into a failure.
+Process completion and delivery receipts remain separate from trigger idempotency.
+
+Apply `chenile-trigger-schema.sql` for new databases. Existing installations must stop
+all trigger producers, back up the two old tables, and run `chenile-trigger-unification.sql`
+as a single PostgreSQL transaction before starting the upgraded application:
+
+```sh
+psql --single-transaction --file=chenile-trigger-unification.sql "$DATABASE_URL"
+```
+
+The optional `db/changelog/chenile-trigger.changelog.xml` applies the same upgrade in
+Liquibase's transaction. It is included by the admin master changelog. Existing claim
+IDs and terminal statuses take precedence; `RECEIVED` with a running execution becomes
+`RUNNING`. Matching execution metadata is copied by trigger/event identity. Claims
+without history retain nullable metadata. Execution-only rows become claims. Duplicate
+execution keys or conflicting IDs abort the upgrade for reconciliation. The old execution
+table is dropped only after merging. The migration can be reapplied.
+
+Retain claim identity and status for the entire duplicate-delivery horizon. Do not delete
+rows merely to prune history: clear `payload` and `error` instead. Deleting a row permits
+that trigger/event to dispatch again. Reusing a key with a different tenant or payload
+still returns the existing claim; the unique key remains global, and adapters must
+namespace tenant-specific trigger IDs as before.

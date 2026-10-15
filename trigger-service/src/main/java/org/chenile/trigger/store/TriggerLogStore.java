@@ -7,6 +7,7 @@ import java.util.Optional;
 public interface TriggerLogStore {
     TriggerLog record(TriggerLog log);
     Optional<TriggerLog> findByTriggerIdAndEventName(String triggerId, String eventName);
+    TriggerLog markRunning(String logId);
     TriggerLog markCompleted(String logId);
-    TriggerLog markFailed(String logId);
+    TriggerLog markFailed(String logId, RuntimeException failure);
 }

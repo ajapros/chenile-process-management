@@ -35,16 +35,16 @@ public class ProcessManagerImpl extends StateEntityServiceImpl<Process> implemen
     ProcessRepository processRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private ProcessOutboxRepository outbox;
-    private TransactionTemplate transactions;
+    private TransactionTemplate transactionTemplate;
 
     @Autowired
     void configureDurability(ObjectProvider<ProcessOutboxRepository> repositories, PlatformTransactionManager manager) {
         outbox = repositories.getIfAvailable();
-        if (outbox != null) transactions = new TransactionTemplate(manager);
+        if (outbox != null) transactionTemplate = new TransactionTemplate(manager);
     }
 
     private <T> T mutate(Supplier<T> mutation) {
-        return transactions == null ? mutation.get() : transactions.execute(tx -> mutation.get());
+        return transactionTemplate == null ? mutation.get() : transactionTemplate.execute(tx -> mutation.get());
     }
     /**
      * @param stm                    the state machine that has read the corresponding State Transition Diagram
@@ -97,7 +97,7 @@ public class ProcessManagerImpl extends StateEntityServiceImpl<Process> implemen
     private List<StateEntityServiceResponse<Process>> startSuccessors(ProcessCompletedEvent event) {
         List<StateEntityServiceResponse<Process>> responses = new ArrayList<>();
         for (ProcessDef definition : processConfigurator.findByPredecessorProcessType(event.processType)) {
-            if (outbox != null && !outbox.receive("CHAIN", receiptKey(event.processId, definition.processType))) continue;
+            if (outbox != null && !outbox.checkIdempotency("CHAIN", receiptKey(event.processId, definition.processType))) continue;
             Map<String, Object> args = CompletionArguments.from(event.input, event.output, definition.predecessorArgs);
             responses.add(createFromDto(event, definition.processType, event.processId, event.tenantId, args));
         }

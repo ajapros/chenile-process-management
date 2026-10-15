@@ -35,7 +35,7 @@ public class CreateSubProcessCommand extends AbstractProcessOutboxCommand {
 
     @Override protected void dispatchCommand(OutboxCommand entry) throws Exception {
         Process child = read(entry, Process.class);
-        if (!receive("CREATE", entry.idempotencyKey)) return;
+        if (!checkIdempotency("CREATE", entry.idempotencyKey)) return;
         if (!durable() || !processes.existsById(child.getId())) managers.getObject().create(child);
     }
 }

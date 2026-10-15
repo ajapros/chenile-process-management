@@ -227,19 +227,30 @@ does not perform its side effects inline; instead each consequence is written as
 drains and executes them. State change and its scheduled consequences therefore commit atomically or not at
 all.
 
-The entry action uses the same registered commands whether durability is enabled or not: it saves the
-process and passes a `ProcessTransition` directly to `OutboxCommandRegistry`. `AbstractProcessOutboxCommand` either persists the command as JSON for
-durable dispatch or, when durability is disabled, invokes it immediately with a live typed body — inline
-mode needs no outbox schema or receipts and preserves synchronous cascades. Parent notification is a
-`SignalParentCommand`, and worker planning and launch use a prepare/dispatch split.
+The consequences of a transition are modelled as a **registry of commands**, not a fixed switch. Each
+command implements `OutboxCommandLifecycle<ProcessTransition>` — `type()` (a stable string discriminator),
+`enqueue(transition)`, `dispatch(command)`, and an optional `onDead(command)` — and is registered as an
+ordered Spring bean in `OutboxCommandRegistry` (via `ProcessCommandConfiguration`). `ProcessEntryAction`
+saves the process and then calls `registry.enqueue(new ProcessTransition(process, toState))`; the registry
+invokes every command's `enqueue` in registration order, and each command decides for itself whether it
+applies to this transition (terminal state, work-pending state, newly created children, a parent to notify).
+When a command is later drained, the dispatcher resolves its stored `command_type` back to the command with
+`registry.resolve(type)`. Adding a new consequence is therefore just registering another bean — no enum,
+switch, or schema change.
 
-Four command types cover the consequences of a transition:
+`AbstractProcessOutboxCommand` is the shared base: its `store(...)` either enqueues the command as JSON for
+durable dispatch or, when durability is disabled, dispatches it immediately with a live typed body (inline
+mode needs no outbox schema or receipts and preserves synchronous cascades); it also scopes/restores the
+tenant context around every `dispatch`/`onDead` and provides the consumer-receipt helper. The same command
+classes run unchanged in both modes.
 
-| Command | Effect |
+Four commands ship by default, covering the consequences of a transition:
+
+| Command (`type()`) | Effect |
 |---|---|
 | `CREATE_SUBPROCESS` | create a child process |
 | `SIGNAL_PARENT` | deliver `subProcessDoneSuccessfully` / `subProcessDoneWithErrors` to the parent |
-| `EMIT_COMPLETED` | run framework chaining and best-effort subscriber fan-out |
+| `EMIT_COMPLETED` | framework chaining (create successors) plus best-effort subscriber fan-out |
 | `START_WORKER` | hand a serialized `WorkerDto` to the configured starter |
 
 Key properties of the mechanism:
@@ -253,8 +264,9 @@ Key properties of the mechanism:
   acknowledgement, so redelivery is a no-op. Parent counting uses a receipt on parent/child identity so a
   child is counted exactly once regardless of redelivery.
 - **Retries and dead-letter.** Failures retry with exponential backoff up to a maximum attempt count, then
-  become `DEAD`, surfaced through `deadCount()` and available for operator `replayDead(id)`. A dead
-  `START_WORKER` is auto-compensated by driving its process to the error terminal
+  become `DEAD`, surfaced through `deadCount()` and available for operator `replayDead(id)`. `DEAD` triggers
+  the command's own `onDead` hook (default: leave it for operator replay); `START_WORKER` overrides it to
+  auto-compensate by driving its process to the error terminal
   (`splitDoneWithErrors` / `doneWithErrors` / `aggregationDoneWithErrors` by worker type) so a worker that
   will never run does not park its subtree.
 - **Draining.** A scheduled poller drains due commands (`drainAll`); it can also be driven explicitly in
@@ -275,7 +287,7 @@ does not introduce another event bus. A `TriggerInput` (trigger id, event id, pa
 recorded, converted to the declared Java event type, and passed to `EventProcessor`. The trigger id plus
 event id form an idempotency claim.
 
-Idempotency is enforced by `TriggerLog` (the `trigger_log` table), whose only columns are `id`,
+Idempotency is enforced by `TriggerLog` (the `trigger_log` table), which retains dispatch metadata alongside `id`,
 `trigger_id`, `event_name`, `trigger_time`, and `status`, with a unique constraint on
 `(trigger_id, event_name)`. Competing dispatches cannot both claim the same pair; a duplicate is detected
 and suppressed in every status, and failed claims are not automatically retried. Claims and status updates
@@ -297,22 +309,15 @@ job-store coordination is out of scope.
 
 ### Trigger execution history (`TriggerObserver`)
 
-Idempotency (`TriggerLog`) and execution history are deliberately separate concerns. `EventTriggerService`
-calls a `TriggerObserver` at the start and end of every accepted dispatch — `started(executionId, input)`
-and `finished(executionId, failure)` — so that a durable, queryable record of *what actually ran* is kept
-without overloading the minimal idempotency claim.
+`trigger_log` is the single record of an accepted trigger. Alongside its idempotency key it stores tenant,
+source, crontab ID, input payload, start/finish times and an error. Lifecycle writes are owned by
+`EventTriggerService` through `TriggerLogStore`, independently of the event transaction. `RECEIVED`
+means accepted but not started; `RUNNING` means dispatch began. Both can remain after a crash and
+continue to suppress duplicate dispatch, just as `COMPLETED` and `FAILED` do.
 
-The default implementation, `DatabaseTriggerObserver`, writes to the `chenile_trigger_execution` table:
-start and finish times, status (`RUNNING` → `COMPLETED` / `FAILED`), error message, source (`CRON` vs
-external), crontab id, tenant, and payload. This is the operator-facing "what happened, when, how long, did
-it succeed" view that an idempotency claim cannot provide.
-
-The observer is pluggable and non-intrusive: `EventTriggerService` depends only on the interface, the
-wiring is `@ConditionalOnMissingBean(TriggerObserver.class)` so an application can substitute its own
-(metrics/APM, event emission, a different store) or disable history with the no-op `TriggerObserver.NONE`;
-`started` / `finished` run in `REQUIRES_NEW` transactions so history commits independently (a failed
-dispatch is still recorded); and a failure thrown by `finished` is suppressed into the original exception
-so observing can never mask or change the dispatch outcome.
+`TriggerObserver` remains optional for metrics or custom observation. The default is `NONE`; replacing
+or disabling it does not disable persisted history. Callback failures are logged without changing a
+successful dispatch outcome. The management API queries the unified records, including unstarted claims.
 
 ## Multi-tenancy
 
@@ -414,26 +419,26 @@ discriminator), `payload` (TEXT, command-owned JSON), `idempotency_key` (unique)
 
 ### Triggering
 
-`trigger_log` (entity `TriggerLog`, idempotency only) — `id` (PK), `trigger_id`, `event_name`,
-`trigger_time`, `status` (RECEIVED/COMPLETED/FAILED), with a unique constraint on
-`(trigger_id, event_name)`.
-
-`chenile_trigger_execution` (explicit SQL, execution history) — `id` (PK), `tenant`, `trigger_id`,
-`event_name`, `source` (CRON/external), `crontab_id`, `trigger_time`, `started_at`, `finished_at`, `status`
-(RUNNING/COMPLETED/FAILED), `error` (TEXT), `payload` (TEXT). Indexes on `(tenant, started_at)`,
-`(tenant, trigger_id)`, `(tenant, crontab_id)`.
+`trigger_log` (entity `TriggerLog`) — `id`, `trigger_id`, `event_name`, `trigger_time`, `status`
+(RECEIVED/RUNNING/COMPLETED/FAILED), tenant, source, `crontab_id`, nullable `started_at` / `finished_at`,
+error and payload. Unique `(trigger_id,event_name)`; indexes on `(tenant,started_at)`,
+`(tenant,trigger_id)` and `(tenant,crontab_id)`. Retain claim rows; prune bulky payload/error fields
+separately if needed. The former execution table is merged and removed.
 
 `chenile_crontab` (entity `Crontab`, durable schedules) — `name` (unique), `enabled` (boolean, indexed),
 `cron_expression`, `timezone`, `event_name`, `headers_json` (TEXT), `event_payload_json` (TEXT), plus base
 columns. (JSON-file schedules via `JsonCrontabRepository` use the same shape without a table.)
 
 Completion has no separate table: terminal status, terminal state-entry time, and `predecessor_id`
-provide completion and successor lineage on `process_table`. Trigger claims and trigger dispatch
-history remain separate.
+provide completion and successor lineage on `process_table`. Trigger claims and dispatch
+history share `trigger_log`.
 
 ### Schema management (explicit SQL or optional Liquibase)
 
 Each owning module ships raw-SQL scripts you can apply with any tool:
+`trigger-service/.../chenile-trigger-schema.sql` for fresh trigger storage, and
+`trigger-service/.../chenile-trigger-unification.sql` for the PostgreSQL upgrade (single transaction; stop producers first).
+See [trigger-service](../trigger-service/README.md) for reconciliation and retention rules.
 `jdbc-process-starter/.../chenile-process-work-schema.sql`,
 `process-outbox/.../chenile-process-outbox-schema.sql` (plus `...-json-migration.sql` for the one-time
 upgrade of an older outbox layout), and
@@ -451,8 +456,8 @@ Hibernate may already have created:
 |---|---|
 | `chenile-process-jdbc` | `chenile_process_work_item` |
 | `chenile-process-outbox` | `chenile_process_outbox`, `chenile_process_receipt` |
-| `chenile-process-history` | `chenile_trigger_execution`, the management indexes on `process_table` |
-| `chenile-process-reference` | `trigger_log`, `process_definition` |
+| `chenile-process-history` | unified `trigger_log`, management indexes on `process_table` |
+| `chenile-process-reference` | unified `trigger_log`, `process_definition` |
 
 Example: `spring.liquibase.contexts=chenile-process-outbox,chenile-process-history`. The STM/base-entity
 tables (`process_table`, `subprocess_error`, `chenile_crontab`) are intentionally left to Hibernate or to a
@@ -473,8 +478,8 @@ process-to-process `SUCCESSOR` edges instead of completion-event nodes.
 |---|---|---|
 | `chenile.process.configurator` | `json` | `json` or `database` definition source |
 | `chenile.process.outbox.enabled` | `false` | enable durable transactional outbox |
-| `chenile.process.outbox.run-dispatcher` | `true` | run the draining poller on this instance |
-| `chenile.process.outbox.poll-interval-millis` | `1000` | poller interval |
+| `chenile.process.outbox.run-dispatcher` | `true` | schedule dispatcher polling on this instance |
+| `chenile.process.outbox.poll-interval-millis` | `1000` | dispatcher polling interval |
 | `chenile.process.outbox.lock-seconds` | `300` | outbox command lease duration |
 | `chenile.process.outbox.max-attempts` | `5` | retries before a command is `DEAD` |
 | `chenile.process.outbox.worker-id` | hostname | claimant identity for leases |

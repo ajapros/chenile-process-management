@@ -41,7 +41,7 @@ public class StartWorkerCommand extends AbstractProcessOutboxCommand {
 
     @Override protected void dispatchCommand(OutboxCommand entry) throws Exception {
         WorkerDto worker = read(entry, WorkerDto.class);
-        if (receive("WORKER", entry.idempotencyKey)) {
+        if (checkIdempotency("WORKER", entry.idempotencyKey)) {
             WorkerStarter starter = starters.getIfAvailable();
             if (starter == null) throw new IllegalStateException("No WorkerStarter configured for durable dispatch");
             starter.start(worker);

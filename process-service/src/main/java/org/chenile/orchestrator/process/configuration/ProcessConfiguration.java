@@ -34,7 +34,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
  Process related workflow configurations in Spring
  */
 @Configuration
-@Import({ProcessCommandConfiguration.class, ProcessOutboxConfiguration.class})
+@Import(ProcessCommandConfiguration.class)
 public class ProcessConfiguration {
     private static final String FLOW_DEFINITION_FILE = "org/chenile/orchestrator/process/process-states.xml";
     public static final String PREFIX_FOR_PROPERTIES = "Process";

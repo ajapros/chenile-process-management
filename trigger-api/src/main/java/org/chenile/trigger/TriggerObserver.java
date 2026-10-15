@@ -2,7 +2,7 @@ package org.chenile.trigger;
 
 import org.chenile.trigger.model.TriggerInput;
 
-/** Execution history is deliberately separate from trigger idempotency. */
+/** Optional dispatch observation; persisted trigger lifecycle does not depend on this extension. */
 public interface TriggerObserver {
     TriggerObserver NONE = new TriggerObserver() {};
     default void started(String executionId, TriggerInput input) {}

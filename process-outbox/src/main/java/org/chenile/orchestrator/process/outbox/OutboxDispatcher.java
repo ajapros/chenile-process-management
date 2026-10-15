@@ -8,7 +8,7 @@ import org.slf4j.LoggerFactory;
  * it DONE or (on failure) applies the {@link OutboxRetryPolicy}.
  *
  * <p>{@link #processOne} does one command; {@link #drainAll} loops until nothing is due. Production
- * runs {@code processOne} behind a poll loop (or scales replicas off {@link
+ * schedules {@link #poll()} (or scales replicas off {@link
  * ProcessOutboxRepository#backlogCount()}); in-VM / test flows call {@code drainAll} on the calling
  * thread right after the state-save transaction commits, preserving today's synchronous cascade
  * semantics so the existing tests keep working.
@@ -32,6 +32,13 @@ public class OutboxDispatcher {
 		this.workerId = workerId;
 		this.lockSeconds = lockSeconds;
 	}
+
+    /** One background polling cycle; manual dispatch remains available when scheduling is disabled. */
+    public void poll() {
+        drainAll(100);
+        long dead = repository.deadCount();
+        if (dead > 0) logger.error("Process outbox has {} DEAD commands requiring operator intervention", dead);
+    }
 
 	/** @return true if a command was claimed (success or failure), false if none was due. */
 	public boolean processOne() {

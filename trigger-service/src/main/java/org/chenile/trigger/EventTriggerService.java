@@ -1,6 +1,9 @@
 package org.chenile.trigger;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.chenile.core.context.HeaderUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.chenile.core.context.ChenileExchange;
 import org.chenile.core.event.EventProcessor;
 import org.chenile.core.model.ChenileConfiguration;
@@ -21,6 +24,8 @@ import java.util.UUID;
 
 /** Dispatches a fully-formed trigger event through Chenile's existing EventProcessor. */
 public class EventTriggerService implements TriggerService {
+    private static final Logger LOG = LoggerFactory.getLogger(EventTriggerService.class);
+    private final ObjectMapper historyMapper = new ObjectMapper().findAndRegisterModules();
     private final TriggerLogStore triggerLogStore;
     private final EventProcessor eventProcessor;
     private final ChenileConfiguration configuration;
@@ -63,19 +68,20 @@ public class EventTriggerService implements TriggerService {
                     .orElseThrow(() -> duplicate), true);
         }
         try {
-            observer.started(log.id, input);
+            triggerLogStore.markRunning(log.id);
+            notifyStarted(log.id, input);
             Map<String, String> headers = new HashMap<>(safeHeaders(input.headers));
             headers.put("x-chenile-trigger-id", input.triggerId);
             List<ChenileExchange> exchanges = eventProcessor.handleEvent(input.eventId, typedPayload(input), headers);
             Optional<ChenileExchange> failed = exchanges.stream().filter(e -> e.getException() != null).findFirst();
             if (failed.isPresent()) throw new IllegalStateException(failed.get().getException().getMessage(), failed.get().getException());
             triggerLogStore.markCompleted(log.id);
-            observer.finished(log.id, null);
+            notifyFinished(log.id, null);
             return new TriggerResult(input.triggerId, input.eventId, log.id, true, false);
         } catch (RuntimeException exception) {
-            triggerLogStore.markFailed(log.id);
-            try { observer.finished(log.id, exception); }
-            catch (RuntimeException historyFailure) { exception.addSuppressed(historyFailure); }
+            try { triggerLogStore.markFailed(log.id, exception); }
+            catch (RuntimeException persistenceFailure) { exception.addSuppressed(persistenceFailure); }
+            notifyFinished(log.id, exception);
             throw exception;
         }
     }
@@ -96,7 +102,26 @@ public class EventTriggerService implements TriggerService {
         log.triggerId = input.triggerId;
         log.eventName = input.eventId;
         log.triggerTime = input.triggerTime;
+        var headers = safeHeaders(input.headers);
+        log.tenant = headers.get(HeaderUtils.TENANT_ID_KEY);
+        log.source = headers.getOrDefault("chenile-trigger-source", "EXTERNAL");
+        log.crontabId = headers.get("chenile-crontab-id");
+        try { log.payload = historyMapper.writeValueAsString(input.payload); }
+        catch (Exception failure) { throw new IllegalArgumentException("Cannot serialize trigger payload", failure); }
         return triggerLogStore.record(log);
+    }
+
+    private void notifyStarted(String id, TriggerInput input) {
+        try { observer.started(id, input); }
+        catch (RuntimeException failure) { LOG.warn("Trigger observer start failed for {}", id, failure); }
+    }
+
+    private void notifyFinished(String id, RuntimeException dispatchFailure) {
+        try { observer.finished(id, dispatchFailure); }
+        catch (RuntimeException failure) {
+            if (dispatchFailure != null) dispatchFailure.addSuppressed(failure);
+            LOG.warn("Trigger observer finish failed for {}", id, failure);
+        }
     }
 
     private Map<String, String> safeHeaders(Map<String, String> headers) { return headers == null ? Map.of() : headers; }

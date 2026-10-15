@@ -9,12 +9,13 @@
   Contexts select which tables to apply:
     chenile-process-jdbc       -> chenile_process_work_item
     chenile-process-outbox     -> chenile_process_outbox, chenile_process_receipt
-    chenile-process-history    -> chenile_trigger_execution, process_table indexes (removes the retired completion snapshot table)
+    chenile-process-history    -> trigger_log, process_table indexes (removes the retired completion snapshot table)
     chenile-process-reference  -> trigger_log, process_definition
+    Trigger unification runs under either history or reference context.
 
-  Running with no contexts applies all four. Every changeset no-ops if its table already exists, so this is
+  Running with no contexts applies all four. Initial-table changesets no-op if their table already exists; upgrade changesets reconcile legacy data, so this is
   safe alongside Hibernate-created tables. The included files resolve on the classpath, so the owning module
-  jars (jdbc-process-starter, process-outbox, process-service) must be on the runtime classpath — they are
+  jars (jdbc-process-starter, process-outbox, process-service, trigger-service) must be on the runtime classpath — they are
   for process-admin-server. A library host may instead point change-log at a single module's changelog.
 -->
 <databaseChangeLog
@@ -25,6 +26,7 @@
 
     <include file="db/changelog/chenile-process-work.changelog.xml" relativeToChangelogFile="false"/>
     <include file="db/changelog/chenile-process-outbox.changelog.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/chenile-trigger.changelog.xml" relativeToChangelogFile="false"/>
     <include file="db/changelog/chenile-process-history.changelog.xml" relativeToChangelogFile="false"/>
     <include file="db/changelog/chenile-process-reference.changelog.xml" relativeToChangelogFile="false"/>
 </databaseChangeLog>

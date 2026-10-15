@@ -12,7 +12,7 @@ import org.chenile.orchestrator.process.service.defs.DatabaseProcessConfigurator
 import org.chenile.trigger.TriggerService;
 import org.chenile.trigger.cron.*;
 import org.chenile.trigger.model.*;
-import org.chenile.trigger.store.TriggerExecutionRepository;
+import org.chenile.trigger.store.TriggerLogRepository;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
@@ -30,13 +30,13 @@ public class ProcessManagementService {
     private final ProcessConfigurator configurator;
     private final CrontabRepository crontabs;
     private final ObjectProvider<CrontabService> cronServices;
-    private final TriggerExecutionRepository executions;
+    private final TriggerLogRepository executions;
     private final TriggerService triggers;
     private final ObjectMapper json = new ObjectMapper();
     public ProcessManagementService(ProcessRepository processes,
             ProcessDefinitionRepository definitions, ProcessConfigurator configurator,
             CrontabRepository crontabs, ObjectProvider<CrontabService> cronServices,
-            TriggerExecutionRepository executions, TriggerService triggers) {
+            TriggerLogRepository executions, TriggerService triggers) {
         this.processes = processes; this.definitions = definitions;
         this.configurator = configurator; this.crontabs = crontabs; this.cronServices = cronServices;
         this.executions = executions; this.triggers = triggers;
@@ -91,11 +91,16 @@ public class ProcessManagementService {
                 .and((r,q,c) -> c.equal(r.get("id"), id))).orElseThrow(ProcessManagementService::notFound);
         return new ProcessDetail(ProcessView.of(p));
     }
-    public PageResult<TriggerExecution> executions(String tenant, String triggerId, String crontabId,
+    public PageResult<TriggerLog> executions(String tenant, String triggerId, String crontabId,
             String status, int page, int size) {
-        Specification<TriggerExecution> query = filter(tenant(tenant), "triggerId", triggerId);
+        Specification<TriggerLog> query = filter(tenant(tenant), "triggerId", triggerId);
         query = filter(query, "crontabId", crontabId);
-        query = filter(query, "status", status);
+        if (present(status)) {
+            TriggerLogStatus selected;
+            try { selected = TriggerLogStatus.valueOf(status); }
+            catch (IllegalArgumentException invalid) { throw bad("Invalid trigger status"); }
+            query = query.and((r, q, c) -> c.equal(r.get("status"), selected));
+        }
         return PageResult.of(executions.findAll(query, page(page, size, "startedAt")));
     }
     public PageResult<Crontab> crontabs(String tenant, int page, int size) {
@@ -203,14 +208,14 @@ public class ProcessManagementService {
                 throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "Execution exceeds 1000 processes; use paginated process queries to inspect branches");
         } while (!frontier.isEmpty());
         List<Node> nodes = new ArrayList<>(); List<Edge> edges = new ArrayList<>();
-        var histories = executions.findAll(ProcessManagementService.<TriggerExecution>tenant(tenant)
+        var histories = executions.findAll(ProcessManagementService.<TriggerLog>tenant(tenant)
             .and((r,q,c) -> r.get("triggerId").in(triggerIds)), PageRequest.of(0, 1001)).getContent();
         if (histories.size() > 1000) throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "Too many trigger events for one trace");
         Map<String, String> triggerNodes = new HashMap<>();
         for (var e : histories) {
             String id = "trigger:" + e.id;
             if ("ProcessCreate".equals(e.eventName)) triggerNodes.put(e.triggerId, id);
-            nodes.add(new Node(id, "TRIGGER", e.eventName + " · " + e.source, e.status, e.startedAt.toString(), e));
+            nodes.add(new Node(id, "TRIGGER", e.eventName + " · " + (e.source == null ? "UNKNOWN" : e.source), e.status.name(), (e.startedAt == null ? e.triggerTime : e.startedAt).toString(), e));
         }
         for (var p : found.values()) {
             String id = "process:" + p.id; var view = ProcessView.of(p);

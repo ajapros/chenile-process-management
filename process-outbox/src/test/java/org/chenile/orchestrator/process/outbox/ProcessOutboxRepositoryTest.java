@@ -100,7 +100,7 @@ public class ProcessOutboxRepositoryTest {
 		enqueue(OutboxTestSupport.emitCompleted("p1", "{}"));
 		OutboxCommand claimed = repository.claimNext("w1", 300, 5).orElseThrow();
 		OutboxCommandLifecycle<Void> failing = OutboxTestSupport.command("EMIT_COMPLETED", cmd -> {
-			repository.receive("TEST", "k1"); // a local mutation inside the dispatch transaction
+			repository.checkIdempotency("TEST", "k1"); // a local mutation inside the dispatch transaction
 			throw new RuntimeException("boom");
 		});
 		try {
@@ -110,7 +110,7 @@ public class ProcessOutboxRepositoryTest {
 			// handleAndComplete rolled back
 		}
 		// The receipt must be gone: a fresh insert of the same key succeeds (true == freshly inserted).
-		Assert.assertTrue(txTemplate.execute(tx -> repository.receive("TEST", "k1")));
+		Assert.assertTrue(txTemplate.execute(tx -> repository.checkIdempotency("TEST", "k1")));
 		// The command was never acknowledged; the dispatcher's failure path now makes it retryable.
 		OutboxRetryPolicy policy = new OutboxRetryPolicy();
 		policy.initialIntervalMillis = 0L;

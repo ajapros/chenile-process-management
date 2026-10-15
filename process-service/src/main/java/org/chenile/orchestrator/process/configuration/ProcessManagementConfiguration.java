@@ -5,7 +5,7 @@ import org.chenile.orchestrator.process.configuration.dao.*;
 import org.chenile.orchestrator.process.configuration.management.*;
 import org.chenile.trigger.TriggerService;
 import org.chenile.trigger.cron.*;
-import org.chenile.trigger.store.TriggerExecutionRepository;
+import org.chenile.trigger.store.TriggerLogRepository;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -17,7 +17,7 @@ import org.springframework.context.annotation.*;
 public class ProcessManagementConfiguration {
     @Bean ProcessManagementService processManagementService(ProcessRepository processes,
             ProcessDefinitionRepository definitions, ProcessConfigurator configurator, CrontabRepository crontabs,
-            ObjectProvider<CrontabService> cronServices, TriggerExecutionRepository executions, TriggerService triggers) {
+            ObjectProvider<CrontabService> cronServices, TriggerLogRepository executions, TriggerService triggers) {
         return new ProcessManagementService(processes, definitions, configurator, crontabs, cronServices, executions, triggers);
     }
     @Bean FilterRegistrationBean<ManagementApiFilter> managementApiFilter(

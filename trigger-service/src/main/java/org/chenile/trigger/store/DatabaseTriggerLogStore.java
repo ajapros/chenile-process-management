@@ -5,6 +5,7 @@ import org.chenile.trigger.model.TriggerLogStatus;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.Optional;
+import java.time.Instant;
 
 public class DatabaseTriggerLogStore implements TriggerLogStore {
     private final TriggerLogRepository repository;
@@ -20,14 +21,20 @@ public class DatabaseTriggerLogStore implements TriggerLogStore {
     }
 
     @Override @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public TriggerLog markCompleted(String logId) { return updateStatus(logId, TriggerLogStatus.COMPLETED); }
+    public TriggerLog markRunning(String logId) { return updateStatus(logId, TriggerLogStatus.RUNNING, null); }
 
     @Override @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public TriggerLog markFailed(String logId) { return updateStatus(logId, TriggerLogStatus.FAILED); }
+    public TriggerLog markCompleted(String logId) { return updateStatus(logId, TriggerLogStatus.COMPLETED, null); }
 
-    private TriggerLog updateStatus(String logId, TriggerLogStatus status) {
+    @Override @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public TriggerLog markFailed(String logId, RuntimeException failure) { return updateStatus(logId, TriggerLogStatus.FAILED, failure); }
+
+    private TriggerLog updateStatus(String logId, TriggerLogStatus status, RuntimeException failure) {
         TriggerLog log = repository.findById(logId).orElseThrow();
         log.status = status;
+        if (status == TriggerLogStatus.RUNNING) log.startedAt = Instant.now();
+        else log.finishedAt = Instant.now();
+        log.error = failure == null ? null : failure.getMessage();
         return repository.saveAndFlush(log);
     }
 }
