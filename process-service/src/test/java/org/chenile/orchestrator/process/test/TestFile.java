@@ -18,10 +18,12 @@ import org.springframework.test.context.junit4.SpringRunner;
 @AutoConfigureMockMvc
 @ActiveProfiles("unittest")
 public class TestFile {
+    @Autowired org.chenile.orchestrator.process.outbox.OutboxDispatcher dispatcher;
     @Autowired
     StateEntityService<Process> processManager;
     @Before
     public void setUp(){
+        SharedData.SYNCH_MODE = true;
 
     }
     @Test
@@ -31,6 +33,7 @@ public class TestFile {
         process.processType = "file";
         process.id = "file-process1";
         process = processManager.create(process).getMutatedEntity();
+        dispatcher.drainAll(1000);
         System.err.println("Current state of file is " + process.getCurrentState().getStateId());
         Process chunkProcess = processManager.retrieve(process.id + "CHUNK1").getMutatedEntity();
         Process fileProcess = processManager.retrieve(process.id).getMutatedEntity();

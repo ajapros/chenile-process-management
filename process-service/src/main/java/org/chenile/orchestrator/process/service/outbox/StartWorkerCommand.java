@@ -32,7 +32,6 @@ public class StartWorkerCommand extends AbstractProcessOutboxCommand {
     @Override public String type() { return TYPE; }
 
     @Override public void enqueue(ProcessTransition transition) throws Exception {
-        if (!durable() && starters.getIfAvailable() == null) return;
         WorkerDto worker = prepare(transition.process());
         if (worker == null) return;
         worker.dispatchId = transition.process().getId() + ":" + worker.workerType;
@@ -48,7 +47,7 @@ public class StartWorkerCommand extends AbstractProcessOutboxCommand {
         }
     }
 
-    /** Snapshot the work definition before durable delivery; inline execution retains the live process. */
+    /** Snapshot the work definition before durable delivery. */
     private WorkerDto prepare(Process process) {
         if (process.skipPostWorkerCreation) return null;
         var definition = configurator.findByName(process.processType);

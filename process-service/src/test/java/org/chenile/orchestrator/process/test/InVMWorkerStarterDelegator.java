@@ -23,6 +23,8 @@ import static org.chenile.orchestrator.process.test.SharedData.SYNCH_MODE;
 public class InVMWorkerStarterDelegator implements WorkerStarter {
     @Autowired
     ApplicationContext applicationContext;
+    @Autowired org.chenile.orchestrator.process.outbox.OutboxDispatcher dispatcher;
+    @jakarta.annotation.PreDestroy void stopWorkers() { executorService.shutdownNow(); }
     ExecutorService executorService = Executors.newFixedThreadPool(20);
     @Override
     public void start(WorkerDto workerDto){
@@ -43,17 +45,19 @@ public class InVMWorkerStarterDelegator implements WorkerStarter {
 
     protected void doAsynchStart(WorkerStarter actualWorker,
                            WorkerDto workerDto) {
+        String latchKey = workerDto.process.id + "-" + workerDto.workerType.name();
+        String proceedKey = latchKey + "PROCEED";
+        CountDownLatch latch = new CountDownLatch(1);
+        LATCHES.put(latchKey, latch);
         executorService.submit(() -> {
             try {
-                String latchKey = workerDto.process.id + "-" + workerDto.workerType.name();
-                String proceedKey = latchKey + "PROCEED";
-                CountDownLatch latch = new CountDownLatch(1);
-                LATCHES.put(latchKey , latch);
                 latch.await();
                 actualWorker.start(workerDto);
+                // The worker's transition has committed; deliver its recorded consequences next.
+                dispatcher.drainAll(1000);
                 LATCHES.get(proceedKey).countDown();
-            }catch (Exception e){
-                e.printStackTrace();
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
             }
         });
     }

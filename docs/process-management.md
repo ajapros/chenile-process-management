@@ -32,6 +32,10 @@ through a dispatcher with at-least-once delivery, consumer-receipt idempotency, 
 retry/backoff, dead-letter handling with compensation, and a reference target of PostgreSQL. Everything —
 state, definitions, outbox, receipts, and trigger idempotency — lives in the application's own database.
 
+> **Diagrams:** see [process-management-diagrams.md](process-management-diagrams.md) for a sequence diagram
+> (cron → trigger → root process → splitter → leaf child → chained successor) and an entity-relationship
+> diagram of the data model.
+
 ## Modules
 
 The Maven reactor is organised into focused modules.
@@ -189,7 +193,7 @@ configuration for the current state and hands a `WorkerDto` to the configured `W
 Every worker type for a process receives the same `config` map from the process definition (copied, never
 mutated). Worker preparation happens at enqueue time, so durable commands retain their original
 configuration snapshot. `StartWorkerCommand` resolves the application's `WorkerStarter` lazily at dispatch;
-inline execution without a starter remains a no-op, while durable dispatch without one fails and retries.
+dispatch without a starter fails and retries.
 Starter configurations expose beans directly; they no longer inject or mutate a `PostSaveHook` bean.
 Applications previously calling `postSaveHook.setWorkerStarter(...)` must instead supply a `WorkerStarter`
 bean. With multiple candidates, select one using `@Primary`; otherwise resolution fails as ambiguous.
@@ -220,9 +224,8 @@ through `IProcessConfigurator.findByName`, with the source selected by property:
 
 ## Durable execution (transactional outbox)
 
-For deployments that need every consequence of a transition to survive a crash, Process Management offers a
-transactional outbox, enabled with `chenile.process.outbox.enabled=true`. When enabled, `ProcessEntryAction`
-does not perform its side effects inline; instead each consequence is written as a row in
+Process Management requires a transactional outbox. Every transition saves its state and records its
+consequences atomically. `ProcessEntryAction` never executes effects inline; each consequence is a row in
 `chenile_process_outbox` **in the same database transaction that saves the `Process`**, and a dispatcher
 drains and executes them. State change and its scheduled consequences therefore commit atomically or not at
 all.
@@ -238,11 +241,10 @@ When a command is later drained, the dispatcher resolves its stored `command_typ
 `registry.resolve(type)`. Adding a new consequence is therefore just registering another bean — no enum,
 switch, or schema change.
 
-`AbstractProcessOutboxCommand` is the shared base: its `store(...)` either enqueues the command as JSON for
-durable dispatch or, when durability is disabled, dispatches it immediately with a live typed body (inline
-mode needs no outbox schema or receipts and preserves synchronous cascades); it also scopes/restores the
-tenant context around every `dispatch`/`onDead` and provides the consumer-receipt helper. The same command
-classes run unchanged in both modes.
+`AbstractProcessOutboxCommand` is the shared base: `store(...)` records a JSON snapshot, and dispatch
+reads that snapshot after the originating transition commits. It scopes/restores tenant context around
+`dispatch`/`onDead` and provides the transactional consumer-receipt helper. Process calls return the
+committed transition state; workers and successor cascades complete separately.
 
 Four commands ship by default, covering the consequences of a transition:
 
@@ -250,7 +252,7 @@ Four commands ship by default, covering the consequences of a transition:
 |---|---|
 | `CREATE_SUBPROCESS` | create a child process |
 | `SIGNAL_PARENT` | deliver `subProcessDoneSuccessfully` / `subProcessDoneWithErrors` to the parent |
-| `EMIT_COMPLETED` | framework chaining (create successors) plus best-effort subscriber fan-out |
+| `EMIT_COMPLETED` | publish `ProcessCompleted` through EventProcessor, including the framework chaining subscriber |
 | `START_WORKER` | hand a serialized `WorkerDto` to the configured starter |
 
 Key properties of the mechanism:
@@ -286,7 +288,7 @@ problem. They are easy to confuse, so they are spelled out here:
    loser cannot acknowledge, fail, or keep its effect — its whole transaction (effect included) rolls back
    when it tries to ack with a stale token. This makes re-delivery of a *single row* safe, but it does not
    make a non-idempotent effect safe across *different* rows that represent the same business fact.
-3. **Effect-level idempotency — `receive(consumer, key)` against `chenile_process_receipt`.** This is the
+3. **Effect-level idempotency — `checkIdempotency(consumer, key)` against `chenile_process_receipt`.** This is the
    actual idempotency check. It is an atomic insert-or-skip:
 
    ```sql
@@ -301,9 +303,8 @@ problem. They are easy to confuse, so they are spelled out here:
    marker and the effect commit together or roll back together — there is no window where one exists without
    the other. The check is atomic (the unique constraint arbitrates races), so there is no check-then-act gap.
 
-   `receive` engages only in durable mode; inline mode short-circuits to `true`
-   (`!durable() || outbox.receive(...)`) and never touches the table, because inline execution does not
-   redeliver. The receipt keys are business identities, not the outbox row id, which is what lets it dedupe
+   Receipt checks always participate in the command transaction. The receipt keys are business
+   identities, not the outbox row id, which is what lets them dedupe
    across distinct-but-equivalent commands and across `replayDead`:
 
    | Consumer | Receipt key | Why it is load-bearing |
@@ -314,10 +315,12 @@ problem. They are easy to confuse, so they are spelled out here:
    | `WORKER` | `{processId}:{workerType}` | de-dupes worker dispatch (receivers should also dedupe on `WorkerDto.dispatchId`) |
 
    These guards are why `chenile_process_receipt` is retained. Because it is append-only, prune it on a
-   retention horizon no shorter than the maximum time a `DEAD` command could still be replayed.
+   retention horizon no shorter than the maximum time a `DEAD` command could still be replayed. For why this
+   is a separate table rather than folded into the outbox row's `idempotency_key` / `status`, see
+   [process-management-diagrams.md](process-management-diagrams.md#why-chenile_process_receipt-is-a-separate-table-not-folded-into-the-outbox).
 
-Effects that cannot be committed on the shared datasource — a broker publish from the queue-based starter,
-or the after-commit subscriber fan-out — are at-least-once; their receivers must deduplicate (workers on
+Effects that cannot be committed on the shared datasource — a broker publish from the queue-based starter
+or an external call by a completion subscriber — are at-least-once; their receivers must deduplicate (workers on
 `WorkerDto.dispatchId`). The outbox targets PostgreSQL as its reference database. See
 [process-outbox.md](process-outbox.md) for operational detail and
 [adr/0001-durable-outbox-for-process-entry-action.md](adr/0001-durable-outbox-for-process-entry-action.md)
@@ -374,14 +377,17 @@ When a process reaches a terminal state it emits a transport-neutral `ProcessCom
 `processId`, `processType`, `tenantId`, `triggerId`, `state`, `input`, `output`, and a `successful` flag.
 A process definition declares a predecessor relationship (`predecessorProcessType`, `predecessorArgs` —
 `INPUT` / `OUTPUT` / `BOTH`), and on completion the matching successors are created as new processes — the
-mechanism for composing one process after another. Predecessor cycles are rejected. Under durable execution
-this chaining is part of the completion command's transaction, while delivery to arbitrary application
-subscribers is best-effort after commit.
+mechanism for composing one process after another. Predecessor cycles are rejected. The originating
+transition commits before the completion command executes. The command publishes once through EventProcessor;
+the existing `ProcessCompleted` subscriber invokes `ProcessManager.processCompleted` through Chenile.
+Framework chaining and application subscribers run in the command transaction, not the originating transition.
+Subscriber failures roll back local effects, receipts, and acknowledgement so the command can retry.
+External effects must be idempotent because they cannot be undone by database rollback.
 
 Completion is recorded by the process's terminal state. The management API exposes `completedAt`
 from its terminal `stateEntryTime`; a nonterminal process has no completion timestamp. The completion
 command publishes the event without a separate history row. Durable delivery retains the serialized
-payload in the outbox for its configured retention horizon; subscriber delivery remains best-effort.
+payload in the outbox for its configured retention horizon; failed subscriber delivery follows outbox retries.
 
 ## Management API and the admin console
 
@@ -409,8 +415,9 @@ queries are tenant-scoped with parameterized JPA criteria.
 management API is enabled, a ≥32-character key is set, all routes are protected, and (outside the `dev`
 profile) a PostgreSQL datasource is configured; an `ApplicationRunner` also verifies the required delivery
 tables exist (`ddl-auto=validate`, `sql.init.mode=never` — operators apply the schema). It defaults to the
-database configurator, the outbox enabled, and the JDBC worker starter with `run-worker=false` (business
-workers remain application-provided), and binds to `127.0.0.1` with external-API logging and Swagger off. The
+database configurator and the JDBC worker starter with `run-worker=false` (business workers remain
+application-provided), and binds to `127.0.0.1` with external-API logging and Swagger off. (The durable
+outbox is always on — it is no longer a toggle.) The
 history/management schema is `process-service/src/main/resources/chenile-process-management-history-schema.sql`
 (additive, re-runnable). The `process-ui` console (React + Vite) talks only to `/process-management/api`,
 holds the key in memory (never in a Vite env file or bundle), and should sit behind a same-origin HTTPS
@@ -457,7 +464,7 @@ discriminator), `payload` (TEXT, command-owned JSON), `idempotency_key` (unique)
 `locked_by`, `claim_token`, `tenant_id`, `locked_until`, `created_at`, `updated_at`, `finished_at`,
 `error_message`. Indexes: `(status, visible_after, locked_until)`, `(process_id)`.
 
-`chenile_process_receipt` — the effect-level idempotency ledger behind `receive(consumer, key)` (see
+`chenile_process_receipt` — the effect-level idempotency ledger behind `checkIdempotency(consumer, key)` (see
 "Idempotency guards"), composite PK `(consumer, receipt_key)` plus `received_at`; a receipt commits with the
 effect and acknowledgement so a redelivered command is a no-op. Append-only — prune on a retention horizon.
 
@@ -521,7 +528,6 @@ process-to-process `SUCCESSOR` edges instead of completion-event nodes.
 | Property | Default | Meaning |
 |---|---|---|
 | `chenile.process.configurator` | `json` | `json` or `database` definition source |
-| `chenile.process.outbox.enabled` | `false` | enable durable transactional outbox |
 | `chenile.process.outbox.run-dispatcher` | `true` | schedule dispatcher polling on this instance |
 | `chenile.process.outbox.poll-interval-millis` | `1000` | dispatcher polling interval |
 | `chenile.process.outbox.lock-seconds` | `300` | outbox command lease duration |
@@ -544,3 +550,17 @@ and wiring with an application-defined trigger implementation. The `process-outb
 retry-then-DEAD, dead-letter compensation, and replay-safe parent counting, with an opt-in suite that runs
 the same guarantees against a real PostgreSQL instance. The durable integration tests in `process-service`
 exercise the outbox end to end.
+
+## Migration from non-durable execution
+
+Provision `chenile_process_outbox` and `chenile_process_receipt` before starting the
+upgraded application. State, receipts and the outbox must share a datasource and
+transaction manager. Remove the former outbox enablement property: it is no longer
+read or validated, and cannot disable durable delivery.
+
+Select a `WorkerStarter` even for in-VM execution. Worker placement is independent
+of durable delivery. Leave `run-dispatcher=true` for background execution, or set it
+to false and explicitly drain **after commit** in tests or a separately hosted
+dispatcher. Transition responses no longer include a synchronously completed
+cascade: retrieve current state separately. Application completion subscribers now
+participate in command retries instead of best-effort after-commit publication.

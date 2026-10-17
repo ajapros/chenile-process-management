@@ -67,9 +67,10 @@ class ProcessEntryActionTest {
         ObjectProvider<ProcessManager> managers = mock(ObjectProvider.class);
         var mapper = new ObjectMapper();
         var transactions = mock(PlatformTransactionManager.class);
-        var commands = new OutboxCommandRegistry<ProcessTransition>(List.of(
-                new CreateSubProcessCommand(null, managers, mapper, transactions, mock(ProcessRepository.class)), new SignalParentCommand(null, managers, mapper, transactions),
-                new EmitCompletedCommand(null, managers, mapper, transactions, processor), new StartWorkerCommand(null, managers, mapper, transactions, mock(IProcessConfigurator.class), mock(ObjectProvider.class))));
+        var outbox = mock(org.chenile.orchestrator.process.outbox.ProcessOutboxRepository.class);
+        var emitter = new EmitCompletedCommand(outbox, managers, mapper, transactions, processor);
+        when(processor.handleEvent(anyString(), any(), anyMap())).thenReturn(List.of(new org.chenile.core.context.ChenileExchange()));
+        var commands = new OutboxCommandRegistry<ProcessTransition>(List.of(emitter));
         ReflectionTestUtils.setField(action, "commands", commands);
         Process process = new Process("feed", false);
         process.setId("process-1");
@@ -81,6 +82,11 @@ class ProcessEntryActionTest {
         process.setCurrentState(terminal);
 
         action.execute(new State(Constants.States.EXECUTING, "process"), terminal, process);
+
+        verifyNoInteractions(processor);
+        var recorded = ArgumentCaptor.forClass(org.chenile.orchestrator.process.outbox.OutboxCommand.class);
+        verify(outbox).enqueue(recorded.capture());
+        emitter.dispatch(recorded.getValue());
 
         ArgumentCaptor<ProcessCompletedEvent> event = ArgumentCaptor.forClass(ProcessCompletedEvent.class);
         ArgumentCaptor<Map<String, String>> headers = ArgumentCaptor.forClass(Map.class);

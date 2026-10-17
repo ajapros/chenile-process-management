@@ -11,8 +11,11 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 
 /** Runs the real Spring MVC/API contracts and migration against an isolated PostgreSQL schema. */
+@org.springframework.boot.test.context.SpringBootTest(classes = org.chenile.orchestrator.process.SpringTestConfig.class,
+        properties = {"chenile.process.management.enabled=true", "chenile.process.configurator=database",
+            "chenile.process.management.api-key=integration-test-administrator-key-123456"})
 @EnabledIfSystemProperty(named = "chenile.outbox.test.jdbc-url", matches = ".+")
-class PostgresProcessManagementApiIntegrationTest extends DurableProcessManagementApiIntegrationTest {
+class PostgresProcessManagementApiIntegrationTest extends AbstractProcessManagementApiIntegrationTest {
     static String schema;
     static DriverManagerDataSource admin;
     @DynamicPropertySource static void database(DynamicPropertyRegistry properties) {

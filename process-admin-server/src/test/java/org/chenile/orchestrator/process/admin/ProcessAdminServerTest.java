@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.*;
 import org.chenile.orchestrator.process.outbox.OutboxDispatcher;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -28,7 +27,7 @@ class ProcessAdminServerTest {
     private static final String KEY = "synthetic-server-test-administrator-key-123456";
     @LocalServerPort int port;
     @Autowired ObjectMapper json;
-    @Autowired ObjectProvider<OutboxDispatcher> dispatchers;
+    @Autowired OutboxDispatcher dispatcher;
     @Autowired JdbcTemplate jdbc;
     private final HttpClient client = HttpClient.newHttpClient();
 
@@ -46,7 +45,7 @@ class ProcessAdminServerTest {
         return json.readTree(response.body());
     }
     private void dispatch() {
-        if (dispatchers.getIfAvailable() != null) dispatchers.getObject().drainAll(20);
+        dispatcher.drainAll(20);
     }
 
     @Test void startsWithDatabaseDefinitionsQuartzAndProtectedWorkflowRoutes() throws Exception {

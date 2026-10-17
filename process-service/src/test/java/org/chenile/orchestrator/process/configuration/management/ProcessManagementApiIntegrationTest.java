@@ -11,15 +11,47 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.any;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(classes = SpringTestConfig.class, properties = {
-    "spring.datasource.url=jdbc:h2:mem:management-api;DB_CLOSE_DELAY=-1",
+    "spring.datasource.url=jdbc:h2:mem:management-api;MODE=PostgreSQL;DB_CLOSE_DELAY=-1",
     "chenile.process.management.enabled=true", "chenile.process.configurator=database",
     "chenile.process.management.api-key=integration-test-administrator-key-123456"})
 /** HTTP validation and query contracts run once; transport contracts are inherited. */
 class ProcessManagementApiIntegrationTest extends AbstractProcessManagementApiIntegrationTest {
+    @Test void triggerEndpointUsesChenileDispatchAndRetainsDuplicateIdentity() throws Exception {
+        definition("source", true, "");
+        String body = """
+                {"triggerId":"http-trigger", "eventId":"ProcessCreate",
+                 "triggerTime":"2026-10-16T00:00:00Z",
+                 "headers":{"x-chenile-tenant-id":"alpha", "chenile-trigger-source":"HTTP"},
+                 "payload":{"processDefName":"source", "args":{"rows":2}}}
+                """;
+        var first = response(post("/trigger").content(body), "alpha", 200).get("payload");
+        assertNotNull(first);
+        assertEquals("http-trigger", first.get("triggerId").asText());
+        assertEquals("ProcessCreate", first.get("eventId").asText());
+        assertTrue(first.get("dispatched").asBoolean());
+        assertFalse(first.get("duplicate").asBoolean());
+        var duplicate = response(post("/trigger").content(body), "alpha", 200).get("payload");
+        assertTrue(duplicate.get("duplicate").asBoolean());
+        assertEquals(first.get("logId"), duplicate.get("logId"));
+        assertEquals(1, processes.count());
+        assertEquals(1, executions.count());
+        var process = processes.findAll().getFirst();
+        assertEquals("http-trigger", process.triggerId);
+        assertEquals("alpha", process.tenant);
+        var log = executions.findAll().getFirst();
+        assertEquals("HTTP", log.source);
+        assertEquals(java.time.Instant.parse("2026-10-16T00:00:00Z"), log.triggerTime);
+        org.mockito.Mockito.verifyNoInteractions(workers);
+        dispatcher.drainAll(30);
+        verify(workers).start(any());
+    }
+
     @Test void protectsEveryReadAndWriteAndRestoresRequestContext() throws Exception {
         for (String route : List.of("/info", "/definitions", "/processes", "/trace", "/executions", "/crontabs"))
             mvc.perform(get(BASE + route)).andExpect(status().isUnauthorized());

@@ -10,6 +10,7 @@
     <dependencies>
         <dependency><groupId>org.chenile.orchestrator.process</groupId><artifactId>trigger-api</artifactId><version>${revision}</version></dependency>
         <dependency><groupId>org.chenile</groupId><artifactId>chenile-core</artifactId></dependency>
+        <dependency><groupId>org.chenile</groupId><artifactId>chenile-http</artifactId></dependency>
         <dependency><groupId>com.fasterxml.jackson.core</groupId><artifactId>jackson-databind</artifactId></dependency>
         <dependency><groupId>com.fasterxml.jackson.datatype</groupId><artifactId>jackson-datatype-jsr310</artifactId></dependency>
         <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-data-jpa</artifactId></dependency>

@@ -32,6 +32,7 @@ import static org.springframework.test.annotation.DirtiesContext.ClassMode.BEFOR
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @DirtiesContext(classMode = BEFORE_EACH_TEST_METHOD)
 public class TestFeeds {
+    @Autowired org.chenile.orchestrator.process.outbox.OutboxDispatcher dispatcher;
     @Autowired
     StateEntityService<Process> processManager;
 
@@ -47,6 +48,7 @@ public class TestFeeds {
         process.processType = "feed";
         process.id = "FEED1";
         processManager.create(process);
+        dispatcher.drainAll(1000);
         assertState(process.id,Constants.States.PROCESSED);
         String fileId = process.id + "FILE1";
         assertState(fileId,Constants.States.PROCESSED);
@@ -63,6 +65,7 @@ public class TestFeeds {
         process.processType = "feed";
         process.id = "FEED2";
         processManager.create(process);
+        dispatcher.drainAll(1000);
         assertState(process.id,Constants.States.PROCESSED);
         // Is FILE1 processed with the correct args?
         String fileId = process.id + "FILE1";
@@ -89,6 +92,7 @@ public class TestFeeds {
         process.processType = "feed";
         process.id = "FEED3";
         processManager.create(process);
+        dispatcher.drainAll(1000);
         assertState(process.id,Constants.States.PROCESSED);
         // Is FILE1 processed with the correct args?
         String fileId = process.id + "FILE1";
@@ -126,6 +130,7 @@ public class TestFeeds {
         process.processType = "feed";
         process.id = "FEED1";
         processManager.create(process);
+        dispatcher.drainAll(1000);
         assertState(process.id,Constants.States.SPLIT_PENDING);
         unblock("FEED1-SPLITTER");
         assertState(process.id,Constants.States.SUB_PROCESSES_PENDING);
@@ -146,6 +151,7 @@ public class TestFeeds {
         process.processType = "feed";
         process.id = "FEED1";
         processManager.create(process);
+        dispatcher.drainAll(1000);
         assertState(process.id,Constants.States.SPLIT_PENDING);
         unblock("FEED1-SPLITTER");
         assertState(process.id,Constants.States.SUB_PROCESSES_PENDING);
@@ -167,7 +173,7 @@ public class TestFeeds {
 
     private void asynch(){
         SYNCH_MODE = false;
-        LATCHES = new HashMap<>();
+        LATCHES = new java.util.concurrent.ConcurrentHashMap<>();
     }
 
     /**
@@ -184,7 +190,7 @@ public class TestFeeds {
         CountDownLatch proceedLatch = new CountDownLatch(1);
         LATCHES.put(proceedKey,proceedLatch);
         LATCHES.get(latchKey).countDown();
-        proceedLatch.await(1000L, TimeUnit.MILLISECONDS);
+        Assert.assertTrue("Worker did not finish: " + latchKey, proceedLatch.await(10, TimeUnit.SECONDS));
     }
 
     private void assertState(String processId,String stateId){

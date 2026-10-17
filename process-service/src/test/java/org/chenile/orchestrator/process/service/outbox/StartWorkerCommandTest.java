@@ -46,20 +46,27 @@ class StartWorkerCommandTest {
         return definition;
     }
 
-    @Test void mapsAllWorkerStatesAndCopiesConfigurationWithoutCloningInlineProcesses() throws Exception {
+    @Test void recordsAllWorkerStatesAndDispatchesTheirConfigurationSnapshots() throws Exception {
         beans.registerSingleton("starter", starter);
         var definition = definition(Map.of("shared", "value", "topic", "default"));
-        var command = command(null);
+        var outbox = mock(ProcessOutboxRepository.class);
+        when(outbox.checkIdempotency(anyString(), anyString())).thenReturn(true);
+        var command = command(outbox);
         for (var mapping : Map.of(Constants.States.SPLIT_PENDING, WorkerType.SPLITTER,
                 Constants.States.EXECUTING, WorkerType.EXECUTOR,
                 Constants.States.AGGREGATION_PENDING, WorkerType.AGGREGATOR).entrySet()) {
             reset(starter);
+            clearInvocations(outbox);
             var process = process(mapping.getKey());
             command.enqueue(new ProcessTransition(process, process.getCurrentState()));
+            verifyNoInteractions(starter);
+            var recorded = ArgumentCaptor.forClass(OutboxCommand.class);
+            verify(outbox).enqueue(recorded.capture());
+            command.dispatch(recorded.getValue());
             var capture = ArgumentCaptor.forClass(WorkerDto.class);
             verify(starter).start(capture.capture());
             var worker = capture.getValue();
-            assertSame(process, worker.process);
+            assertNotSame(process, worker.process);
             assertEquals(mapping.getValue(), worker.workerType);
             assertEquals("process-1:" + mapping.getValue(), worker.dispatchId);
             assertEquals(definition.config, worker.execDef);
@@ -72,7 +79,13 @@ class StartWorkerCommandTest {
         beans.registerSingleton("starter", starter);
         definition(null);
         var process = process(Constants.States.EXECUTING);
-        command(null).enqueue(new ProcessTransition(process, process.getCurrentState()));
+        var outbox = mock(ProcessOutboxRepository.class);
+        when(outbox.checkIdempotency(anyString(), anyString())).thenReturn(true);
+        var command = command(outbox);
+        command.enqueue(new ProcessTransition(process, process.getCurrentState()));
+        var recorded = ArgumentCaptor.forClass(OutboxCommand.class);
+        verify(outbox).enqueue(recorded.capture());
+        command.dispatch(recorded.getValue());
         var capture = ArgumentCaptor.forClass(WorkerDto.class);
         verify(starter).start(capture.capture());
         assertEquals(Map.of(), capture.getValue().execDef);
@@ -81,7 +94,9 @@ class StartWorkerCommandTest {
     @Test void skipsSuppressedWorkTerminalStatesAndMissingDefinitions() throws Exception {
         beans.registerSingleton("starter", starter);
         definition(Map.of());
-        var command = command(null);
+        var outbox = mock(ProcessOutboxRepository.class);
+        when(outbox.checkIdempotency(anyString(), anyString())).thenReturn(true);
+        var command = command(outbox);
         var suppressed = process(Constants.States.EXECUTING);
         suppressed.skipPostWorkerCreation = true;
         command.enqueue(new ProcessTransition(suppressed, suppressed.getCurrentState()));
@@ -91,12 +106,6 @@ class StartWorkerCommandTest {
         var unknown = process(Constants.States.EXECUTING);
         command.enqueue(new ProcessTransition(unknown, unknown.getCurrentState()));
         verifyNoInteractions(starter);
-    }
-
-    @Test void missingStarterIsAnInlineNoOp() throws Exception {
-        var process = process(Constants.States.EXECUTING);
-        command(null).enqueue(new ProcessTransition(process, process.getCurrentState()));
-        verifyNoInteractions(configurator);
     }
 
     @Test void durableWorkSnapshotsConfigurationAndMissingStarterFailsOnlyAtDispatch() throws Exception {
@@ -137,14 +146,19 @@ class StartWorkerCommandTest {
         beans.registerSingleton("one", starter);
         beans.registerSingleton("two", mock(WorkerStarter.class));
         definition(Map.of());
-        var command = command(null);
+        var outbox = mock(ProcessOutboxRepository.class);
+        when(outbox.checkIdempotency(anyString(), anyString())).thenReturn(true);
+        var command = command(outbox);
         var process = process(Constants.States.EXECUTING);
         var transition = new ProcessTransition(process, process.getCurrentState());
-        assertThrows(NoUniqueBeanDefinitionException.class, () -> command.enqueue(transition));
+        command.enqueue(transition);
+        var recorded = ArgumentCaptor.forClass(OutboxCommand.class);
+        verify(outbox).enqueue(recorded.capture());
+        assertThrows(NoUniqueBeanDefinitionException.class, () -> command.dispatch(recorded.getValue()));
         var selected = new RootBeanDefinition(WorkerStarter.class, () -> starter);
         selected.setPrimary(true);
         beans.registerBeanDefinition("selected", selected);
-        command.enqueue(transition);
+        command.dispatch(recorded.getValue());
         verify(starter).start(any());
     }
 }

@@ -18,6 +18,10 @@ import org.springframework.test.context.ActiveProfiles;
 @EnableJpaRepositories(basePackages = {"org.chenile.orchestrator.**.configuration.dao",
         "org.chenile.trigger.store", "org.chenile.trigger.cron"})
 public class SpringTestConfig extends SpringBootServletInitializer{
+    @org.springframework.context.annotation.Bean
+    @org.springframework.context.annotation.Primary
+    WorkerStarter testWorkerStarter() { return worker -> { }; }
+
 	
 }
 

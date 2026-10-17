@@ -27,34 +27,26 @@ public abstract class AbstractProcessOutboxCommand implements OutboxCommandLifec
 
     protected AbstractProcessOutboxCommand(ProcessOutboxRepository outbox, ObjectProvider<ProcessManager> managers,
             ObjectMapper mapper, PlatformTransactionManager transactionManager) {
-        this.outbox = outbox;
+        this.outbox = java.util.Objects.requireNonNull(outbox, "Process outbox is required");
         this.managers = managers;
         this.mapper = mapper;
         independent = new TransactionTemplate(transactionManager);
         independent.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
-    protected final boolean durable() { return outbox != null; }
-
     protected void store(Process process, String key, Object data) throws Exception {
-        OutboxCommand entry = OutboxCommand.create(process.getId(), type(), key,
-                durable() ? mapper.writeValueAsString(data) : null);
+        OutboxCommand entry = OutboxCommand.create(process.getId(), type(), key, mapper.writeValueAsString(data));
         entry.tenantId = process.tenant;
-        if (durable()) outbox.enqueue(entry);
-        else {
-            entry.attachInlinePayload(data);
-            dispatch(entry);
-        }
+        outbox.enqueue(entry);
     }
 
     protected <T> T read(OutboxCommand entry, Class<T> type) throws Exception {
-        T local = entry.inlinePayload(type);
-        return local == null ? mapper.readValue(entry.payload, type) : local;
+        return mapper.readValue(entry.payload, type);
     }
 
-    /** True permits execution; durable mode also records the claim in the current transaction. */
+    /** True permits execution and records the claim in the current transaction. */
     protected final boolean checkIdempotency(String consumer, String key) {
-        return !durable() || outbox.checkIdempotency(consumer, key);
+        return outbox.checkIdempotency(consumer, key);
     }
 
     /** Flush tenant-derived JPA callbacks before returning to the caller's context. */

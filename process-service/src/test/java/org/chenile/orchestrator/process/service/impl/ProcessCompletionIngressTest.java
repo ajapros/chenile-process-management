@@ -17,7 +17,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(classes = SpringTestConfig.class, properties = {
-        "spring.datasource.url=jdbc:h2:mem:completion-ingress;DB_CLOSE_DELAY=-1"})
+        "spring.datasource.url=jdbc:h2:mem:completion-ingress;MODE=PostgreSQL;DB_CLOSE_DELAY=-1"})
 @ActiveProfiles("unittest")
 class ProcessCompletionIngressTest {
     @Autowired EventProcessor eventProcessor;

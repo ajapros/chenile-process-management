@@ -9,6 +9,7 @@ When I POST a REST request to URL "/process" with payload
     "processDefName": "feed"
 }
 """
+And the process outbox is drained
 Then the REST response contains key "mutatedEntity"
 And store "$.payload.mutatedEntity.id" from response to "id"
 And the REST response key "mutatedEntity.currentState.stateId" is "${initialState}"
@@ -34,6 +35,7 @@ When I PATCH a REST request to URL "/process/${id}/${event}" with payload
     ]
 }
 """
+And the process outbox is drained
 Then the REST response contains key "mutatedEntity"
 And the REST response key "mutatedEntity.id" is "${id}"
 And the REST response key "mutatedEntity.currentState.stateId" is "SUB_PROCESSES_PENDING"
@@ -49,6 +51,7 @@ When I PATCH a REST request to URL "/process/${childId}/${event}" with payload
     "comment": "${comment}"
 }
 """
+And the process outbox is drained
 Then the REST response contains key "mutatedEntity"
 And the REST response key "mutatedEntity.currentState.stateId" is "PROCESSED"
 
@@ -67,5 +70,6 @@ And the REST response key "mutatedEntity.currentState.stateId" is "PROCESSED"
 "comment": "${comment}"
 }
 """
+And the process outbox is drained
   Then the REST response contains key "mutatedEntity"
   And the REST response key "mutatedEntity.currentState.stateId" is "PROCESSED"

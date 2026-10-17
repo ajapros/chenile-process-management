@@ -1,7 +1,7 @@
 Feature: Chunk test - Chunk returns error.
 Scenario: Create a new chunk process
 Given that "flowName" equals "PROCESS_FLOW"
-And that "initialState" equals "PROCESSED"
+And that "initialState" equals "EXECUTING"
 When I POST a REST request to URL "/process" with payload
 """json
 {
@@ -9,6 +9,7 @@ When I POST a REST request to URL "/process" with payload
     "processDefName": "chunk"
 }
 """
+And the process outbox is drained
 Then the REST response contains key "mutatedEntity"
 And store "$.payload.mutatedEntity.id" from response to "id"
 And the REST response key "mutatedEntity.currentState.stateId" is "${initialState}"
@@ -18,4 +19,4 @@ Scenario: Retrieve the chunk that just got created
 When I GET a REST request to URL "/process/${id}"
 Then the REST response contains key "mutatedEntity"
 And the REST response key "mutatedEntity.id" is "${id}"
-And the REST response key "mutatedEntity.currentState.stateId" is "${initialState}"
+And the REST response key "mutatedEntity.currentState.stateId" is "PROCESSED"

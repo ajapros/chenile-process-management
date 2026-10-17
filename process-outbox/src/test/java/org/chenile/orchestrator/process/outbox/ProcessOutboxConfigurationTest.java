@@ -25,15 +25,14 @@ class ProcessOutboxConfigurationTest {
             // Prevent real background execution; invoke the registered task explicitly below.
             .withBean(TaskScheduler.class, () -> mock(TaskScheduler.class));
 
-    @Test void pollingIsAbsentWhenOutboxOrBackgroundDispatchIsDisabled() {
+    @Test void alwaysWiresTheOutboxAndAllowsManualDispatchWithoutBackgroundPolling() {
         application.run(context -> {
             assertNull(context.getStartupFailure());
-            assertTrue(context.getBeansOfType(ProcessOutboxRepository.class).isEmpty());
-            assertTrue(context.getBeansOfType(OutboxDispatcher.class).isEmpty());
-            assertTrue(context.getBeansOfType(ScheduledTaskHolder.class).isEmpty());
+            assertNotNull(context.getBean(ProcessOutboxRepository.class));
+            assertNotNull(context.getBean(OutboxDispatcher.class));
+            assertEquals(1, context.getBean(ScheduledTaskHolder.class).getScheduledTasks().size());
         });
-        application.withPropertyValues("chenile.process.outbox.enabled=true",
-                "chenile.process.outbox.run-dispatcher=false").run(context -> {
+        application.withPropertyValues("chenile.process.outbox.run-dispatcher=false").run(context -> {
             assertNull(context.getStartupFailure());
             assertNotNull(context.getBean(ProcessOutboxRepository.class));
             assertNotNull(context.getBean(OutboxDispatcher.class));
@@ -42,8 +41,7 @@ class ProcessOutboxConfigurationTest {
     }
 
     @Test void enabledPollingUsesConfiguredDelayAndDispatchesThroughTheDispatcher() {
-        application.withPropertyValues("chenile.process.outbox.enabled=true",
-                "chenile.process.outbox.poll-interval-millis=2500").run(context -> {
+        application.withPropertyValues("chenile.process.outbox.poll-interval-millis=2500").run(context -> {
             assertNull(context.getStartupFailure());
             var tasks = context.getBean(ScheduledTaskHolder.class).getScheduledTasks();
             assertEquals(1, tasks.size());

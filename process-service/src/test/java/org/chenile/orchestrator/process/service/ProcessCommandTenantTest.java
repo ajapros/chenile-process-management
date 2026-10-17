@@ -18,7 +18,7 @@ class ProcessCommandTenantTest {
         var context=ContextContainer.getInstance(); var snapshot=context.snapshot();
         boolean active=TransactionSynchronizationManager.isActualTransactionActive();
         var manager=mock(EntityManager.class);
-        var command=new AbstractProcessOutboxCommand(null, null, new ObjectMapper(), mock(PlatformTransactionManager.class)) {
+        var command=new AbstractProcessOutboxCommand(mock(org.chenile.orchestrator.process.outbox.ProcessOutboxRepository.class), null, new ObjectMapper(), mock(PlatformTransactionManager.class)) {
             @Override public String type() { return "TEST"; }
             @Override public void enqueue(ProcessTransition transition) { }
             @Override protected void dispatchCommand(OutboxCommand entry) { assertEquals("worker-tenant",context.getTenant()); }
@@ -35,7 +35,7 @@ class ProcessCommandTenantTest {
     @Test void failedCommandRestoresTenantWithoutFlushingPartialWork() {
         var context=ContextContainer.getInstance(); var snapshot=context.snapshot();
         var manager=mock(EntityManager.class);
-        var command=new AbstractProcessOutboxCommand(null, null, new ObjectMapper(), mock(PlatformTransactionManager.class)) {
+        var command=new AbstractProcessOutboxCommand(mock(org.chenile.orchestrator.process.outbox.ProcessOutboxRepository.class), null, new ObjectMapper(), mock(PlatformTransactionManager.class)) {
             @Override public String type() { return "TEST"; }
             @Override public void enqueue(ProcessTransition transition) { }
             @Override protected void dispatchCommand(OutboxCommand entry) { throw new IllegalStateException("fail"); }

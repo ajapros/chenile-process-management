@@ -18,12 +18,17 @@ spring:
       indent-output: true
   datasource:
     type: com.zaxxer.hikari.HikariDataSource
-    url: jdbc:h2:mem:demo;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    url: jdbc:h2:mem:demo;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
     username: demo
     password: password
     hikari:
       poolName: Hikari
       auto-commit: false
+
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:reset-test-outbox.sql,classpath:chenile-process-outbox-schema.sql
 
   liquibase:
     # Remove 'faker' if you do not want the sample data to be loaded automatically
@@ -41,3 +46,8 @@ server:
       enabled: false
 
 
+
+chenile:
+  process:
+    outbox:
+      run-dispatcher: false

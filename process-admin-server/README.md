@@ -70,7 +70,7 @@ Run your application's JDBC workers with access to the same database and registe
 HTTP endpoints must include the administrator key and tenant headers. Do not enable
 `chenile.process.worker.jdbc.run-worker` in this stock host without supplying business workers.
 The outbox dispatcher is enabled by default and delivers process commands to the JDBC queue.
-If you explicitly disable outbox delivery, inline commands still use the JDBC starter.
+Outbox delivery is mandatory. Use `chenile.process.outbox.run-dispatcher=false` only when another instance drains the commands. There is no outbox enablement setting.
 
 ## PostgreSQL deployment
 

@@ -20,12 +20,6 @@ public class OutboxCommand {
 	public Instant updatedAt;
 	public Instant finishedAt;
 	public String errorMessage;
-    private transient Object inlinePayload;
-
-    /** Local execution preserves object identity; this body is never written to the table. */
-    public void attachInlinePayload(Object body) { inlinePayload = body; }
-    public <T> T inlinePayload(Class<T> type) { return inlinePayload == null ? null : type.cast(inlinePayload); }
-
     public static OutboxCommand create(String processId, String type, String key, String json) {
         OutboxCommand command = new OutboxCommand();
         command.processId = processId;

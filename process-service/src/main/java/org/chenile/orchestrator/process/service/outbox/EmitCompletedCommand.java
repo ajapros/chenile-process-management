@@ -8,8 +8,6 @@ import org.springframework.transaction.PlatformTransactionManager;
 
 import org.chenile.core.context.HeaderUtils;
 import org.chenile.core.event.EventProcessor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import java.util.HashMap;
 import org.chenile.orchestrator.process.model.ProcessCompletedEvent;
 import org.chenile.orchestrator.process.outbox.OutboxCommand;
@@ -17,11 +15,8 @@ import org.chenile.orchestrator.process.model.Process;
 import org.chenile.orchestrator.process.model.Constants;
 import org.chenile.orchestrator.process.service.CompletionArguments;
 import org.chenile.stm.State;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 public class EmitCompletedCommand extends AbstractProcessOutboxCommand {
-    private static final Logger LOG = LoggerFactory.getLogger(EmitCompletedCommand.class);
     private final EventProcessor events;
     public static final String TYPE = "EMIT_COMPLETED";
     public EmitCompletedCommand(ProcessOutboxRepository outbox, ObjectProvider<ProcessManager> managers,
@@ -41,11 +36,15 @@ public class EmitCompletedCommand extends AbstractProcessOutboxCommand {
 
     @Override protected void dispatchCommand(OutboxCommand entry) throws Exception {
         ProcessCompletedEvent event = read(entry, ProcessCompletedEvent.class);
-        if (!durable()) { publishInline(event); return; }
-        managers.getObject().processCompleted(event);
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override public void afterCommit() { publishAfterCommit(event); }
-        });
+        var headers = new HashMap<String, String>();
+        if (event.tenantId != null) headers.put(HeaderUtils.TENANT_ID_KEY, event.tenantId);
+        if (event.triggerId != null) headers.put("triggerId", event.triggerId);
+        var exchanges = events.handleEvent(Constants.Events.PROCESS_COMPLETED, event, headers);
+        if (exchanges.isEmpty()) throw new IllegalStateException("No ProcessCompleted subscriber configured");
+        for (var exchange : exchanges) {
+            if (exchange.getException() != null)
+                throw new IllegalStateException("Completion subscriber failed for " + event.processId, exchange.getException());
+        }
     }
     public static ProcessCompletedEvent completedEvent(Process process, State terminalState) {
         ProcessCompletedEvent event = new ProcessCompletedEvent();
@@ -64,20 +63,5 @@ public class EmitCompletedCommand extends AbstractProcessOutboxCommand {
         event.args = CompletionArguments.from(process.input, process.output);
         event.successful = Constants.States.PROCESSED.equals(event.state);
         return event;
-    }
-    private void publishInline(ProcessCompletedEvent event) {
-        var headers = new HashMap<String, String>();
-        if (event.tenantId != null) headers.put(HeaderUtils.TENANT_ID_KEY, event.tenantId);
-        if (event.triggerId != null) headers.put("triggerId", event.triggerId);
-        for (var exchange : events.handleEvent(Constants.Events.PROCESS_COMPLETED, event, headers))
-            if (exchange.getException() != null)
-                LOG.warn("Completion subscriber failed for {}", event.processId, exchange.getException());
-    }
-
-    private void publishAfterCommit(ProcessCompletedEvent event) {
-        // afterCommit still has the old resources bound: never join the completed transaction.
-        try {
-            independent.executeWithoutResult(tx -> publishInline(event));
-        } catch (Exception failure) { LOG.warn("Best-effort completion publication failed for {}", event.processId, failure); }
     }
 }

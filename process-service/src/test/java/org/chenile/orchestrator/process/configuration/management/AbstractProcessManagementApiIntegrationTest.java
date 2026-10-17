@@ -17,7 +17,6 @@ import static org.mockito.ArgumentMatchers.any;
 import org.chenile.trigger.cron.CrontabRepository;
 import org.chenile.trigger.store.*;
 import org.junit.jupiter.api.*;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -48,7 +47,7 @@ abstract class AbstractProcessManagementApiIntegrationTest {
     @Autowired CrontabRepository crontabs;
     @Autowired ProcessManager manager;
     @MockitoBean WorkerStarter workers;
-    @Autowired ObjectProvider<OutboxDispatcher> dispatchers;
+    @Autowired OutboxDispatcher dispatcher;
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager transactions;
     final ObjectMapper json = new ObjectMapper();
@@ -60,9 +59,7 @@ abstract class AbstractProcessManagementApiIntegrationTest {
         new TransactionTemplate(transactions).executeWithoutResult(tx -> {
             executions.deleteAll(); crontabs.deleteAll();
             processes.deleteAll(); definitions.deleteAll();
-            if (dispatchers.getIfAvailable() != null) {
-                jdbc.update("delete from chenile_process_outbox"); jdbc.update("delete from chenile_process_receipt");
-            }
+            jdbc.update("delete from chenile_process_outbox"); jdbc.update("delete from chenile_process_receipt");
         });
         ((org.chenile.orchestrator.process.service.defs.DatabaseProcessConfigurator) configurator).clearCache();
     }
@@ -90,7 +87,7 @@ abstract class AbstractProcessManagementApiIntegrationTest {
             context.put(HeaderUtils.TENANT_ID_KEY, tenant);
             DoneSuccessfullyPayload done = new DoneSuccessfullyPayload(); done.output = "{\"result\":4}";
             manager.processById(id, Constants.Events.DONE_SUCCESSFULLY, done);
-            if (dispatchers.getIfAvailable() != null) dispatchers.getObject().drainAll(30);
+            dispatcher.drainAll(30);
         } finally { context.restore(original); }
     }
 

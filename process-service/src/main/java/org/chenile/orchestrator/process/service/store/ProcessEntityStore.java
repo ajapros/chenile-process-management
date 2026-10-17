@@ -21,7 +21,7 @@ public class ProcessEntityStore implements EntityStore<Process>{
         Optional<Process> entity = processRepository.findById(id);
         if (entity.isPresent()) {
             Process process = entity.get();
-            // Inline transitions serialize worker/completion snapshots after the read session closes.
+            // Readers consume detached snapshots after the read session closes.
             for (var error : process.errors)
                 if (error.errors != null) error.errors.size();
             return process;

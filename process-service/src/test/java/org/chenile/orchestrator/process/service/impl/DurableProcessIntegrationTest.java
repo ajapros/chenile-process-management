@@ -36,11 +36,13 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(classes = SpringTestConfig.class, properties = {
         "spring.datasource.url=jdbc:h2:mem:durable-process;MODE=PostgreSQL;DB_CLOSE_DELAY=-1",
-        "chenile.process.outbox.enabled=true", "chenile.process.outbox.run-dispatcher=false",
+        "chenile.process.outbox.run-dispatcher=false",
         "spring.sql.init.mode=always", "spring.sql.init.schema-locations=classpath:chenile-process-outbox-schema.sql"})
 @ActiveProfiles("unittest")
 class DurableProcessIntegrationTest {
     @Autowired ProcessManager manager;
+    @org.springframework.test.context.bean.override.mockito.MockitoSpyBean
+    org.chenile.core.event.EventProcessor events;
     @Autowired ProcessConfigurator configurator;
     @Autowired ProcessRepository processes;
     @Autowired ProcessOutboxRepository outbox;
@@ -82,11 +84,43 @@ class DurableProcessIntegrationTest {
     }
 
     @Test void committedCreationCanBeDispatchedLater() {
-        String id = create();
-        assertEquals(1L, outbox.backlogCount());
-        assertTrue(dispatches.isEmpty());
+        String id = new TransactionTemplate(transactionManager).execute(tx -> {
+            String created = create();
+            assertEquals(1L, outbox.backlogCount());
+            // A separate dispatcher cannot observe this transition's uncommitted command.
+            assertFalse(java.util.concurrent.CompletableFuture.supplyAsync(dispatcher::processOne).join());
+            assertTrue(dispatches.isEmpty());
+            return created;
+        });
         dispatcher.drainAll(20);
         assertEquals(List.of(id + ":EXECUTOR"), dispatches);
+        assertEquals(0L, outbox.backlogCount());
+        assertEquals(0L, outbox.deadCount());
+    }
+
+    @Test void failedCompletionSubscriberRollsBackSuccessorsAndRetriesWithoutUndoingTheTransition() throws Exception {
+        String id = create();
+        dispatcher.drainAll(20);
+        manager.processById(id, Constants.Events.DONE_SUCCESSFULLY, new DoneSuccessfullyPayload());
+        assertTrue(processes.findByPredecessorId(id).isEmpty());
+        doAnswer(call -> {
+            @SuppressWarnings("unchecked")
+            var replies = new java.util.ArrayList<>((java.util.List<org.chenile.core.context.ChenileExchange>) call.callRealMethod());
+            var failed = new org.chenile.core.context.ChenileExchange();
+            failed.setException(new IllegalStateException("application subscriber unavailable"));
+            replies.add(failed);
+            return replies;
+        }).when(events).handleEvent(eq(Constants.Events.PROCESS_COMPLETED), any(), anyMap());
+        assertTrue(dispatcher.processOne());
+        assertEquals(Constants.States.PROCESSED, processes.findById(id).orElseThrow().getCurrentState().getStateId());
+        assertTrue(processes.findByPredecessorId(id).isEmpty());
+        assertEquals(0, jdbc.queryForObject("select count(*) from chenile_process_receipt where consumer='CHAIN'", Integer.class));
+        assertEquals("PENDING", jdbc.queryForObject("select status from chenile_process_outbox where process_id=? and command_type='EMIT_COMPLETED'", String.class, id));
+        doCallRealMethod().when(events).handleEvent(eq(Constants.Events.PROCESS_COMPLETED), any(), anyMap());
+        new TransactionTemplate(transactionManager).executeWithoutResult(tx ->
+                jdbc.update("update chenile_process_outbox set visible_after=current_timestamp where status='PENDING'"));
+        dispatcher.drainAll(20);
+        assertEquals(1, processes.findByPredecessorId(id).size());
         assertEquals(0L, outbox.backlogCount());
         assertEquals(0L, outbox.deadCount());
     }

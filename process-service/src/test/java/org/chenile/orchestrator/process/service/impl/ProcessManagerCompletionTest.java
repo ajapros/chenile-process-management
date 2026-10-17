@@ -116,6 +116,9 @@ class ProcessManagerCompletionTest {
         ProcessManagerImpl manager = spy(new ProcessManagerImpl(mock(STM.class),
                 mock(STMActionsInfoProvider.class), mock(EntityStore.class)));
         manager.processConfigurator = mock(IProcessConfigurator.class);
+        var outbox = mock(org.chenile.orchestrator.process.outbox.ProcessOutboxRepository.class);
+        when(outbox.checkIdempotency(anyString(), anyString())).thenReturn(true);
+        manager.configureTransactions(outbox, mock(org.springframework.transaction.PlatformTransactionManager.class));
         StateEntityServiceResponse<Process> response = mock(StateEntityServiceResponse.class);
         doReturn(response).when(manager).create(any(Process.class));
         return manager;

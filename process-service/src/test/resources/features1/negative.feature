@@ -9,6 +9,7 @@ When I POST a REST request to URL "/process" with payload
     "processDefName": "feed"
 }
 """
+And the process outbox is drained
 Then the REST response contains key "mutatedEntity"
 And store "$.payload.mutatedEntity.id" from response to "id"
 And the REST response key "mutatedEntity.currentState.stateId" is "${initialState}"
@@ -33,6 +34,7 @@ When I PATCH a REST request to URL "/process/${id}/${event}" with payload
     ]
 }
 """
+And the process outbox is drained
 Then the REST response contains key "mutatedEntity"
 And the REST response key "mutatedEntity.id" is "${id}"
 And the REST response key "mutatedEntity.currentState.stateId" is "SUB_PROCESSES_PENDING"
@@ -48,6 +50,7 @@ When I PATCH a REST request to URL "/process/${id}/${event}" with payload
      "errors": ["row1 was not structured properly"]
 }
 """
+And the process outbox is drained
 Then the REST response contains key "mutatedEntity"
 And the REST response key "mutatedEntity.id" is "${id}"
 And the REST response key "mutatedEntity.currentState.stateId" is "AGGREGATION_PENDING"
@@ -62,6 +65,7 @@ Scenario: Send the aggregationDone event to the file with comments
   "comment": "${comment}"
 }
 """
+And the process outbox is drained
   Then the REST response contains key "mutatedEntity"
   And the REST response key "mutatedEntity.id" is "${id}"
   And the REST response key "mutatedEntity.currentState.stateId" is "PROCESSED_WITH_ERRORS"

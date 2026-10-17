@@ -22,5 +22,13 @@ import org.springframework.test.context.ContextConfiguration;
 @CucumberContextConfiguration
 @ActiveProfiles("unittest")
 public class CukesSteps1 {
+    @org.springframework.beans.factory.annotation.Autowired
+    org.chenile.orchestrator.process.outbox.OutboxDispatcher dispatcher;
+
+    @io.cucumber.java.en.And("the process outbox is drained")
+    public void drainOutbox() {
+        dispatcher.drainAll(1000);
+    }
+
 	@Given("dummy") public void dummy(){}
 }

@@ -13,7 +13,6 @@ import org.springframework.transaction.PlatformTransactionManager;
 
 @Configuration
 @EnableScheduling
-@ConditionalOnProperty(name = "chenile.process.outbox.enabled", havingValue = "true")
 public class ProcessOutboxConfiguration {
     @Bean ProcessOutboxRepository processOutboxRepository(JdbcTemplate jdbc, PlatformTransactionManager manager) {
         return new ProcessOutboxRepository(jdbc, manager);

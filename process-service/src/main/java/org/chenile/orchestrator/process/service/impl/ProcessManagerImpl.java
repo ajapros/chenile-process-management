@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
 import org.chenile.orchestrator.process.outbox.ProcessOutboxRepository;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -38,13 +37,13 @@ public class ProcessManagerImpl extends StateEntityServiceImpl<Process> implemen
     private TransactionTemplate transactionTemplate;
 
     @Autowired
-    void configureDurability(ObjectProvider<ProcessOutboxRepository> repositories, PlatformTransactionManager manager) {
-        outbox = repositories.getIfAvailable();
-        if (outbox != null) transactionTemplate = new TransactionTemplate(manager);
+    void configureTransactions(ProcessOutboxRepository repository, PlatformTransactionManager manager) {
+        outbox = repository;
+        transactionTemplate = new TransactionTemplate(manager);
     }
 
     private <T> T mutate(Supplier<T> mutation) {
-        return transactionTemplate == null ? mutation.get() : transactionTemplate.execute(tx -> mutation.get());
+        return transactionTemplate.execute(tx -> mutation.get());
     }
     /**
      * @param stm                    the state machine that has read the corresponding State Transition Diagram
@@ -74,22 +73,21 @@ public class ProcessManagerImpl extends StateEntityServiceImpl<Process> implemen
     @Override
     public StateEntityServiceResponse<Process> processById(String id, String event, Object payload) {
         return mutate(() -> {
-            if (outbox != null) processRepository.lockById(id);
+            processRepository.lockById(id);
             return super.processById(id, event, payload);
         });
     }
 
     @Override
     public StateEntityServiceResponse<Process> process(Process process, String event, Object payload) {
-        if (outbox != null) return processById(process.getId(), event, payload);
-        return super.process(process, event, payload);
+        return processById(process.getId(), event, payload);
     }
 
     @Override
     public List<StateEntityServiceResponse<Process>> processCompleted(ProcessCompletedEvent event) {
         if (event == null || event.processType == null || event.processType.isBlank())
             throw new IllegalArgumentException("ProcessCompleted requires processType");
-        if (outbox != null && (event.processId == null || event.processId.isBlank()))
+        if (event.processId == null || event.processId.isBlank())
             throw new IllegalArgumentException("Durable ProcessCompleted requires processId");
         return mutate(() -> startSuccessors(event));
     }
@@ -97,7 +95,7 @@ public class ProcessManagerImpl extends StateEntityServiceImpl<Process> implemen
     private List<StateEntityServiceResponse<Process>> startSuccessors(ProcessCompletedEvent event) {
         List<StateEntityServiceResponse<Process>> responses = new ArrayList<>();
         for (ProcessDef definition : processConfigurator.findByPredecessorProcessType(event.processType)) {
-            if (outbox != null && !outbox.checkIdempotency("CHAIN", receiptKey(event.processId, definition.processType))) continue;
+            if (!outbox.checkIdempotency("CHAIN", receiptKey(event.processId, definition.processType))) continue;
             Map<String, Object> args = CompletionArguments.from(event.input, event.output, definition.predecessorArgs);
             responses.add(createFromDto(event, definition.processType, event.processId, event.tenantId, args));
         }

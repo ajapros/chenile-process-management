@@ -19,9 +19,11 @@ import org.springframework.test.context.junit4.SpringRunner;
 @AutoConfigureMockMvc
 @ActiveProfiles("unittest")
 public class TestChunks {
+    @Autowired org.chenile.orchestrator.process.outbox.OutboxDispatcher dispatcher;
     @Autowired
     StateEntityService<Process> processManager;
    @Before public void setUp(){
+        SharedData.SYNCH_MODE = true;
 
    }
    @Test @Order(1)
@@ -29,6 +31,7 @@ public class TestChunks {
         Process process = new Process();
         process.processType = "chunk";
         processManager.create(process);
+        dispatcher.drainAll(1000);
         Process process1 = processManager.retrieve(process.id).getMutatedEntity();
        Assert.assertEquals("PROCESSED",process1.getCurrentState().getStateId());
     }

@@ -15,32 +15,32 @@ import org.springframework.core.annotation.Order;
 import org.springframework.transaction.PlatformTransactionManager;
 import java.util.List;
 
-/** Commands are always available; only their delivery transport is optional. */
+/** Every process consequence is persisted for dispatch after its transition commits. */
 @Configuration
 public class ProcessCommandConfiguration {
     // Retain the shared, command-specific JSON configuration without adding an application mapper bean.
     private final ObjectMapper mapper = new ObjectMapper();
 
     @Bean @Order(0) CreateSubProcessCommand createSubProcessCommand(
-            ObjectProvider<ProcessOutboxRepository> repositories, ObjectProvider<ProcessManager> managers,
+            ProcessOutboxRepository repository, ObjectProvider<ProcessManager> managers,
             PlatformTransactionManager transactionManager, ProcessRepository processes) {
-        return new CreateSubProcessCommand(repositories.getIfAvailable(), managers, mapper, transactionManager, processes);
+        return new CreateSubProcessCommand(repository, managers, mapper, transactionManager, processes);
     }
     @Bean @Order(1) SignalParentCommand signalParentCommand(
-            ObjectProvider<ProcessOutboxRepository> repositories, ObjectProvider<ProcessManager> managers,
+            ProcessOutboxRepository repository, ObjectProvider<ProcessManager> managers,
             PlatformTransactionManager transactionManager) {
-        return new SignalParentCommand(repositories.getIfAvailable(), managers, mapper, transactionManager);
+        return new SignalParentCommand(repository, managers, mapper, transactionManager);
     }
     @Bean @Order(2) EmitCompletedCommand emitCompletedCommand(
-            ObjectProvider<ProcessOutboxRepository> repositories, ObjectProvider<ProcessManager> managers,
+            ProcessOutboxRepository repository, ObjectProvider<ProcessManager> managers,
             PlatformTransactionManager transactionManager, EventProcessor events) {
-        return new EmitCompletedCommand(repositories.getIfAvailable(), managers, mapper, transactionManager, events);
+        return new EmitCompletedCommand(repository, managers, mapper, transactionManager, events);
     }
     @Bean @Order(3) StartWorkerCommand startWorkerCommand(
-            ObjectProvider<ProcessOutboxRepository> repositories, ObjectProvider<ProcessManager> managers,
+            ProcessOutboxRepository repository, ObjectProvider<ProcessManager> managers,
             PlatformTransactionManager transactionManager, IProcessConfigurator configurator,
             ObjectProvider<WorkerStarter> starters) {
-        return new StartWorkerCommand(repositories.getIfAvailable(), managers, mapper, transactionManager, configurator, starters);
+        return new StartWorkerCommand(repository, managers, mapper, transactionManager, configurator, starters);
     }
 
     @Bean OutboxCommandRegistry<ProcessTransition> processOutboxCommands(List<OutboxCommandLifecycle<ProcessTransition>> commands) {

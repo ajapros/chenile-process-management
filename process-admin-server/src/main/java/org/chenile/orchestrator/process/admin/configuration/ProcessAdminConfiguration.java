@@ -34,9 +34,7 @@ public class ProcessAdminConfiguration {
     }
     @Bean ApplicationRunner verifyDeliverySchema(JdbcTemplate jdbc, Environment environment) {
         return args -> {
-            String[] tables = environment.getProperty("chenile.process.outbox.enabled", Boolean.class, true)
-                ? new String[]{"chenile_process_outbox", "chenile_process_receipt", "chenile_process_work_item"}
-                : new String[]{"chenile_process_work_item"};
+            String[] tables = {"chenile_process_outbox", "chenile_process_receipt", "chenile_process_work_item"};
             for (String table : tables) {
                 try { jdbc.queryForList("select 1 from " + table + " where 1=0"); }
                 catch (org.springframework.dao.DataAccessException failure) {

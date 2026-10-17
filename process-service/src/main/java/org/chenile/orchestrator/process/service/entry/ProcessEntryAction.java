@@ -9,7 +9,7 @@ import org.chenile.utils.entity.service.EntityStore;
 import org.chenile.workflow.service.stmcmds.GenericEntryAction;
 import org.springframework.beans.factory.annotation.Autowired;
 
-/** Save first, then use the same registered commands in both inline and durable modes. */
+/** Save the transition and record its commands atomically; dispatch happens after commit. */
 public class ProcessEntryAction extends GenericEntryAction<Process> {
     @Autowired private OutboxCommandRegistry<ProcessTransition> commands;
 
