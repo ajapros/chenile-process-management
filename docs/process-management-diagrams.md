@@ -208,6 +208,38 @@ erDiagram
     }
 ```
 
+### Table descriptions
+
+- **`process_table`** (entity `Process`) — the heart of the system: one row per process in the tree, holding
+  its type, STM state, split/aggregation counters, serialized `input`/`output`, and the self-references
+  `parent_id` (sub-process tree) and `predecessor_id` (successor lineage). Every running job is a subtree of
+  these rows.
+- **`subprocess_error`** (entity `SubProcessError`) — error detail for a process that failed: one critical
+  exception message and stack trace per row, linked from `process_table` via a Hibernate join table. The bulk
+  of validation messages live in its child table below.
+- **`subprocess_error_validation_errors`** — the `@ElementCollection` of row-level validation strings for a
+  `SubProcessError`. Keeps the many small "row N was malformed" messages out of the main error row.
+- **`process_definition`** (entity `ProcessDefinition`) — the database-backed process catalogue used when
+  `chenile.process.configurator=database`: one row per process type, storing the `ProcessDef` as JSON (leaf
+  flag, parent/predecessor relationships, worker `config`). Editable at runtime via the management API.
+- **`chenile_process_work_item`** — the JDBC worker queue (jdbc-process-starter). Each row is a unit of work
+  claimed by a worker with `FOR UPDATE SKIP LOCKED`, leased, retried, and finally `SUCCESS` or `DEAD`. This is
+  the KEDA-scalable backlog for distributing worker execution.
+- **`chenile_process_outbox`** — the transactional outbox. Each row is one durable consequence of a transition
+  (a command), written in the same transaction that saves the process and later drained by the dispatcher. It
+  carries the registry `command_type`, serialized payload, the unique `idempotency_key` (enqueue de-dup),
+  `claim_token` + lease (fencing), and `visible_after` (backoff/scheduling).
+- **`chenile_process_receipt`** — the effect-level idempotency ledger. One row per `(consumer, receipt_key)`
+  business fact, inserted in the same transaction as the effect so a redelivered command is a no-op. This is
+  what makes parent counting and successor chaining exactly-once across retries and replays.
+- **`trigger_log`** (entity `TriggerLog`, trigger-service) — one row per accepted trigger, serving double duty:
+  the unique `(trigger_id, event_name)` claim that makes dispatch idempotent, plus the dispatch history
+  (status `RECEIVED` → `RUNNING` → `COMPLETED`/`FAILED`, source, timings, payload, error). It is what the
+  management API's execution view reads.
+- **`chenile_crontab`** (entity `Crontab`, crontab-trigger) — durable Quartz schedules: one row per cron,
+  holding the expression, timezone, the event to fire (`ProcessCreate`), and its headers/payload JSON. Saving
+  or deleting a row registers or removes the Quartz job.
+
 `CHENILE_PROCESS_RECEIPT` has no relationships by design — it is the effect-level idempotency ledger
 (`checkIdempotency(consumer, key)`), keyed by business identity (e.g. `PARENT` → `[parentId, childId]`,
 `CHAIN` → `[predecessorId, successorType]`), not by a foreign key.

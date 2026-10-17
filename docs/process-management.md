@@ -26,8 +26,8 @@ The moving parts: **process definitions** describe each type and its worker conf
 JSON file or a database table; **workers** run in one of three interchangeable modes — in-VM, a pub/sub
 queue, or a durable JDBC work queue; **triggers** (durable Quartz crontabs, deduplicated through
 `trigger_log`) activate the system; and **tenancy** is carried from a framework header through the whole
-tree. For deployments that require every consequence of a transition to survive a crash, an opt-in
-**transactional outbox** writes each consequence in the same transaction as the state save and executes it
+tree. So that every consequence of a transition survives a crash, a **transactional outbox** — always on,
+not a mode you turn on — writes each consequence in the same transaction as the state save and executes it
 through a dispatcher with at-least-once delivery, consumer-receipt idempotency, lease-fenced claiming,
 retry/backoff, dead-letter handling with compensation, and a reference target of PostgreSQL. Everything —
 state, definitions, outbox, receipts, and trigger idempotency — lives in the application's own database.
