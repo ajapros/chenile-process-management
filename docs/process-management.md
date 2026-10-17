@@ -49,10 +49,10 @@ with the `WorkerStarter` interface and the configuration abstraction (`IProcessC
 `ProcessManagerImpl`, `ProcessController`, `ProcessEntryAction`, `StartWorkerCommand`, the configurators, the
 durable-execution wiring, and the Spring configuration.
 
-`process-utils` provides the worker base classes (`SplitterBase`, `ExecutorBase`, `AggregatorBase`,
-orchestrated by `BatchServiceBase`) and helpers.
-
-`process-delegate` is a client for invoking the manager remotely.
+`process-delegate` provides the remote manager client together with the worker APIs, base classes
+(`SplitterBase`, `ExecutorBase`, `AggregatorBase`, orchestrated by `BatchServiceBase`) and helpers.
+The former `process-utils` module has been merged into this artifact. Existing Java packages under
+`org.chenile.orchestrator.process.utils` and `org.chenile.orchestrator.delegate` are unchanged.
 
 `process-outbox` is the transactional outbox infrastructure used for durable execution (see below). It is
 independent and database-only so that it can be depended on without creating a cycle.
@@ -207,7 +207,7 @@ Three interchangeable `WorkerStarter` implementations decide where work actually
   claim, lease, attempt/retry, `DEAD` after the maximum attempts); a runner polls and executes. This is
   the production-grade, KEDA-scalable option.
 
-Workers extend the `process-utils` base classes, which handle payload typing, tenant propagation into the
+Workers extend the `process-delegate` base classes, which handle payload typing, tenant propagation into the
 Chenile context, and error reporting back to the daemon.
 
 ## Process definitions
@@ -564,3 +564,12 @@ to false and explicitly drain **after commit** in tests or a separately hosted
 dispatcher. Transition responses no longer include a synchronously completed
 cascade: retrieve current state separately. Application completion subscribers now
 participate in command retries instead of best-effort after-commit publication.
+
+## Migration from process-utils
+
+Replace Maven dependencies on `org.chenile.orchestrator.process:process-utils`
+with `org.chenile.orchestrator.process:process-delegate`. The former artifact is
+no longer built or managed by the parent. Worker APIs, helper classes and client
+classes retain their existing Java package names, so source imports do not change.
+Use only the consolidated artifact to avoid duplicate classes from an old
+`process-utils` JAR. No database or runtime behavior changes are required.
