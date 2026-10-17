@@ -1,7 +1,6 @@
 package org.chenile.trigger.configuration;
 
 import org.chenile.core.event.EventProcessor;
-import org.chenile.core.model.ChenileConfiguration;
 import org.chenile.trigger.store.*;
 import org.chenile.trigger.EventTriggerService;
 import org.chenile.trigger.TriggerService;
@@ -19,8 +18,8 @@ public class ChenileTriggerConfiguration {
         return new DatabaseTriggerLogStore(repository);
     }
     @Bean public TriggerService triggerService(TriggerLogStore triggerLogStore, EventProcessor eventProcessor,
-                                               ChenileConfiguration configuration, TriggerObserver observer) {
-        return new EventTriggerService(triggerLogStore, eventProcessor, configuration, observer);
+                                               TriggerObserver observer) {
+        return new EventTriggerService(triggerLogStore, eventProcessor, observer);
     }
     @Bean @ConditionalOnMissingBean(TriggerObserver.class)
     public TriggerObserver triggerObserver() {

@@ -34,7 +34,6 @@ public class ProcessController extends ControllerSupport{
 	@EventsSubscribedTo("ProcessCreate")
 	public ResponseEntity<GenericResponse<StateEntityServiceResponse<Process>>> create(
 			HttpServletRequest httpServletRequest,
-			@ChenileParamType(ProcessDto.class)
 			@RequestBody ProcessDto processDto){
 		return process(httpServletRequest,processDto);
 	}
@@ -44,7 +43,6 @@ public class ProcessController extends ControllerSupport{
 	@EventsSubscribedTo("ProcessCompleted")
 	public ResponseEntity<GenericResponse<List<StateEntityServiceResponse<Process>>>> processCompleted(
 			HttpServletRequest httpServletRequest,
-			@ChenileParamType(ProcessCompletedEvent.class)
 			@RequestBody ProcessCompletedEvent event){
 		return process(httpServletRequest,event);
 	}

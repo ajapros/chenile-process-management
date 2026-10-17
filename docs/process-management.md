@@ -330,7 +330,8 @@ for the design rationale.
 
 `trigger-service` converts an external activation into a synchronously dispatched in-JVM Chenile event; it
 does not introduce another event bus. A `TriggerInput` (trigger id, event id, payload, headers, time) is
-recorded, converted to the declared Java event type, and passed to `EventProcessor`. The trigger id plus
+recorded and passed unchanged to `EventProcessor`. Chenile's transformation pipeline converts raw JSON
+or decoded JSON objects to the subscriber's selected input type. The trigger id plus
 event id form an idempotency claim.
 
 Idempotency is enforced by `TriggerLog` (the `trigger_log` table), which retains dispatch metadata alongside `id`,
@@ -348,7 +349,9 @@ use Quartz syntax (with seconds), not five-field Unix cron.
 
 Schedules can come from the database or from a classpath JSON resource (`JsonCrontabRepository`), both behind
 the `CrontabReader` interface; `CrontabValidator` enforces a valid cron expression, timezone, tenant format,
-and JSON headers/payload for either source. The JSON form accepts structured `headers` / `payload` objects as
+and JSON headers with `x-` names for either source. Event payloads are opaque to the cron adapter: it
+passes `eventPayloadJson` unchanged, including null or blank values; payload validation belongs to the
+subscriber's transformation pipeline. The JSON form accepts structured `headers` / `payload` objects as
 an alternative to pre-encoded `headersJson` / `eventPayloadJson` strings, and derives a stable id from
 `tenant:name` when none is given. Cron ownership assumes a single scheduler instance; distributed Quartz
 job-store coordination is out of scope.
@@ -356,7 +359,7 @@ job-store coordination is out of scope.
 ### Trigger execution history (`TriggerObserver`)
 
 `trigger_log` is the single record of an accepted trigger. Alongside its idempotency key it stores tenant,
-source, crontab ID, input payload, start/finish times and an error. Lifecycle writes are owned by
+source, adapter-owned `triggerContext` JSON, input payload, start/finish times and an error. Lifecycle writes are owned by
 `EventTriggerService` through `TriggerLogStore`, independently of the event transaction. `RECEIVED`
 means accepted but not started; `RUNNING` means dispatch began. Both can remain after a crash and
 continue to suppress duplicate dispatch, just as `COMPLETED` and `FAILED` do.
@@ -471,9 +474,14 @@ effect and acknowledgement so a redelivered command is a no-op. Append-only — 
 ### Triggering
 
 `trigger_log` (entity `TriggerLog`) — `id`, `trigger_id`, `event_name`, `trigger_time`, `status`
-(RECEIVED/RUNNING/COMPLETED/FAILED), tenant, source, `crontab_id`, nullable `started_at` / `finished_at`,
-error and payload. Unique `(trigger_id,event_name)`; indexes on `(tenant,started_at)`,
-`(tenant,trigger_id)` and `(tenant,crontab_id)`. Retain claim rows; prune bulky payload/error fields
+(RECEIVED/RUNNING/COMPLETED/FAILED), tenant, source, nullable `started_at` / `finished_at`,
+error, payload and `trigger_context` JSON, plus inherited `BaseJpaEntity` audit/version columns.
+Unique `(trigger_id,event_name)`; indexes on `(tenant,started_at)` and `(tenant,trigger_id)`.
+The log has no cron-specific columns. Crontab supplies its ID, Quartz fire identity and times,
+and configured/generated headers through `TriggerInput.triggerContext`; the trigger service
+serializes this adapter-owned object without knowing its schema. All trigger headers must start
+with `x-` so Chenile propagates them between JVMs. Cron metadata uses `x-chenile-crontab-id`,
+`x-chenile-trigger-source` and `x-chenile-quartz-*` keys in both headers and context JSON. Retain claim rows; prune bulky payload/error fields
 separately if needed. The former execution table is merged and removed.
 
 `chenile_crontab` (entity `Crontab`, durable schedules) — `name` (unique), `enabled` (boolean, indexed),
@@ -544,7 +552,7 @@ Integration tests (`TestFeeds`, `TestFile`, `TestChunks`) drive the full recursi
 with fake workers resolved by naming convention, in both synchronous and latch-stepped asynchronous modes.
 `ProcessManagerImplTriggerTest` covers `ProcessDto` creation and trigger correlation. BDD/REST suites drive
 the transition matrix over the REST surface. `DatabaseProcessConfiguratorTest` checks the database
-configurator. The `trigger-service` tests cover dispatch, typed payloads, and the `trigger_log` uniqueness
+configurator. The `trigger-service` tests cover unchanged payload dispatch and the `trigger_log` uniqueness
 guarantee. The `crontab-trigger` tests cover JSON loading, Quartz dispatch, transactional schedule updates,
 and wiring with an application-defined trigger implementation. The `process-outbox` tests cover rollback-together, idempotent enqueue, `SKIP LOCKED`, backoff,
 retry-then-DEAD, dead-letter compensation, and replay-safe parent counting, with an opt-in suite that runs

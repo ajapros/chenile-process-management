@@ -21,12 +21,13 @@ public final class CrontabValidator {
         if (cron.tenant != null && !cron.tenant.matches("[A-Za-z0-9_.-]{1,128}"))
             throw new IllegalArgumentException("Invalid cron tenant");
         try {
-            if (cron.headersJson != null && !cron.headersJson.isBlank()
-                    && JSON.readValue(cron.headersJson, new TypeReference<Map<String,String>>() {}) == null)
-                throw new IllegalArgumentException("Headers must be a JSON object");
-            if (cron.eventPayloadJson != null && !cron.eventPayloadJson.isBlank()
-                    && JSON.readValue(cron.eventPayloadJson, new TypeReference<Map<String,Object>>() {}) == null)
-                throw new IllegalArgumentException("Payload must be a JSON object");
+            if (cron.headersJson != null && !cron.headersJson.isBlank()) {
+                var headers = JSON.readValue(cron.headersJson, new TypeReference<Map<String,String>>() {});
+                if (headers == null) throw new IllegalArgumentException("Headers must be a JSON object");
+                for (String key : headers.keySet())
+                    if (!key.toLowerCase(java.util.Locale.ROOT).startsWith("x-"))
+                        throw new IllegalArgumentException("Crontab headers must start with x-");
+            }
         } catch (Exception e) { throw new IllegalArgumentException("Invalid crontab JSON", e); }
     }
 }

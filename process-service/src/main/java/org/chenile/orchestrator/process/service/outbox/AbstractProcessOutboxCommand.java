@@ -4,9 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.chenile.core.context.ContextContainer;
-import org.chenile.orchestrator.process.api.ProcessManager;
 import org.chenile.orchestrator.process.outbox.ProcessOutboxRepository;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -19,16 +17,14 @@ import org.chenile.orchestrator.process.outbox.OutboxCommandLifecycle;
 /** Shared tenant isolation and JSON persistence, not a central command switch. */
 public abstract class AbstractProcessOutboxCommand implements OutboxCommandLifecycle<ProcessTransition> {
     private final ProcessOutboxRepository outbox;
-    protected final ObjectProvider<ProcessManager> managers;
     protected final ObjectMapper mapper;
     protected final TransactionTemplate independent;
     @PersistenceContext
     private EntityManager entityManager;
 
-    protected AbstractProcessOutboxCommand(ProcessOutboxRepository outbox, ObjectProvider<ProcessManager> managers,
+    protected AbstractProcessOutboxCommand(ProcessOutboxRepository outbox,
             ObjectMapper mapper, PlatformTransactionManager transactionManager) {
         this.outbox = java.util.Objects.requireNonNull(outbox, "Process outbox is required");
-        this.managers = managers;
         this.mapper = mapper;
         independent = new TransactionTemplate(transactionManager);
         independent.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);

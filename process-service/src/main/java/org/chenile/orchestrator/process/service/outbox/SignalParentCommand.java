@@ -17,12 +17,14 @@ import org.apache.commons.lang3.StringUtils;
 import java.util.stream.Collectors;
 
 public class SignalParentCommand extends AbstractProcessOutboxCommand {
+    private final ObjectProvider<ProcessManager> managers;
     public static final String TYPE = "SIGNAL_PARENT";
     /** All addressing and event-specific data is in this JSON object, not table columns. */
     public record Data(String parentId, String childId, String eventName, JsonNode payload) { }
     public SignalParentCommand(ProcessOutboxRepository outbox, ObjectProvider<ProcessManager> managers,
             ObjectMapper mapper, PlatformTransactionManager transactionManager) {
-        super(outbox, managers, mapper, transactionManager);
+        super(outbox, mapper, transactionManager);
+        this.managers = managers;
     }
     @Override public String type() { return TYPE; }
 

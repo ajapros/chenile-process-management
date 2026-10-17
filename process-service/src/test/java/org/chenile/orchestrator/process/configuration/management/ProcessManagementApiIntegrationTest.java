@@ -27,7 +27,7 @@ class ProcessManagementApiIntegrationTest extends AbstractProcessManagementApiIn
         String body = """
                 {"triggerId":"http-trigger", "eventId":"ProcessCreate",
                  "triggerTime":"2026-10-16T00:00:00Z",
-                 "headers":{"x-chenile-tenant-id":"alpha", "chenile-trigger-source":"HTTP"},
+                 "headers":{"x-chenile-tenant-id":"alpha", "x-chenile-trigger-source":"HTTP"},
                  "payload":{"processDefName":"source", "args":{"rows":2}}}
                 """;
         var first = response(post("/trigger").content(body), "alpha", 200).get("payload");

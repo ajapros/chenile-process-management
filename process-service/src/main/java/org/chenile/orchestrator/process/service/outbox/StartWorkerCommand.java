@@ -18,6 +18,7 @@ import java.util.HashMap;
 
 public class StartWorkerCommand extends AbstractProcessOutboxCommand {
     private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(StartWorkerCommand.class);
+    private final ObjectProvider<ProcessManager> managers;
     public static final String TYPE = "START_WORKER";
     private final IProcessConfigurator configurator;
     private final ObjectProvider<WorkerStarter> starters;
@@ -25,7 +26,8 @@ public class StartWorkerCommand extends AbstractProcessOutboxCommand {
     public StartWorkerCommand(ProcessOutboxRepository outbox, ObjectProvider<ProcessManager> managers,
             ObjectMapper mapper, PlatformTransactionManager transactionManager, IProcessConfigurator configurator,
             ObjectProvider<WorkerStarter> starters) {
-        super(outbox, managers, mapper, transactionManager);
+        super(outbox, mapper, transactionManager);
+        this.managers = managers;
         this.configurator = configurator;
         this.starters = starters;
     }

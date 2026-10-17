@@ -77,6 +77,10 @@ class PostgresTriggerMigrationTest {
         assertEquals("claim-id", rows.get("complete").get("id"));
         assertEquals("{\"value\":1}", rows.get("complete").get("payload"));
         assertEquals("alpha", rows.get("complete").get("tenant"));
+        var context = new com.fasterxml.jackson.databind.ObjectMapper()
+                .readTree((String) rows.get("complete").get("trigger_context"));
+        assertEquals("daily", context.get("x-chenile-crontab-id").asText());
+        assertEquals("CRON", context.get("x-chenile-trigger-source").asText());
         assertEquals("RECEIVED", rows.get("missing").get("status"));
         assertNull(rows.get("missing").get("started_at"));
         assertEquals("FAILED", rows.get("conflict").get("status"));
@@ -104,6 +108,8 @@ class PostgresTriggerMigrationTest {
     @Test void createsFreshSchemaAndCanBeReapplied() throws Exception {
         migrate(); migrate();
         assertEquals(0, jdbc.queryForObject("select count(*) from trigger_log", Integer.class));
+        assertEquals(0, jdbc.queryForObject("select count(*) from information_schema.columns where table_schema=current_schema() and table_name='trigger_log' and column_name='crontab_id'", Integer.class));
+        assertEquals(1, jdbc.queryForObject("select count(*) from information_schema.columns where table_schema=current_schema() and table_name='trigger_log' and column_name='trigger_context'", Integer.class));
         assertNull(jdbc.queryForObject("select to_regclass('chenile_trigger_execution')", String.class));
     }
 }

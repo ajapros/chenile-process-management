@@ -104,7 +104,7 @@ Filters are exact matches and combined with AND.
 | POST `/crontabs` | Add a ProcessCreate schedule |
 | PUT `/crontabs/{id}` | Edit/enable/disable an existing tenant's schedule |
 | POST `/triggers` | Generate ProcessCreate through the normal trigger ingress |
-| GET `/executions` | Trigger history; filters `triggerId`, `crontabId`, `status`, `page`, `size` |
+| GET `/executions` | Trigger history; filters `triggerId`, `crontabId` (from context JSON), `status`, `page`, `size` |
 | GET `/definitions` | Global active definitions (database or JSON configurator) |
 | POST `/definitions` | Add a database-backed definition |
 | PUT `/definitions/{name}` | Update an existing database-backed definition |

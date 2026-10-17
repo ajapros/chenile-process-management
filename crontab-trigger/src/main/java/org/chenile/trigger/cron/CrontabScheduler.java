@@ -59,14 +59,15 @@ public class CrontabScheduler {
         input.eventId = crontab.eventName;
         input.headers.putAll(map(crontab.headersJson));
         if (crontab.tenant != null) input.headers.put("x-chenile-tenant-id", crontab.tenant);
-        input.headers.put("chenile-trigger-source", "CRON");
-        input.headers.put("chenile-crontab-id", crontab.id);
-        input.headers.put("chenile-quartz-fire-instance-id", context.getFireInstanceId());
-        input.headers.put("chenile-quartz-scheduled-fire-time", String.valueOf(context.getScheduledFireTime().toInstant()));
-        input.headers.put("chenile-quartz-fire-time", String.valueOf(context.getFireTime().toInstant()));
+        input.headers.put("x-chenile-trigger-source", "CRON");
+        input.headers.put("x-chenile-crontab-id", crontab.id);
+        input.headers.put("x-chenile-quartz-fire-instance-id", context.getFireInstanceId());
+        input.headers.put("x-chenile-quartz-scheduled-fire-time", String.valueOf(context.getScheduledFireTime().toInstant()));
+        input.headers.put("x-chenile-quartz-fire-time", String.valueOf(context.getFireTime().toInstant()));
         if (context.getNextFireTime() != null)
-            input.headers.put("chenile-quartz-next-fire-time", String.valueOf(context.getNextFireTime().toInstant()));
-        input.payload = object(crontab.eventPayloadJson);
+            input.headers.put("x-chenile-quartz-next-fire-time", String.valueOf(context.getNextFireTime().toInstant()));
+        input.triggerContext.putAll(input.headers);
+        input.payload = crontab.eventPayloadJson;
         triggerService.trigger(input);
     }
 
@@ -77,11 +78,6 @@ public class CrontabScheduler {
     private Map<String, String> map(String json) {
         if (json == null || json.isBlank()) return Map.of();
         try { return mapper.readValue(json, new TypeReference<LinkedHashMap<String, String>>() { }); }
-        catch (Exception e) { throw new IllegalArgumentException("Invalid crontab JSON", e); }
-    }
-    private Map<String, Object> object(String json) {
-        if (json == null || json.isBlank()) return new LinkedHashMap<>();
-        try { return mapper.readValue(json, new TypeReference<LinkedHashMap<String, Object>>() { }); }
         catch (Exception e) { throw new IllegalArgumentException("Invalid crontab JSON", e); }
     }
 }

@@ -112,8 +112,18 @@ abstract class AbstractProcessManagementApiIntegrationTest {
         interrupted.triggerId = "interrupted"; interrupted.eventName = "ProcessCreate";
         interrupted.triggerTime = java.time.Instant.now(); interrupted.tenant = "alpha";
         interrupted.status = org.chenile.trigger.model.TriggerLogStatus.RECEIVED;
-        executions.saveAndFlush(interrupted);
+        String cronId = "nightly_%\"";
+        interrupted.triggerContext = json.writeValueAsString(Map.of("x-chenile-crontab-id", cronId));
+        var context = ContextContainer.getInstance();
+        var snapshot = context.snapshot();
+        try {
+            context.setTenant("alpha");
+            executions.saveAndFlush(interrupted);
+        } finally { context.restore(snapshot); }
         assertEquals(1, response(get(BASE + "/executions").param("status", "RECEIVED"), "alpha", 200).get("totalElements").asInt());
+        assertEquals(1, response(get(BASE + "/executions").param("crontabId", cronId), "alpha", 200).get("totalElements").asInt());
+        assertEquals(0, response(get(BASE + "/executions").param("crontabId", "nightly"), "alpha", 200).get("totalElements").asInt());
+        assertEquals(0, response(get(BASE + "/executions").param("crontabId", cronId), "beta", 200).get("totalElements").asInt());
         assertEquals(1, response(get(BASE + "/trace").param("triggerId", interrupted.triggerId), "alpha", 200).get("nodes").size());
         var roots = response(get(BASE + "/processes").param("triggerId", event.get("triggerId").asText()), "alpha", 200);
         assertEquals(1, roots.get("totalElements").asInt());

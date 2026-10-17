@@ -11,7 +11,7 @@ class JsonCrontabRepositoryTest {
     private static final String CRONS = """
         [{"name":"daily","tenant":"default","enabled":false,"cronExpression":"0 0 2 * * ?",
           "eventName":"ProcessCreate","payload":{"processDefName":"feed","args":{"batchId":"a"}},
-          "headers":{"custom":"value"}}]
+          "headers":{"x-custom":"value"}}]
         """;
     private ByteArrayInputStream json(String value) { return new ByteArrayInputStream(value.getBytes(StandardCharsets.UTF_8)); }
     @Test void readsNativeSchedulesAndStructuredPayloadsWithStableIds() throws Exception {
@@ -19,7 +19,7 @@ class JsonCrontabRepositoryTest {
         var cron = repository.findAll().get(0);
         assertEquals("UTC", cron.timezone);
         assertTrue(cron.eventPayloadJson.contains("processDefName"));
-        assertEquals("{\"custom\":\"value\"}", cron.headersJson);
+        assertEquals("{\"x-custom\":\"value\"}", cron.headersJson);
         assertTrue(repository.findByEnabledTrue().isEmpty());
         String id = cron.id; cron.name = "caller mutation";
         assertEquals("daily", repository.findById(id).orElseThrow().name);

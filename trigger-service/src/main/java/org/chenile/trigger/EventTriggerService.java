@@ -6,8 +6,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.chenile.core.context.ChenileExchange;
 import org.chenile.core.event.EventProcessor;
-import org.chenile.core.model.ChenileConfiguration;
-import org.chenile.core.model.ChenileEventDefinition;
 import org.chenile.trigger.store.TriggerLogStore;
 import org.chenile.trigger.model.TriggerLog;
 import org.chenile.trigger.model.TriggerLogStatus;
@@ -28,33 +26,25 @@ public class EventTriggerService implements TriggerService {
     private final ObjectMapper historyMapper = new ObjectMapper().findAndRegisterModules();
     private final TriggerLogStore triggerLogStore;
     private final EventProcessor eventProcessor;
-    private final ChenileConfiguration configuration;
-    private final ObjectMapper objectMapper;
     private TriggerObserver observer = TriggerObserver.NONE;
 
-    public EventTriggerService(TriggerLogStore store, EventProcessor processor,
-                               ChenileConfiguration configuration, TriggerObserver observer) {
-        this(store, processor, configuration);
+    public EventTriggerService(TriggerLogStore store, EventProcessor processor, TriggerObserver observer) {
+        this(store, processor);
         this.observer = observer;
     }
 
-    public EventTriggerService(TriggerLogStore triggerLogStore, EventProcessor eventProcessor,
-                               ChenileConfiguration configuration) {
-        this(triggerLogStore, eventProcessor, configuration, new ObjectMapper());
-    }
-
-    EventTriggerService(TriggerLogStore triggerLogStore, EventProcessor eventProcessor,
-                        ChenileConfiguration configuration, ObjectMapper objectMapper) {
+    public EventTriggerService(TriggerLogStore triggerLogStore, EventProcessor eventProcessor) {
         this.triggerLogStore = triggerLogStore;
         this.eventProcessor = eventProcessor;
-        this.configuration = configuration;
-        this.objectMapper = objectMapper;
     }
 
     @Override
     public TriggerResult trigger(TriggerInput input) {
         require(input != null, "Trigger input is required");
         require(input.eventId != null && !input.eventId.isBlank(), "Trigger eventId is required");
+        for (String header : safeHeaders(input.headers).keySet())
+            require(header != null && header.toLowerCase(java.util.Locale.ROOT).startsWith("x-"),
+                    "Trigger headers must start with x-");
         if (input.triggerId == null || input.triggerId.isBlank()) input.triggerId = UUID.randomUUID().toString();
         if (input.triggerTime == null) input.triggerTime = Instant.now();
         Optional<TriggerLog> existing = triggerLogStore.findByTriggerIdAndEventName(input.triggerId, input.eventId);
@@ -72,7 +62,7 @@ public class EventTriggerService implements TriggerService {
             notifyStarted(log.id, input);
             Map<String, String> headers = new HashMap<>(safeHeaders(input.headers));
             headers.put("x-chenile-trigger-id", input.triggerId);
-            List<ChenileExchange> exchanges = eventProcessor.handleEvent(input.eventId, typedPayload(input), headers);
+            List<ChenileExchange> exchanges = eventProcessor.handleEvent(input.eventId, input.payload, headers);
             Optional<ChenileExchange> failed = exchanges.stream().filter(e -> e.getException() != null).findFirst();
             if (failed.isPresent()) throw new IllegalStateException(failed.get().getException().getMessage(), failed.get().getException());
             triggerLogStore.markCompleted(log.id);
@@ -90,12 +80,6 @@ public class EventTriggerService implements TriggerService {
         return new TriggerResult(input.triggerId, input.eventId, log.id, log.status == TriggerLogStatus.COMPLETED, duplicate);
     }
 
-    private Object typedPayload(TriggerInput input) {
-        ChenileEventDefinition event = configuration.getEvents().get(input.eventId);
-        if (event == null || event.getType() == null || input.payload == null || event.getType().isInstance(input.payload)) return input.payload;
-        return objectMapper.convertValue(input.payload, event.getType());
-    }
-
     private TriggerLog receivedLog(TriggerInput input) {
         TriggerLog log = new TriggerLog();
         log.status = TriggerLogStatus.RECEIVED;
@@ -104,10 +88,12 @@ public class EventTriggerService implements TriggerService {
         log.triggerTime = input.triggerTime;
         var headers = safeHeaders(input.headers);
         log.tenant = headers.get(HeaderUtils.TENANT_ID_KEY);
-        log.source = headers.getOrDefault("chenile-trigger-source", "EXTERNAL");
-        log.crontabId = headers.get("chenile-crontab-id");
-        try { log.payload = historyMapper.writeValueAsString(input.payload); }
-        catch (Exception failure) { throw new IllegalArgumentException("Cannot serialize trigger payload", failure); }
+        log.source = headers.getOrDefault("x-chenile-trigger-source", "EXTERNAL");
+        try {
+            log.payload = input.payload instanceof String text ? text : historyMapper.writeValueAsString(input.payload);
+            log.triggerContext = historyMapper.writeValueAsString(input.triggerContext);
+        }
+        catch (Exception failure) { throw new IllegalArgumentException("Cannot serialize trigger payload or context", failure); }
         return triggerLogStore.record(log);
     }
 

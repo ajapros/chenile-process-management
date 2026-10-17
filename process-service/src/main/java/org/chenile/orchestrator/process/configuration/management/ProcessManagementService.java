@@ -94,7 +94,15 @@ public class ProcessManagementService {
     public PageResult<TriggerLog> executions(String tenant, String triggerId, String crontabId,
             String status, int page, int size) {
         Specification<TriggerLog> query = filter(tenant(tenant), "triggerId", triggerId);
-        query = filter(query, "crontabId", crontabId);
+        if (present(crontabId)) {
+            // Adapter context is stored as compact JSON; escape both JSON and LIKE metacharacters.
+            String fragment;
+            try { fragment = json.writeValueAsString(Map.of("x-chenile-crontab-id", crontabId)); }
+            catch (com.fasterxml.jackson.core.JsonProcessingException invalid) { throw bad("Invalid crontab ID"); }
+            String pattern = "%" + fragment.substring(1, fragment.length() - 1)
+                    .replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
+            query = query.and((r, q, c) -> c.like(r.get("triggerContext"), pattern, '!'));
+        }
         if (present(status)) {
             TriggerLogStatus selected;
             try { selected = TriggerLogStatus.valueOf(status); }
@@ -131,7 +139,8 @@ public class ProcessManagementService {
         input.triggerId = "manual:" + tenant + ":" + (present(request.triggerId()) ? request.triggerId() : UUID.randomUUID());
         input.eventId = "ProcessCreate"; input.payload = request.payload();
         input.headers.put("x-chenile-tenant-id", tenant);
-        input.headers.put("chenile-trigger-source", "MANUAL");
+        input.headers.put("x-chenile-trigger-source", "MANUAL");
+        input.triggerContext.putAll(input.headers);
         return triggers.trigger(input);
     }
     private void validatePayload(ProcessDto payload) {

@@ -1,5 +1,7 @@
 package org.chenile.trigger.store;
 
+import org.chenile.core.context.ContextContainer;
+import org.chenile.core.context.HeaderUtils;
 import org.chenile.trigger.model.TriggerLog;
 import org.chenile.trigger.model.TriggerLogStatus;
 import org.springframework.transaction.annotation.Propagation;
@@ -13,7 +15,7 @@ public class DatabaseTriggerLogStore implements TriggerLogStore {
     public DatabaseTriggerLogStore(TriggerLogRepository repository) { this.repository = repository; }
 
     @Override @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public TriggerLog record(TriggerLog log) { return repository.saveAndFlush(log); }
+    public TriggerLog record(TriggerLog log) { return save(log); }
 
     @Override
     public Optional<TriggerLog> findByTriggerIdAndEventName(String triggerId, String eventName) {
@@ -35,6 +37,18 @@ public class DatabaseTriggerLogStore implements TriggerLogStore {
         if (status == TriggerLogStatus.RUNNING) log.startedAt = Instant.now();
         else log.finishedAt = Instant.now();
         log.error = failure == null ? null : failure.getMessage();
-        return repository.saveAndFlush(log);
+        return save(log);
+    }
+
+    /** BaseJpaEntity callbacks must see the persisted trigger's tenant, including during updates. */
+    private TriggerLog save(TriggerLog log) {
+        var context = ContextContainer.getInstance();
+        var snapshot = context.snapshot();
+        try {
+            context.put(HeaderUtils.TENANT_ID_KEY, log.tenant);
+            return repository.saveAndFlush(log);
+        } finally {
+            context.restore(snapshot);
+        }
     }
 }

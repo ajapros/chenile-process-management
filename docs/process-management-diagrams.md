@@ -93,7 +93,7 @@ erDiagram
     PROCESS_TABLE ||--o{ SUBPROCESS_ERROR : "errors (OneToMany)"
     SUBPROCESS_ERROR ||--o{ SUBPROCESS_ERROR_VALIDATION_ERRORS : "validation strings"
     PROCESS_DEFINITION ||..o{ PROCESS_TABLE : "process_type (config, logical)"
-    CHENILE_CRONTAB ||..o{ TRIGGER_LOG : "crontab_id (logical)"
+    CHENILE_CRONTAB ||..o{ TRIGGER_LOG : "adapter metadata in trigger_context"
     TRIGGER_LOG ||..o{ PROCESS_TABLE : "trigger_id (correlation, logical)"
     PROCESS_TABLE ||..o{ CHENILE_PROCESS_WORK_ITEM : "process_id (logical)"
     PROCESS_TABLE ||..o{ CHENILE_PROCESS_OUTBOX : "process_id (logical)"
@@ -145,7 +145,7 @@ erDiagram
         varchar status "RECEIVED|RUNNING|COMPLETED|FAILED"
         varchar tenant
         varchar source "CRON|EXTERNAL"
-        varchar crontab_id
+        text trigger_context "adapter metadata JSON"
         timestamptz started_at
         timestamptz finished_at
         text error

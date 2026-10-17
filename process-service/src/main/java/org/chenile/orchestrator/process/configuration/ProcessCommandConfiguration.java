@@ -32,9 +32,9 @@ public class ProcessCommandConfiguration {
         return new SignalParentCommand(repository, managers, mapper, transactionManager);
     }
     @Bean @Order(2) EmitCompletedCommand emitCompletedCommand(
-            ProcessOutboxRepository repository, ObjectProvider<ProcessManager> managers,
+            ProcessOutboxRepository repository,
             PlatformTransactionManager transactionManager, EventProcessor events) {
-        return new EmitCompletedCommand(repository, managers, mapper, transactionManager, events);
+        return new EmitCompletedCommand(repository, mapper, transactionManager, events);
     }
     @Bean @Order(3) StartWorkerCommand startWorkerCommand(
             ProcessOutboxRepository repository, ObjectProvider<ProcessManager> managers,

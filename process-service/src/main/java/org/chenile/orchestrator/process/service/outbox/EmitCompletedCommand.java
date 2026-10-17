@@ -1,9 +1,7 @@
 package org.chenile.orchestrator.process.service.outbox;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.chenile.orchestrator.process.api.ProcessManager;
 import org.chenile.orchestrator.process.outbox.ProcessOutboxRepository;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import org.chenile.core.context.HeaderUtils;
@@ -19,10 +17,10 @@ import org.chenile.stm.State;
 public class EmitCompletedCommand extends AbstractProcessOutboxCommand {
     private final EventProcessor events;
     public static final String TYPE = "EMIT_COMPLETED";
-    public EmitCompletedCommand(ProcessOutboxRepository outbox, ObjectProvider<ProcessManager> managers,
+    public EmitCompletedCommand(ProcessOutboxRepository outbox,
             ObjectMapper mapper, PlatformTransactionManager transactionManager,
             EventProcessor events) {
-        super(outbox, managers, mapper, transactionManager);
+        super(outbox, mapper, transactionManager);
         this.events = events;
     }
     @Override public String type() { return TYPE; }
@@ -38,7 +36,7 @@ public class EmitCompletedCommand extends AbstractProcessOutboxCommand {
         ProcessCompletedEvent event = read(entry, ProcessCompletedEvent.class);
         var headers = new HashMap<String, String>();
         if (event.tenantId != null) headers.put(HeaderUtils.TENANT_ID_KEY, event.tenantId);
-        if (event.triggerId != null) headers.put("triggerId", event.triggerId);
+        if (event.triggerId != null) headers.put("x-chenile-trigger-id", event.triggerId);
         var exchanges = events.handleEvent(Constants.Events.PROCESS_COMPLETED, event, headers);
         if (exchanges.isEmpty()) throw new IllegalStateException("No ProcessCompleted subscriber configured");
         for (var exchange : exchanges) {
