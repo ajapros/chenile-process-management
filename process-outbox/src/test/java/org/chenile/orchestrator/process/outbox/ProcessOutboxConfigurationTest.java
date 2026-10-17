@@ -26,12 +26,6 @@ class ProcessOutboxConfigurationTest {
             .withBean(TaskScheduler.class, () -> mock(TaskScheduler.class));
 
     @Test void alwaysWiresTheOutboxAndAllowsManualDispatchWithoutBackgroundPolling() {
-        application.run(context -> {
-            assertNull(context.getStartupFailure());
-            assertNotNull(context.getBean(ProcessOutboxRepository.class));
-            assertNotNull(context.getBean(OutboxDispatcher.class));
-            assertEquals(1, context.getBean(ScheduledTaskHolder.class).getScheduledTasks().size());
-        });
         application.withPropertyValues("chenile.process.outbox.run-dispatcher=false").run(context -> {
             assertNull(context.getStartupFailure());
             assertNotNull(context.getBean(ProcessOutboxRepository.class));
@@ -43,6 +37,8 @@ class ProcessOutboxConfigurationTest {
     @Test void enabledPollingUsesConfiguredDelayAndDispatchesThroughTheDispatcher() {
         application.withPropertyValues("chenile.process.outbox.poll-interval-millis=2500").run(context -> {
             assertNull(context.getStartupFailure());
+            assertNotNull(context.getBean(ProcessOutboxRepository.class));
+            assertNotNull(context.getBean(OutboxDispatcher.class));
             var tasks = context.getBean(ScheduledTaskHolder.class).getScheduledTasks();
             assertEquals(1, tasks.size());
             var task = assertInstanceOf(FixedDelayTask.class, tasks.iterator().next().getTask());

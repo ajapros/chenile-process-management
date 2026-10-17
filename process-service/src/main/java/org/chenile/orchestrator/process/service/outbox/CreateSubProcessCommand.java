@@ -16,7 +16,7 @@ import org.chenile.orchestrator.process.configuration.dao.ProcessRepository;
 public class CreateSubProcessCommand extends AbstractProcessOutboxCommand {
     public static final String TYPE = "CREATE_SUBPROCESS";
     private final ProcessRepository processes;
-    public CreateSubProcessCommand(ProcessOutboxRepository outbox, ObjectProvider<ProcessManager> managers,
+    public CreateSubProcessCommand(ProcessOutboxRepository outbox, ProcessManager processManager,
             ObjectMapper mapper, PlatformTransactionManager transactionManager, ProcessRepository processes) {
         super(outbox, managers, mapper, transactionManager);
         this.processes = processes;

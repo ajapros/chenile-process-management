@@ -36,12 +36,16 @@ class OutboxDispatcherTest {
     @Test void failingCommandRetriesThenDies() {
         enqueue(OutboxTestSupport.emitCompleted("p1", "{}"));
         List<OutboxCommand> handled = new ArrayList<>();
-        var dispatcher = dispatcher(c -> { handled.add(c); throw new IllegalStateException("transient"); }, ignored -> { });
+        List<String> dead = new ArrayList<>();
+        var dispatcher = dispatcher(c -> { handled.add(c); throw new IllegalStateException("transient"); }, c -> dead.add(c.id));
         assertTrue(dispatcher.processOne());
         assertEquals(1L, repository.backlogCount());
+        assertTrue(dead.isEmpty());
         assertTrue(dispatcher.processOne());
         assertEquals(0L, repository.backlogCount());
+        assertEquals(List.of(handled.get(1).id), dead);
         assertFalse(dispatcher.processOne());
+        assertEquals(1, dead.size());
         assertEquals(2, handled.size());
         assertEquals(2, handled.get(1).attempt);
         assertEquals(1L, repository.deadCount());
@@ -58,18 +62,6 @@ class OutboxDispatcherTest {
         assertEquals(Set.of("START_WORKER", "CREATE_SUBPROCESS", "EMIT_COMPLETED"),
                 handled.stream().map(c -> c.commandType).collect(java.util.stream.Collectors.toSet()));
         assertEquals(3L, jdbc.queryForObject("select count(*) from chenile_process_outbox where status='DONE'", Long.class));
-    }
-
-    @Test void exhaustionInvokesTheMatchingCommandsDeadMethodExactlyOnce() {
-        enqueue(OutboxTestSupport.startWorker("p1", "EXECUTOR", "{}"));
-        List<String> dead = new ArrayList<>();
-        var dispatcher = dispatcher(c -> { throw new IllegalStateException("always fails"); }, c -> dead.add(c.id));
-        assertTrue(dispatcher.processOne());
-        assertTrue(dead.isEmpty());
-        assertTrue(dispatcher.processOne());
-        assertEquals(1, dead.size());
-        assertFalse(dispatcher.processOne());
-        assertEquals(1, dead.size());
     }
 
     @Test void anAdditionalCommandOwnsEnqueueDispatchAndDeadHandlingWithoutSchemaChanges() throws Exception {

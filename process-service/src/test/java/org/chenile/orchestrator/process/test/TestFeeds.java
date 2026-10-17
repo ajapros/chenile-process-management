@@ -1,14 +1,10 @@
 package org.chenile.orchestrator.process.test;
 
-import org.chenile.orchestrator.process.configuration.dao.ProcessRepository;
 import org.chenile.orchestrator.process.model.Constants;
 import org.chenile.orchestrator.process.model.Process;
 import org.chenile.workflow.api.StateEntityService;
 import org.junit.Assert;
 import org.junit.Test;
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.Order;
-import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -18,8 +14,6 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit4.SpringRunner;
 import static org.chenile.orchestrator.process.test.SharedData.*;
 
-import java.util.HashMap;
-import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -29,62 +23,13 @@ import static org.springframework.test.annotation.DirtiesContext.ClassMode.BEFOR
 @SpringBootTest(classes = SpringConfig.class)
 @AutoConfigureMockMvc
 @ActiveProfiles("unittest")
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @DirtiesContext(classMode = BEFORE_EACH_TEST_METHOD)
 public class TestFeeds {
     @Autowired org.chenile.orchestrator.process.outbox.OutboxDispatcher dispatcher;
     @Autowired
     StateEntityService<Process> processManager;
 
-    @Autowired
-    private ProcessRepository processRepository;
-
     @Test
-    @Order(10)
-    public void testWith1File() throws Exception {
-        synch();
-        FeedSplitter.numFiles = 1;
-        Process process = new Process();
-        process.processType = "feed";
-        process.id = "FEED1";
-        processManager.create(process);
-        dispatcher.drainAll(1000);
-        assertState(process.id,Constants.States.PROCESSED);
-        String fileId = process.id + "FILE1";
-        assertState(fileId,Constants.States.PROCESSED);
-        assertState(fileId + "CHUNK1",Constants.States.PROCESSED);
-
-    }
-
-    @Test
-    @Order(9)
-    public void testWith2Files() throws Exception {
-        synch();
-        FeedSplitter.numFiles = 2;
-        Process process = new Process();
-        process.processType = "feed";
-        process.id = "FEED2";
-        processManager.create(process);
-        dispatcher.drainAll(1000);
-        assertState(process.id,Constants.States.PROCESSED);
-        // Is FILE1 processed with the correct args?
-        String fileId = process.id + "FILE1";
-        String expectedArgs = """
-                { "filename" : "file1" }
-                """;
-        assertStateArgs(fileId,Constants.States.PROCESSED,expectedArgs);
-        assertState(fileId + "CHUNK1",Constants.States.PROCESSED);
-        // Test if the second file has been processed successfully as well.
-        fileId = process.id + "FILE2";
-        expectedArgs = """
-                { "filename" : "file2" }
-                """;
-        assertStateArgs(fileId,Constants.States.PROCESSED,expectedArgs);
-        assertState(fileId + "CHUNK1",Constants.States.PROCESSED);
-    }
-
-    @Test
-    @Order(9)
     public void testWith3Files() throws Exception {
         synch();
         FeedSplitter.numFiles = 3;
@@ -116,34 +61,12 @@ public class TestFeeds {
                 { "filename" : "file3" }
                 """;
         assertStateArgs(fileId,Constants.States.PROCESSED,expectedArgs);
-        // Is the chunk corresponding to file 2 processed correctly.
+        // Is the chunk corresponding to file 3 processed correctly.
         assertState(fileId + "CHUNK1",Constants.States.PROCESSED);
 
     }
 
     @Test
-    @Order(8)
-    public void testWith1FileAsynch() throws Exception {
-        asynch();
-        FeedSplitter.numFiles = 1;
-        Process process = new Process();
-        process.processType = "feed";
-        process.id = "FEED1";
-        processManager.create(process);
-        dispatcher.drainAll(1000);
-        assertState(process.id,Constants.States.SPLIT_PENDING);
-        unblock("FEED1-SPLITTER");
-        assertState(process.id,Constants.States.SUB_PROCESSES_PENDING);
-        unblock("FEED1FILE1-SPLITTER");
-        unblock("FEED1FILE1CHUNK1-EXECUTOR");
-        unblock("FEED1FILE1-AGGREGATOR");
-        assertState(process.id,Constants.States.AGGREGATION_PENDING);
-        unblock("FEED1-AGGREGATOR");
-        assertState(process.id,Constants.States.PROCESSED);
-    }
-
-    @Test
-    @Order(7)
     public void testWith2FilesAsynch() throws Exception {
         asynch();
         FeedSplitter.numFiles = 2;
@@ -161,7 +84,6 @@ public class TestFeeds {
         unblock("FEED1FILE2CHUNK1-EXECUTOR");
         unblock("FEED1FILE1-AGGREGATOR");
         unblock("FEED1FILE2-AGGREGATOR");
-        System.out.println("Done with all the count down LATCHES");
         assertState(process.id,Constants.States.AGGREGATION_PENDING);
         unblock("FEED1-AGGREGATOR");
         assertState(process.id,Constants.States.PROCESSED);

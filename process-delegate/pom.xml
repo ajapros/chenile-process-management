@@ -13,7 +13,7 @@
 	<artifactId>process-delegate</artifactId>
 	<packaging>jar</packaging>
 
-	<name>Process Business Delegate - Allows Remote calls to the Process Manager</name>
+	<name>Process Delegate and Worker Support</name>
 
 	<dependencies>
 		<dependency>
@@ -26,5 +26,10 @@
 			<artifactId>chenile-proxy</artifactId>
 		</dependency>
 
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
 	</dependencies>
 </project>

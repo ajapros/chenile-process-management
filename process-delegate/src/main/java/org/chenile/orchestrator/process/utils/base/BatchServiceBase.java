@@ -59,6 +59,8 @@ public abstract class BatchServiceBase<T> implements BatchService<T> {
 
 	@Override
 	public boolean startWorker(WorkerDto workerDto) {
+		logger.info("Received process work processId={} processType={} workerType={}",
+				workerDto.process.getId(), workerDto.process.processType, workerDto.workerType);
 		String componentName = workerDto.process.processType + camelCase(workerDto.workerType);
         logger.info("Start() method of BatchServiceBase. Worker Type is {}", workerDto.workerType);
 		try {
@@ -86,4 +88,5 @@ public abstract class BatchServiceBase<T> implements BatchService<T> {
 			case EXECUTOR -> Constants.Events.DONE_WITH_ERRORS;
 		};
 	}
+
 }

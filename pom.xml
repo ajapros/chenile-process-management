@@ -10,7 +10,6 @@
 		<module>crontab-trigger</module>
 		<module>process-service</module>
 		<module>process-delegate</module>
-		<module>process-utils</module>
 		<module>jdbc-process-starter</module>
 		<module>q-based-process-starter</module>
 		<module>invm-process-starter</module>
