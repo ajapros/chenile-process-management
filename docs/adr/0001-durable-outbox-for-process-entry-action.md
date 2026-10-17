@@ -4,13 +4,22 @@ Status: Accepted — implemented, opt-in
 Date: 2026-10-01
 Related: [process-management guide](../process-management.md), [operations](../process-outbox.md)
 
+> Implementation update (2026-10-17): durable execution is now mandatory. The
+> original optional inline path described below has been removed. Every transition
+> records its commands atomically with the process save; handlers execute after
+> commit. `EMIT_COMPLETED` publishes once through EventProcessor in the independent
+> handler transaction, including framework chaining and application subscribers.
+> Subscriber failures trigger rollback and retry; the direct manager call and
+> best-effort after-commit fan-out and the outbox enablement setting have been removed. See [current operations](../process-outbox.md). The original ADR
+> below is preserved as historical context.
+
 ## Context and decision
 
 The default entry action saves a process then performs child creation, parent notification, completion
 publication, and worker dispatch inline. A crash between save and effect can strand the tree.
 `TriggerLog` handles trigger dispatch idempotency only, not process effects.
 
-Use PostgreSQL as the reference database, enabled explicitly with `chenile.process.outbox.enabled=true`.
+The original design used PostgreSQL as the reference database with explicit opt-in delivery.
 Leave legacy synchronous behavior unchanged when disabled. The first version guarantees
 **framework-managed process chaining**, not durable delivery to arbitrary subscribers or external services.
 Authoritative state remains in the application database; Temporal-style deterministic replay is not adopted.

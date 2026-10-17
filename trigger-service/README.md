@@ -56,6 +56,41 @@ adapter, correlating each scheduled run with its trigger claim.
 Tenant identity is supplied through the standard `x-chenile-tenant-id` header and is persisted
 as the inherited `BaseJpaEntity.tenant` value.
 
+## HTTP endpoint
+
+`POST /trigger` exposes `TriggerService.trigger(TriggerInput)` through a Chenile
+HTTP controller. The trigger configuration registers the controller automatically;
+the host must enable the normal `org.chenile.configuration.http` configuration.
+The module depends on `chenile-http`; `trigger-api` remains transport-independent.
+
+```json
+{
+  "triggerId": "customer-import-2026-10-16",
+  "eventId": "ProcessCreate",
+  "headers": {
+    "x-chenile-tenant-id": "alpha",
+    "chenile-trigger-source": "HTTP"
+  },
+  "payload": {
+    "processDefName": "customerImport",
+    "args": {"batch": 42}
+  }
+}
+```
+
+The request body is the existing `TriggerInput` contract; optional `triggerTime`
+is an ISO-8601 instant. Event headers are supplied in its `headers` map, just as
+for other trigger adapters. The HTTP request follows the Chenile interceptor and
+service invocation pipeline. Successful responses use the standard Chenile
+`GenericResponse` envelope, whose `payload` is a `TriggerResult` containing
+`triggerId`, `eventId`, `logId`, `dispatched`, and `duplicate`.
+
+Repeated trigger/event pairs return the existing claim and do not dispatch again.
+Keys retain the trigger service's global identity semantics; this endpoint does
+not add the tenant prefix used by the management API's manual-trigger endpoint.
+The destination event and its configured subscribers determine payload typing
+and behavior. No dependency on the process manager or cron implementation is added.
+
 ## Unified trigger storage
 
 `TriggerLog` maps to `trigger_log`. One retained row owns both the unique

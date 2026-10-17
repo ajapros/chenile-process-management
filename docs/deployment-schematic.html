@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chenile Process Management — Deployment Schematic</title>
+<style>
+  :root{
+    --bg:#0e1420; --panel:#151d2c; --panel2:#1b2638; --ink:#e7eef7; --muted:#93a4bd;
+    --line:#39506f; --accent:#4cc2ff; --accent2:#7ef0c2; --warn:#ffd166; --pink:#ff7eb6;
+    --server:#2a3b55; --worker:#3a2f52; --queue:#13324a;
+    --edge:#54708f; --radius:14px;
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 700px at 70% -10%,#17233a 0%,var(--bg) 55%);
+    color:var(--ink);font-family:var(--font);line-height:1.5;}
+  .wrap{max-width:1120px;margin:0 auto;padding:28px 20px 56px;}
+  h1{font-size:26px;margin:0 0 4px;letter-spacing:.2px}
+  .sub{color:var(--muted);margin:0 0 18px;font-size:15px}
+  .tabs{display:flex;gap:8px;margin-bottom:14px}
+  .tab{background:var(--panel2);color:var(--muted);border:1px solid #2d3f5c;border-radius:999px;
+    padding:8px 18px;font-size:14px;cursor:pointer;font-family:var(--font)}
+  .tab.on{background:var(--accent);color:#06243a;border-color:var(--accent);font-weight:700}
+  .scene.hidden{display:none}
+  .stage{background:linear-gradient(180deg,var(--panel) 0%,#121a28 100%);
+    border:1px solid #223049;border-radius:var(--radius);padding:10px;box-shadow:0 20px 50px rgba(0,0,0,.35)}
+  svg{width:100%;height:auto;display:block}
+  .comp{fill:var(--panel2);stroke:var(--line);stroke-width:1.4}
+  .comp.active{stroke:var(--accent);stroke-width:2.6;filter:url(#glow)}
+  .lbl{fill:var(--ink);font-size:13px;font-family:var(--font)}
+  .lbl.small{font-size:11px;fill:var(--muted)}
+  .zonelbl{fill:var(--muted);font-size:12px;letter-spacing:1.5px;font-weight:600;text-transform:uppercase}
+  .edge{stroke:var(--edge);stroke-width:2;fill:none;opacity:.5}
+  .edge.lit{stroke:var(--accent);opacity:1;stroke-width:2.6;filter:url(#glow)}
+  .edge.callback{stroke-dasharray:7 5}
+  .flow{stroke-dasharray:9 7;animation:march 1s linear infinite}
+  .flow.rev{animation-direction:reverse}
+  @keyframes march{to{stroke-dashoffset:-16}}
+  .packet{fill:var(--accent);filter:url(#glow)}
+  .packet.callback{fill:var(--accent2)}
+  .tag{fill:var(--muted);font-size:11px}
+  .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:18px 0 10px}
+  button{background:var(--panel2);color:var(--ink);border:1px solid #2d3f5c;border-radius:10px;
+    padding:9px 16px;font-size:14px;cursor:pointer;transition:.15s;font-family:var(--font)}
+  button:hover{border-color:var(--accent);color:#fff}
+  button.primary{background:var(--accent);color:#06243a;border-color:var(--accent);font-weight:700}
+  button:disabled{opacity:.4;cursor:default}
+  .speed{margin-left:auto;color:var(--muted);font-size:13px;display:flex;align-items:center;gap:8px}
+  .narr{display:grid;grid-template-columns:64px 1fr;gap:16px;background:var(--panel);
+    border:1px solid #223049;border-radius:var(--radius);padding:18px 20px;margin-top:14px;min-height:96px}
+  .step-no{font-size:40px;font-weight:800;color:var(--accent);line-height:1;opacity:.9}
+  .narr h3{margin:0 0 4px;font-size:17px}
+  .narr p{margin:0;color:var(--muted);font-size:14.5px}
+  .progress{display:flex;gap:6px;margin-top:14px}
+  .dot{flex:1;height:5px;border-radius:3px;background:#243149;transition:.2s}
+  .dot.done{background:var(--accent2)}
+  .dot.cur{background:var(--accent)}
+  .counters{display:flex;gap:14px;flex-wrap:wrap;margin:16px 0 2px}
+  .counter{background:var(--panel);border:1px solid #223049;border-radius:12px;padding:12px 18px;min-width:150px}
+  .counter .n{font-size:30px;font-weight:800;line-height:1}
+  .counter .k{color:var(--muted);font-size:12.5px;margin-top:3px}
+  .c-server .n{color:var(--accent)} .c-mono .n{color:var(--pink)} .c-inst .n{color:var(--accent2)}
+  .legend{display:flex;flex-wrap:wrap;gap:16px;margin-top:16px;color:var(--muted);font-size:13px}
+  .legend span{display:inline-flex;align-items:center;gap:7px}
+  .sw{width:14px;height:14px;border-radius:4px;display:inline-block}
+  footer{margin-top:22px;color:var(--muted);font-size:12.5px}
+  code{background:#1d2740;padding:1px 6px;border-radius:5px;font-size:12.5px;color:#cfe3ff}
+  .hint{color:var(--muted);font-size:13.5px;margin:10px 2px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Chenile Process Management — Deployment Schematic</h1>
+  <p class="sub">The brain and the muscle, split across mini monoliths. One server, as many workers as you need.</p>
+
+  <div class="tabs">
+    <button class="tab on" data-scene="loop">The work loop</button>
+    <button class="tab" data-scene="scale">Scaling out</button>
+  </div>
+
+  <!-- ===================== SCENE 1: THE LOOP ===================== -->
+  <section class="scene" id="scene-loop">
+    <div class="stage">
+      <svg id="svg1" viewBox="0 0 1040 560" role="img" aria-label="Animated deployment loop">
+        <defs>
+          <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="3.2" result="b"/><feMerge>
+            <feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+            <path d="M0,0 L8,3 L0,6 Z" fill="var(--edge)"/>
+          </marker>
+          <marker id="arrowA" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+            <path d="M0,0 L8,3 L0,6 Z" fill="var(--accent)"/>
+          </marker>
+        </defs>
+
+        <rect x="40" y="120" width="360" height="360" rx="16" fill="#223450" fill-opacity=".45" stroke="#3a567c" stroke-width="1.5" stroke-dasharray="5 5"/>
+        <text x="60" y="146" class="zonelbl">Process Manager Server</text>
+        <rect x="470" y="300" width="120" height="150" rx="14" fill="#123047" fill-opacity=".55" stroke="#2f6186" stroke-width="1.5" stroke-dasharray="5 5"/>
+        <text x="486" y="326" class="zonelbl" font-size="10">Queue</text>
+        <rect x="648" y="120" width="352" height="360" rx="16" fill="#2f2750" fill-opacity=".45" stroke="#574a86" stroke-width="1.5" stroke-dasharray="5 5"/>
+        <text x="668" y="146" class="zonelbl">Process Manager Worker</text>
+
+        <g id="c-cron"><rect class="comp" x="60" y="60" width="150" height="42" rx="11"/>
+          <text class="lbl" x="135" y="86" text-anchor="middle">Cron / Trigger</text></g>
+        <g id="c-trig"><rect class="comp" x="70" y="172" width="150" height="46" rx="11"/>
+          <text class="lbl" x="145" y="193" text-anchor="middle">trigger-service</text>
+          <text class="lbl small" x="145" y="209" text-anchor="middle">trigger_log</text></g>
+        <g id="c-stm"><rect class="comp" x="70" y="246" width="150" height="46" rx="11"/>
+          <text class="lbl" x="145" y="267" text-anchor="middle">ProcessManager</text>
+          <text class="lbl small" x="145" y="283" text-anchor="middle">STM + ProcessEntryAction</text></g>
+        <g id="c-outbox"><rect class="comp" x="70" y="320" width="150" height="46" rx="11"/>
+          <text class="lbl" x="145" y="341" text-anchor="middle">outbox poller</text>
+          <text class="lbl small" x="145" y="357" text-anchor="middle">START_WORKER</text></g>
+        <g id="c-starter"><rect class="comp" x="250" y="320" width="130" height="46" rx="11"/>
+          <text class="lbl" x="315" y="341" text-anchor="middle">q-based</text>
+          <text class="lbl small" x="315" y="357" text-anchor="middle">starter · ChenilePub</text></g>
+        <g id="c-db"><path d="M95 410 a50 10 0 0 1 100 0 v34 a50 10 0 0 1 -100 0 z" class="comp"/>
+          <ellipse cx="145" cy="410" rx="50" ry="10" class="comp"/>
+          <text class="lbl small" x="145" y="438" text-anchor="middle">PostgreSQL</text></g>
+        <g id="c-queue"><rect class="comp" x="486" y="338" width="88" height="78" rx="12"/>
+          <text class="lbl" x="530" y="373" text-anchor="middle">topic</text>
+          <text class="lbl small" x="530" y="391" text-anchor="middle">azure /</text>
+          <text class="lbl small" x="530" y="405" text-anchor="middle">kafka</text></g>
+        <g id="c-listener"><rect class="comp" x="690" y="190" width="170" height="46" rx="11"/>
+          <text class="lbl" x="775" y="211" text-anchor="middle">ProcessWorkListener</text>
+          <text class="lbl small" x="775" y="227" text-anchor="middle">pubsub subscriber</text></g>
+        <g id="c-jars"><rect class="comp" x="690" y="268" width="170" height="46" rx="11"/>
+          <text class="lbl" x="775" y="289" text-anchor="middle">worker jars</text>
+          <text class="lbl small" x="775" y="305" text-anchor="middle">splitter · executor · aggregator</text></g>
+        <g id="c-delegate"><rect class="comp" x="690" y="346" width="170" height="46" rx="11"/>
+          <text class="lbl" x="775" y="367" text-anchor="middle">process-delegate</text>
+          <text class="lbl small" x="775" y="383" text-anchor="middle">ProcessManagerClient</text></g>
+
+        <path id="seg1" class="edge" d="M135,102 L145,172" marker-end="url(#arrow)"/>
+        <path id="seg2" class="edge" d="M145,218 L145,246" marker-end="url(#arrow)"/>
+        <path id="seg3" class="edge" d="M145,292 L145,320" marker-end="url(#arrow)"/>
+        <path id="seg4" class="edge" d="M220,343 L250,343" marker-end="url(#arrow)"/>
+        <path id="seg5" class="edge" d="M380,355 C430,372 452,377 486,377" marker-end="url(#arrow)"/>
+        <path id="seg6" class="edge" d="M574,360 C620,320 650,250 690,218" marker-end="url(#arrow)"/>
+        <path id="seg7" class="edge" d="M775,236 L775,268" marker-end="url(#arrow)"/>
+        <path id="seg8" class="edge" d="M775,314 L775,346" marker-end="url(#arrow)"/>
+        <path id="seg9" class="edge callback" d="M690,372 C470,500 300,430 170,292" marker-end="url(#arrow)"/>
+        <text x="300" y="474" class="tag">callback: splitDone / doneSuccessfully / aggregationDone — HTTP to process.manager.base-url</text>
+
+        <circle id="packet" class="packet" r="8" cx="135" cy="102" opacity="0"/>
+        <text id="packetlbl" class="tag" x="0" y="0" opacity="0" text-anchor="middle">WorkerDto</text>
+      </svg>
+    </div>
+
+    <div class="controls">
+      <button id="btnPlay" class="primary">▶ Play</button>
+      <button id="btnPrev">‹ Prev</button>
+      <button id="btnNext">Next ›</button>
+      <button id="btnReset">↺ Reset</button>
+      <span class="speed">Speed
+        <button data-speed="1600" class="sp">0.75×</button>
+        <button data-speed="1150" class="sp primary">1×</button>
+        <button data-speed="700" class="sp">1.6×</button>
+      </span>
+    </div>
+    <div class="progress" id="progress"></div>
+    <div class="narr">
+      <div class="step-no" id="stepNo">0</div>
+      <div><h3 id="stepTitle">Ready</h3><p id="stepText">Press Play to send one unit of work around the loop. The blue packet is a <code>WorkerDto</code> going out; the green packet is the result coming back.</p></div>
+    </div>
+  </section>
+
+  <!-- ===================== SCENE 2: SCALING ===================== -->
+  <section class="scene hidden" id="scene-scale">
+    <div class="stage">
+      <svg id="svg2" viewBox="0 0 1040 560" role="img" aria-label="Scaling schematic">
+        <!-- the ONE server, reused across every worker monolith -->
+        <rect x="40" y="150" width="250" height="260" rx="16" fill="#223450" fill-opacity=".5" stroke="#3a567c" stroke-width="1.6"/>
+        <text x="58" y="176" class="zonelbl">Process Manager Server</text>
+        <text x="58" y="193" class="lbl small">one brain · reused by all workers</text>
+        <g><rect class="comp" x="70" y="206" width="190" height="40" rx="10"/>
+          <text class="lbl" x="165" y="231" text-anchor="middle">ProcessManager · STM</text></g>
+        <g><rect class="comp" x="70" y="254" width="190" height="40" rx="10"/>
+          <text class="lbl" x="165" y="279" text-anchor="middle">durable outbox + poller</text></g>
+        <g><rect class="comp" x="70" y="302" width="190" height="40" rx="10"/>
+          <text class="lbl" x="165" y="321" text-anchor="middle">q-based starter</text>
+          <text class="lbl small" x="165" y="335" text-anchor="middle">routes by process type → topic</text></g>
+        <g><path d="M90 360 a40 9 0 0 1 80 0 v22 a40 9 0 0 1 -80 0 z" class="comp"/>
+          <ellipse cx="130" cy="360" rx="40" ry="9" class="comp"/>
+          <text class="lbl small" x="130" y="400" text-anchor="middle">PostgreSQL</text></g>
+
+        <!-- vertical topic bus -->
+        <line x1="360" y1="150" x2="360" y2="470" stroke="#2f6186" stroke-width="2" stroke-dasharray="4 4" opacity=".7"/>
+        <text x="360" y="140" class="zonelbl" font-size="10" text-anchor="middle">topics</text>
+        <!-- connector from starter to the bus -->
+        <path d="M260,322 L360,322" class="edge" opacity=".5"/>
+
+        <!-- dynamic pools render here -->
+        <g id="pools"></g>
+      </svg>
+    </div>
+
+    <div class="counters">
+      <div class="counter c-server"><div class="n">1</div><div class="k">process manager server</div></div>
+      <div class="counter c-mono"><div class="n" id="nMono">1</div><div class="k">worker monoliths</div></div>
+      <div class="counter c-inst"><div class="n" id="nInst">2</div><div class="k">worker instances</div></div>
+    </div>
+
+    <div class="controls">
+      <button id="btnAdd" class="primary">+ Add worker monolith</button>
+      <button id="btnReplica">+ Replica on newest pool</button>
+      <button id="btnScaleReset">↺ Reset</button>
+    </div>
+    <p class="hint" id="scaleHint">One server already serves the first worker pool. Add more monoliths — the same server routes each process type to its own topic and feeds every pool. Click a pool to add a replica (competing consumers).</p>
+  </section>
+
+  <div class="legend">
+    <span><i class="sw" style="background:#2a3b55"></i>Server monolith (brain · stateful)</span>
+    <span><i class="sw" style="background:#3a2f52"></i>Worker monolith (muscle · stateless)</span>
+    <span><i class="sw" style="background:var(--queue)"></i>Queue / topic</span>
+    <span><i class="sw" style="background:var(--accent)"></i>WorkerDto out</span>
+    <span><i class="sw" style="background:var(--accent2)"></i>result callback</span>
+  </div>
+
+  <footer>Companion to <code>docs/deployment.md</code> and <code>docs/deployment-presentation.md</code>. The queue hop is at-least-once; the server's receipt-level idempotency makes a replayed <code>WorkerDto</code> safe. You scale throughput by adding workers, never by adding brains.</footer>
+</div>
+
+<script>
+/* ---------------- SCENE 1: the loop ---------------- */
+const steps = [
+  {seg:"seg1", lit:["c-cron","c-trig"], title:"Cron fires", text:"A Quartz crontab (or any external trigger) fires on the server and calls trigger-service. Idempotency is claimed in trigger_log on (trigger_id, event_name)."},
+  {seg:"seg2", lit:["c-trig","c-stm"], title:"ProcessCreate", text:"trigger-service raises the ProcessCreate event. ProcessManager persists a root Process and enters the state machine."},
+  {seg:"seg3", lit:["c-stm","c-outbox"], title:"Record consequence", text:"In the SAME transaction that saves the Process, the transition records a START_WORKER command in the durable outbox. State and consequence commit atomically."},
+  {seg:"seg4", lit:["c-outbox","c-starter"], title:"Poller drains", text:"The outbox poller drains the due command and hands the WorkerDto to the configured worker starter — here, the queue-based one."},
+  {seg:"seg5", lit:["c-starter","c-queue"], title:"Publish WorkerDto", text:"QueueBasedProcessStarter serializes the WorkerDto and ChenilePub.asyncPublish()es it to the topic named in the process definition's execDef. Tenant rides along as a header.", packet:"WorkerDto"},
+  {seg:"seg6", lit:["c-queue","c-listener"], title:"Deliver to worker", text:"The broker delivers the message to the worker monolith's pubsub subscriber, surfacing the WorkerDto to ProcessWorkListener.", packet:"WorkerDto"},
+  {seg:"seg7", lit:["c-listener","c-jars"], title:"Dispatch to worker", text:"ProcessWorkListener resolves the right IWorker by workerType (SPLITTER / EXECUTOR / AGGREGATOR) and processType, then calls start(workerDto, input)."},
+  {seg:"seg8", lit:["c-jars","c-delegate"], title:"Do the work", text:"The worker extends SplitterBase / ExecutorBase / AggregatorBase and runs doStart(...). On return it uses process-delegate's ProcessManagerClient to report the result."},
+  {seg:"seg9", lit:["c-delegate","c-stm"], title:"Callback to the brain", text:"The result travels back over HTTP (via the Chenile proxy at process.manager.base-url) as splitDone / doneSuccessfully / aggregationDone. The STM advances and records the NEXT consequences — looping until a terminal state chains any successors.", callback:true, packet:"result"}
+];
+const packet=document.getElementById("packet"), packetlbl=document.getElementById("packetlbl");
+const stepNo=document.getElementById("stepNo"), stepTitle=document.getElementById("stepTitle"), stepText=document.getElementById("stepText");
+const progress=document.getElementById("progress");
+let i=-1, playing=false, speed=1150, raf=null;
+steps.forEach((_,k)=>{const d=document.createElement("div");d.className="dot";progress.appendChild(d);});
+const dots=[...progress.children];
+function clearHi(){document.querySelectorAll("#svg1 .comp").forEach(c=>c.classList.remove("active"));document.querySelectorAll("#svg1 .edge").forEach(e=>e.classList.remove("lit"));}
+function setProg(){dots.forEach((d,k)=>{d.className="dot"+(k<i?" done":k===i?" cur":"");});}
+function showStep(n, animate=true){
+  cancelAnimationFrame(raf); i=n; const s=steps[n];
+  clearHi();
+  s.lit.forEach(id=>document.getElementById(id).querySelector(".comp").classList.add("active"));
+  const edge=document.getElementById(s.seg); edge.classList.add("lit");
+  stepNo.textContent=n+1; stepTitle.textContent=s.title; stepText.textContent=s.text; setProg();
+  packet.classList.toggle("callback",!!s.callback);
+  const len=edge.getTotalLength(); packetlbl.textContent=s.packet||""; const showLbl=!!s.packet;
+  if(!animate){const p=edge.getPointAtLength(len);packet.setAttribute("cx",p.x);packet.setAttribute("cy",p.y);packet.setAttribute("opacity",1);return;}
+  let start=null; packet.setAttribute("opacity",1); packetlbl.setAttribute("opacity",showLbl?1:0);
+  function frame(ts){ if(start===null)start=ts; const t=Math.min((ts-start)/speed,1);
+    const e=t<.5?2*t*t:-1+(4-2*t)*t; const p=edge.getPointAtLength(e*len);
+    packet.setAttribute("cx",p.x);packet.setAttribute("cy",p.y);
+    packetlbl.setAttribute("x",p.x);packetlbl.setAttribute("y",p.y-14);
+    if(t<1)raf=requestAnimationFrame(frame); else if(playing)raf=requestAnimationFrame(()=>advance()); }
+  raf=requestAnimationFrame(frame);
+}
+function advance(){ if(i>=steps.length-1){ if(playing)setTimeout(()=>{if(playing){i=-1;next();}},650); return;} next(); }
+function next(){ showStep(Math.min(i+1,steps.length-1)); }
+function prev(){ if(i>0) showStep(i-1,false); }
+const btnPlay=document.getElementById("btnPlay");
+btnPlay.onclick=()=>{ playing=!playing; btnPlay.textContent=playing?"⏸ Pause":"▶ Play"; btnPlay.classList.toggle("primary",!playing);
+  if(playing){ if(i>=steps.length-1||i<0)i=-1; showStep(Math.min(i+1,steps.length-1)); } else cancelAnimationFrame(raf); };
+document.getElementById("btnNext").onclick=()=>{playing=false;btnPlay.textContent="▶ Play";btnPlay.classList.add("primary");next();};
+document.getElementById("btnPrev").onclick=()=>{playing=false;btnPlay.textContent="▶ Play";btnPlay.classList.add("primary");prev();};
+document.getElementById("btnReset").onclick=()=>{playing=false;btnPlay.textContent="▶ Play";btnPlay.classList.add("primary");
+  cancelAnimationFrame(raf);clearHi();i=-1;setProg();packet.setAttribute("opacity",0);packetlbl.setAttribute("opacity",0);
+  stepNo.textContent="0";stepTitle.textContent="Ready";stepText.textContent="Press Play to send one unit of work around the loop.";};
+document.querySelectorAll(".sp").forEach(b=>b.onclick=()=>{speed=+b.dataset.speed;document.querySelectorAll(".sp").forEach(x=>x.classList.remove("primary"));b.classList.add("primary");});
+
+/* ---------------- SCENE 2: scaling ---------------- */
+const SVGNS="http://www.w3.org/2000/svg";
+const poolTemplates=[
+  {name:"File workers",   topic:"orders-file-work",   types:"feed · file",   color:"#7ef0c2"},
+  {name:"Chunk workers",  topic:"orders-chunk-work",  types:"chunk",         color:"#4cc2ff"},
+  {name:"Report workers", topic:"orders-report-work", types:"report",        color:"#ff7eb6"},
+  {name:"Image workers",  topic:"orders-image-work",  types:"thumbnail",     color:"#ffd166"}
+];
+let pools=[{...poolTemplates[0], replicas:2}];
+const poolsG=document.getElementById("pools");
+const nMono=document.getElementById("nMono"), nInst=document.getElementById("nInst");
+
+function el(tag,attrs,parent){const e=document.createElementNS(SVGNS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e;}
+function renderPools(newest=-1){
+  poolsG.innerHTML="";
+  const n=pools.length, top=150, bottom=470, gap=14;
+  const ph=Math.min(120,(bottom-top-gap*(n-1))/n);
+  pools.forEach((p,k)=>{
+    const y=top+k*(ph+gap), cy=y+ph/2;
+    // topic pill on the bus
+    const pill=el("g",{},poolsG);
+    el("rect",{x:316,y:cy-13,width:88,height:26,rx:13,fill:"#123047",stroke:p.color,"stroke-width":1.4},pill);
+    el("text",{x:360,y:cy+4,"text-anchor":"middle",class:"lbl small",fill:p.color},pill).textContent="topic";
+    // deliver arrow: bus -> pool  (ant-march = live flow)
+    const dpath=el("path",{d:`M404,${cy} L560,${cy}`,fill:"none",stroke:p.color,"stroke-width":2.4,"marker-end":"url(#arrowA)",class:"flow"},poolsG);
+    dpath.style.opacity=.95;
+    // callback arrow: pool -> server (dashed, reverse flow, faint)
+    el("path",{d:`M560,${cy+ph/2-10} C430,${cy+70} 330,360 262,300`,fill:"none",stroke:"#7ef0c2","stroke-width":1.6,class:"flow rev",opacity:.35},poolsG);
+    // pool box
+    const g=el("g",{},poolsG);
+    if(k===newest){g.style.transformOrigin=`760px ${cy}px`;g.animate(
+      [{opacity:0,transform:"translateX(26px) scale(.96)"},{opacity:1,transform:"translateX(0) scale(1)"}],
+      {duration:420,easing:"cubic-bezier(.2,.8,.2,1)"});}
+    el("rect",{x:560,y:y,width:440,height:ph,rx:14,fill:"#2f2750","fill-opacity":.55,stroke:p.color,"stroke-width":1.8},g);
+    el("text",{x:580,y:y+24,class:"lbl",fill:"#fff","font-weight":"700"},g).textContent=p.name+" monolith";
+    el("text",{x:580,y:y+42,class:"lbl small"},g).textContent="subscribes "+p.topic+"  ·  serves "+p.types;
+    el("text",{x:580,y:y+60,class:"lbl small",fill:p.color},g).textContent="process-delegate · ProcessWorkListener · worker jars";
+    // replica chips
+    for(let r=0;r<p.replicas;r++){
+      const cx=582+r*34;
+      el("rect",{x:cx,y:y+ph-30,width:26,height:18,rx:4,fill:"#1b2638",stroke:p.color,"stroke-width":1.3},g);
+      el("text",{x:cx+13,y:y+ph-17,"text-anchor":"middle",class:"lbl small",fill:p.color},g).textContent="▶";
+    }
+    el("text",{x:582+p.replicas*34+6,y:y+ph-17,class:"lbl small"},g).textContent=p.replicas+(p.replicas>1?" instances":" instance");
+    // make whole pool clickable to add a replica
+    const hit=el("rect",{x:560,y:y,width:440,height:ph,rx:14,fill:"transparent",style:"cursor:pointer"},g);
+    hit.addEventListener("click",()=>{ if(p.replicas<5){p.replicas++; renderPools(); updateCounters(); } });
+  });
+  updateCounters();
+}
+function updateCounters(){
+  nMono.textContent=pools.length;
+  nInst.textContent=pools.reduce((s,p)=>s+p.replicas,0);
+}
+document.getElementById("btnAdd").onclick=()=>{
+  if(pools.length>=poolTemplates.length){document.getElementById("scaleHint").textContent="That's four worker pools, all fed by the one server. Real deployments add as many as the broker and the server's callback capacity allow — the brain never multiplies.";return;}
+  const t=poolTemplates[pools.length]; pools.push({...t,replicas:1}); renderPools(pools.length-1);
+  document.getElementById("scaleHint").textContent="Added "+t.name+". Same server, new topic, new pool — no change to the brain. Each process type is routed to the pool that can serve it.";
+};
+document.getElementById("btnReplica").onclick=()=>{ const p=pools[pools.length-1]; if(p.replicas<5){p.replicas++;renderPools();}
+  document.getElementById("scaleHint").textContent="Added a replica to "+p.name+". Competing consumers on the same topic share the WorkerDtos; KEDA can scale this count on queue depth — even to zero.";};
+document.getElementById("btnScaleReset").onclick=()=>{ pools=[{...poolTemplates[0],replicas:2}]; renderPools();
+  document.getElementById("scaleHint").textContent="Back to one server and one worker pool. Add monoliths to watch the same server fan work out to all of them.";};
+
+/* ---------------- tab switching ---------------- */
+document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
+  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("on")); t.classList.add("on");
+  const sc=t.dataset.scene;
+  document.getElementById("scene-loop").classList.toggle("hidden",sc!=="loop");
+  document.getElementById("scene-scale").classList.toggle("hidden",sc!=="scale");
+  if(sc!=="loop"){ playing=false; btnPlay.textContent="▶ Play"; btnPlay.classList.add("primary"); cancelAnimationFrame(raf); }
+  if(sc==="scale") renderPools();
+});
+renderPools();
+</script>
+</body>
+</html>

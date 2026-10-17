@@ -199,8 +199,8 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-Backend HTTP integration contracts run against real repositories in both inline and outbox
-modes, covering authentication/context cleanup, tenant boundaries, trigger retries, definition
+Backend HTTP integration contracts run against real repositories with mandatory outbox
+delivery, covering authentication/context cleanup, tenant boundaries, trigger retries, definition
 cache invalidation, cron validation/editing, completion/successor links, legacy subprocess
 traversal, exact AND filters, pagination validation and oversized graph rejection. Frontend
 tests cover API/header/error handling, graph layout/cycle safety and process→event drill-downs.

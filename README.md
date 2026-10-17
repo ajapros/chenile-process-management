@@ -75,12 +75,14 @@ Use this single map for all worker settings for a process type.
 See [the process-management guide](docs/process-management.md) for the lifecycle,
 module wiring, tests, and remaining durability limitations.
 
-## Opt-in durable process consequences
+## Durable process consequences
 
-Set `chenile.process.outbox.enabled=true` after migrating the PostgreSQL outbox and receipt schema.
-State saves and child/parent/worker/chaining commands commit atomically. The poller retries failures;
-receipts prevent repeated parent counting and successor creation. The default remains synchronous.
-Framework chaining is durable; arbitrary application completion listeners remain best-effort.
+Provision the PostgreSQL outbox and receipt schema: durable delivery is mandatory.
+State saves and child/parent/worker/chaining commands commit atomically; effects execute after commit.
+The dispatcher retries failures, and receipts prevent repeated parent counting and successor creation.
+Completion is published through EventProcessor in the command transaction, including the framework
+chaining subscriber. Application subscriber failures trigger retries; external effects require deduplication.
+There is no outbox enablement setting; durable delivery is always active.
 See [setup, monitoring, replay, and PostgreSQL tests](docs/process-outbox.md).
 
 ## Database-backed process definitions

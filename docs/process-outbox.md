@@ -1,9 +1,8 @@
 # Durable process outbox
 
-Apply `process-outbox/src/main/resources/chenile-process-outbox-schema.sql` with your migration tool, then enable:
+Apply `process-outbox/src/main/resources/chenile-process-outbox-schema.sql` with your migration tool. Durable delivery is mandatory; configure polling with:
 
 ```properties
-chenile.process.outbox.enabled=true
 chenile.process.outbox.run-dispatcher=true
 chenile.process.outbox.poll-interval-millis=1000
 chenile.process.outbox.worker-id=process-replica-1
@@ -29,13 +28,14 @@ before upgrading. Do not run old and new producers/dispatchers concurrently duri
 PostgreSQL is the reference
 database. Process JPA, outbox JDBC, and the JDBC starter must share a DataSource and transaction manager.
 Provision at least two connections per concurrent dispatch thread plus request traffic, for independent
-handler and after-commit publication transactions. Use consistent UTC database/JDBC timezones for leases.
+handler transactions and request traffic. Use consistent UTC database/JDBC timezones for leases.
 
 `ProcessOutboxConfiguration` is supplied by `process-outbox` in the existing
 `org.chenile.orchestrator.process.configuration` package. The application's normal
 configuration scan discovers it; `ProcessConfiguration` does not import it.
-It activates only when `chenile.process.outbox.enabled=true` and accepts the generic
-command registry without depending on `process-service`.
+It accepts the generic command registry without depending on `process-service`.
+Outbox infrastructure is always wired when its configuration is included.
+There is no enablement setting; only background polling can be disabled.
 
 `OutboxDispatcher.poll()` owns each background cycle: it drains up to 100 commands
 and reports DEAD commands. The configured fixed-delay task is registered only when
@@ -62,26 +62,26 @@ retry and eventually become DEAD rather than being silently acknowledged.
 Add a Spring bean implementing `OutboxCommandLifecycle<ProcessTransition>` (or subclass
 `AbstractProcessOutboxCommand`) to register another process command automatically. Its enqueue
 method decides whether the transition needs that effect. Use the abstract base's `store(...)` helper
-to choose durable persistence or immediate execution centrally;
-use `read(...)` for the typed body and `checkIdempotency(...)` for mode-aware receipt claims (true permits execution). Do not bypass this
-support by writing directly to the repository if the command must also work in inline mode.
-The abstract base provides delivery, JSON reading, receipts, tenant restoration, and independent
-transaction support; each implementation provides its dispatch and optional dead behavior.
-`ProcessCommandSupport` has been removed. Custom subclasses pass their shared dependencies to the base
-constructor; direct lifecycle implementations must provide their own delivery support.
-No new database columns are needed.
+to record durable JSON commands. Use `read(...)` for typed bodies and
+`checkIdempotency(...)` for atomic receipt claims (true permits execution).
+The abstract base provides tenant restoration and independent transaction support.
+Custom subclasses pass their shared dependencies to its constructor.
 
-The four commands and registry are wired in both modes. With the outbox disabled (the default),
-enqueue immediately calls the same command's dispatch method, preserving the live typed process/worker
-objects so synchronous cascades and their returned state remain intact. No outbox repository, tables,
-receipts, polling, or transaction synchronization is required. Completion is published synchronously
-through EventProcessor exactly once, which invokes the framework subscriber and application listeners.
-Without a configured WorkerStarter, inline worker dispatch remains a no-op as before.
+Every manager transition executes transactionally: its process save and recorded
+commands commit together. Commands execute only after that commit, in independent
+handler transactions. A child/parent/successor transition performed by a handler
+records its own consequences; those consequences become deliverable after the
+handler transaction commits. Enqueue never invokes a command directly.
 
-With the outbox enabled, command bodies are serialized to JSON, receipt checks are transactional,
-and completion chaining runs in the handler transaction with best-effort fan-out after commit.
-Automatic retries/dead callbacks are a durable-transport policy; commands' onDead methods can also
-be invoked explicitly in inline mode, but inline dispatch failures propagate to the caller.
+`EMIT_COMPLETED` publishes once through EventProcessor. Its registered framework
+subscriber calls `processCompleted` through Chenile and creates matching successors.
+Application subscribers execute in the same command transaction. Subscriber
+failures, or a missing completion subscriber, fail the command and trigger retry;
+there is no direct manager call and no second after-commit publication.
+
+A missing WorkerStarter fails dispatch and retries. Even in-VM workers are launched
+from committed commands. Process creation returns the initial committed state,
+not the final state of a synchronous cascade. Tests explicitly drain after commit.
 
 The table stores shared delivery metadata (process/tenant identity, type, deduplication key, status,
 retry/lease timestamps) and a `payload` text column containing command-owned JSON. For example,
@@ -94,10 +94,9 @@ DEAD commits; they are not a durable compensation queue and are not automaticall
 
 State and consequences commit atomically. Framework child creation, parent counting, and chaining use
 transactional receipts separate from TriggerLog. Repeated completion ingress creates each matching successor
-once when enabled. Direct ProcessDto creation remains non-deduplicated. Disabling durability restores
-synchronous behavior and completion ingress can create repeated successors.
+once. Direct ProcessDto creation remains non-deduplicated. Non-durable execution is no longer supported.
 
-Application ProcessCompleted listeners are best-effort after commit. External starters must deduplicate
+Application ProcessCompleted listeners run in the command transaction and failures trigger retries. External starters must deduplicate
 `WorkerDto.dispatchId`. Prefer the JDBC starter for transactional handoff; worker execution/retry lifecycle
 remains separate from outbox command delivery.
 
@@ -132,7 +131,7 @@ by default. Receipt cleanup needs an application-defined retention policy and mu
 
 ## Verification
 
-Normal `mvn test` runs H2 and legacy synchronous regressions. PostgreSQL tests are opt-in:
+Normal `mvn test` runs H2 durable delivery and recursive worker regressions. PostgreSQL tests are opt-in:
 
 ```sh
 mvn test -Dchenile.outbox.test.jdbc-url=jdbc:postgresql://localhost:5432/test_database \
