@@ -8,6 +8,9 @@
     <artifactId>trigger-api</artifactId>
     <name>Trigger contracts</name>
     <dependencies>
-
+        <dependency>
+            <groupId>org.chenile</groupId>
+            <artifactId>chenile-base</artifactId>
+        </dependency>
     </dependencies>
 </project>

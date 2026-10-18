@@ -10,21 +10,17 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.chenile.trigger.model.TriggerStatus;
 
-import java.net.URI;
+import org.chenile.http.annotation.ChenileResponseCodes;
 
 /** HTTP adapter for the same trigger dispatch and idempotency contract used by other adapters. */
 @RestController
 @ChenileController(value = "trigger", serviceName = "triggerService")
 public class TriggerController extends ControllerSupport {
     @PostMapping("/trigger")
+    @ChenileResponseCodes(success = 202, warning = 202)
     public ResponseEntity<GenericResponse<TriggerResult>> trigger(
             HttpServletRequest request, @RequestBody TriggerInput input) {
-        ResponseEntity<GenericResponse<TriggerResult>> response = process(request, input);
-        if (!response.getStatusCode().is2xxSuccessful()) return response;
-        response.getBody().setCode(202);
-        return ResponseEntity.accepted().headers(response.getHeaders())
-                .location(URI.create("/trigger/" + response.getBody().getData().triggerId()))
-                .body(response.getBody());
+        return process(request, input);
     }
     @GetMapping("/trigger/{triggerId}")
     public ResponseEntity<GenericResponse<TriggerStatus>> status(HttpServletRequest request,

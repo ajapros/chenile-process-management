@@ -22,6 +22,11 @@ before the ID is returned, including when the caller has an outer transaction th
 No subscriber is invoked by submission. Invocation output is logged during later dispatch;
 it is not included in the acknowledgement or status response.
 
+`TriggerResult` implements `ResponseHeadersAware` from `chenile-base`, supplying the Location
+header without adding metadata to the JSON payload. The controller only delegates to `process(...)`;
+its `@ChenileResponseCodes(success = 202, warning = 202)` annotation supplies both HTTP status and
+envelope code. Chenile handles response headers uniformly for both HTTP entry-point styles.
+
 The optional idempotency key is scoped by tenant and event. Concurrent submissions with the
 same key return the original acknowledgement. Without a key, every submission is new.
 The caller cannot supply the accepted trigger ID: it is the outbox command ID. Dispatch

@@ -75,7 +75,14 @@ abstract class AbstractProcessManagementApiIntegrationTest {
         var result = mvc.perform(authorized(request, tenant)).andReturn();
         String body = result.getResponse().getContentAsString();
         assertEquals(expected, result.getResponse().getStatus(), body);
-        return body.isEmpty() ? json.nullNode() : json.readTree(body);
+        var parsed = body.isEmpty() ? json.nullNode() : json.readTree(body);
+        if (expected == 202 && result.getRequest().getRequestURI().equals("/trigger")) {
+            assertEquals(202, parsed.get("code").asInt());
+            assertEquals("/trigger/" + parsed.get("payload").get("triggerId").asText(),
+                    result.getResponse().getHeader("Location"));
+            assertFalse(parsed.get("payload").has("responseHeaders"));
+        }
+        return parsed;
     }
     void definition(String name, boolean leaf, String predecessor) throws Exception {
         response(post(BASE + "/definitions").content(json.writeValueAsString(Map.of("processType", name, "leaf", leaf,
