@@ -11,12 +11,11 @@ import java.util.HashMap;
 import java.util.Map;
 
 /** A trigger is a durable event invocation, independent of processes and cron. */
-public class DispatchTriggerCommand implements OutboxCommandLifecycle<DispatchTriggerCommand.Submission> {
+public class DispatchTriggerCommand implements OutboxCommandLifecycle<OutboxCommand> {
     public static final String TYPE = "DISPATCH_TRIGGER";
     private static final Logger LOG = LoggerFactory.getLogger(DispatchTriggerCommand.class);
     public record Data(String eventId, Instant triggerTime, Map<String, String> headers,
             Map<String, Object> triggerContext, Object payload) { }
-    public record Submission(OutboxCommand command) { }
     private final ProcessOutboxRepository repository;
     private final EventProcessor events;
     private final ObjectMapper mapper;
@@ -24,10 +23,10 @@ public class DispatchTriggerCommand implements OutboxCommandLifecycle<DispatchTr
         this.repository = repository; this.events = events; this.mapper = mapper;
     }
     @Override public String type() { return TYPE; }
-    @Override public boolean shouldEnqueue(Submission submission) {
-        return submission != null && TYPE.equals(submission.command().commandType);
+    @Override public boolean shouldEnqueue(OutboxCommand command) {
+        return command != null && TYPE.equals(command.commandType);
     }
-    @Override public void enqueue(Submission submission) { repository.enqueue(submission.command()); }
+    @Override public void enqueue(OutboxCommand command) { repository.enqueue(command); }
     @Override public void dispatch(OutboxCommand command) throws Exception {
         Data data = mapper.readValue(command.payload, Data.class);
         var headers = new HashMap<>(data.headers());

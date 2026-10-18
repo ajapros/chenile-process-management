@@ -18,7 +18,7 @@ import java.security.MessageDigest;
 /** Commits durable acceptance before returning; execution is exclusively the dispatcher's job. */
 public class EventTriggerService implements TriggerService {
     private final ProcessOutboxRepository outbox;
-    private final OutboxCommandProducer<DispatchTriggerCommand.Submission> producer;
+    private final OutboxCommandProducer<OutboxCommand> producer;
     private final ObjectMapper mapper;
     private final TransactionTemplate acceptance;
     public EventTriggerService(ProcessOutboxRepository outbox, DispatchTriggerCommand command,
@@ -62,7 +62,7 @@ public class EventTriggerService implements TriggerService {
             entry.id = id; entry.tenantId = tenant;
         } catch (Exception failure) { throw new IllegalArgumentException("Cannot persist trigger submission", failure); }
         String acceptedId = acceptance.execute(tx -> {
-            try { producer.enqueue(new DispatchTriggerCommand.Submission(entry)); }
+            try { producer.enqueue(entry); }
             catch (Exception failure) { throw new IllegalStateException("Cannot enqueue trigger", failure); }
             return outbox.findByIdempotencyKey(entry.idempotencyKey).orElseThrow().id;
         });
