@@ -1,5 +1,9 @@
 %% Generated to match process-service/src/main/resources/org/chenile/orchestrator/process/process-states.xml
 %% (PROCESS_FLOW). Rectangles are manual states; <<choice>> nodes are the `if` decision states.
+%% Guard labels are worded to keep Mermaid 10.8.0 happy (no ==, &&, > or () in labels). Exact guards:
+%%   isThisLeafNode:          leaf == true / leaf == false
+%%   areAllSubProcessesDone:  (numSubProcesses == numCompletedSubProcesses) && splitCompleted, else otherwise
+%%   areThereErrors:          errors.size() > 0 / errors.size() == 0
 stateDiagram-v2
     state isThisLeafNode <<choice>>
     state areAllSubProcessesDone <<choice>>
@@ -7,8 +11,8 @@ stateDiagram-v2
 
     [*] --> isThisLeafNode
 
-    isThisLeafNode --> EXECUTING : leaf == true
-    isThisLeafNode --> SPLIT_PENDING : leaf == false
+    isThisLeafNode --> EXECUTING : leaf is true
+    isThisLeafNode --> SPLIT_PENDING : leaf is false
 
     EXECUTING --> EXECUTING : statusUpdate
     EXECUTING --> PROCESSED : doneSuccessfully
@@ -23,14 +27,14 @@ stateDiagram-v2
     SUB_PROCESSES_PENDING --> areAllSubProcessesDone : subProcessDoneSuccessfully
     SUB_PROCESSES_PENDING --> areAllSubProcessesDone : subProcessDoneWithErrors
 
-    areAllSubProcessesDone --> AGGREGATION_PENDING : numSubProcesses == numCompletedSubProcesses && splitCompleted
+    areAllSubProcessesDone --> AGGREGATION_PENDING : all sub-processes done and split completed
     areAllSubProcessesDone --> SUB_PROCESSES_PENDING : otherwise
 
     AGGREGATION_PENDING --> areThereErrors : aggregationDone
     AGGREGATION_PENDING --> PROCESSED_WITH_ERRORS : aggregationDoneWithErrors
 
-    areThereErrors --> PROCESSED_WITH_ERRORS : errors.size() > 0
-    areThereErrors --> PROCESSED : errors.size() == 0
+    areThereErrors --> PROCESSED_WITH_ERRORS : has errors
+    areThereErrors --> PROCESSED : no errors
 
     PROCESSED --> [*]
     PROCESSED_WITH_ERRORS --> [*]

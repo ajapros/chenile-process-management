@@ -27,40 +27,43 @@ sequenceDiagram
     participant W as WorkerStarter
 
     Note over Cron: Quartz fires an enabled crontab row
-    Cron->>Trig: trigger(TriggerInput{eventId="ProcessCreate", payload=ProcessDto})
-    Trig->>Reg: commit DISPATCH_TRIGGER (PENDING)
-    Trig-->>Cron: acknowledgement = outbox ID
-    Note over Reg: later claim RUNNING; retry on rollback
-    Reg->>EP: handleEvent("ProcessCreate", original payload, x-headers)
-    EP->>PM: create(ProcessDto)  [processDefName = "feed"]
-    Note over PM: root Process "feed" (leaf=false) saved<br/>STM → SPLIT_PENDING
-    PM->>Reg: enqueue(ProcessTransition{feed, SPLIT_PENDING})
-    Reg->>W: START_WORKER (SPLITTER)
+    Cron->>Trig: trigger ProcessCreate with a ProcessDto payload
+    Trig->>Reg: commit DISPATCH_TRIGGER in PENDING
+    Trig-->>Cron: acknowledgement is the outbox id
+    Note over Reg: later claim RUNNING and retry on rollback
+    Reg->>EP: handleEvent ProcessCreate with original payload and x-headers
+    EP->>PM: create the ProcessDto, processDefName is feed
+    Note over PM: root Process feed is non-leaf and saved
+    Note over PM: feed STM moves to SPLIT_PENDING
+    PM->>Reg: enqueue transition feed to SPLIT_PENDING
+    Reg->>W: START_WORKER for the SPLITTER
     Note over Reg: DONE commits with local subscriber effects
 
     Note over W: splitter decides the children
-    W->>PM: processById(feed, splitDone, {subProcesses:[file]})
-    Note over PM: feed STM → SUB_PROCESSES_PENDING
-    PM->>Reg: enqueue(ProcessTransition{feed, SUB_PROCESSES_PENDING})
-    Reg->>PM: CREATE_SUBPROCESS → create(file)
-    Note over PM: child "file" Process (leaf=true)<br/>parent_id = feed, STM → EXECUTING
-    PM->>Reg: enqueue(ProcessTransition{file, EXECUTING})
-    Reg->>W: START_WORKER (EXECUTOR)
+    W->>PM: splitDone for feed with one child file
+    Note over PM: feed STM moves to SUB_PROCESSES_PENDING
+    PM->>Reg: enqueue transition feed to SUB_PROCESSES_PENDING
+    Reg->>PM: CREATE_SUBPROCESS creates file
+    Note over PM: child file is a leaf, parent_id is feed
+    Note over PM: file STM moves to EXECUTING
+    PM->>Reg: enqueue transition file to EXECUTING
+    Reg->>W: START_WORKER for the EXECUTOR
 
-    W->>PM: processById(file, doneSuccessfully)
-    Note over PM: file STM → PROCESSED (terminal)
-    PM->>Reg: enqueue(ProcessTransition{file, PROCESSED})
-    Reg->>PM: SIGNAL_PARENT → processById(feed, subProcessDoneSuccessfully)
-    Reg->>PM: EMIT_COMPLETED → processCompleted(fileCompletedEvent)
-    Note over PM: findByPredecessorProcessType("file")<br/>matches successor definition "archive"
-    PM->>PM: create "archive" (leaf=true, predecessor_id = file)
-    Note over PM: archive STM → EXECUTING
-    PM->>Reg: enqueue(ProcessTransition{archive, EXECUTING})
-    Reg->>W: START_WORKER (EXECUTOR)
+    W->>PM: doneSuccessfully for file
+    Note over PM: file STM moves to PROCESSED which is terminal
+    PM->>Reg: enqueue transition file to PROCESSED
+    Reg->>PM: SIGNAL_PARENT sends subProcessDoneSuccessfully to feed
+    Reg->>PM: EMIT_COMPLETED publishes the file completed event
+    Note over PM: predecessor lookup on file matches successor archive
+    PM->>PM: create archive as a leaf with predecessor_id file
+    Note over PM: archive STM moves to EXECUTING
+    PM->>Reg: enqueue transition archive to EXECUTING
+    Reg->>W: START_WORKER for the EXECUTOR
 
-    Note over PM: feed — numSubProcesses == numCompleted && splitCompleted<br/>then AGGREGATION_PENDING, aggregator, PROCESSED
-    W->>PM: processById(archive, doneSuccessfully)
-    Note over PM: archive → PROCESSED (no further predecessor config)
+    Note over PM: once all sub-processes are done and the split completed
+    Note over PM: feed moves to AGGREGATION_PENDING then aggregator then PROCESSED
+    W->>PM: doneSuccessfully for archive
+    Note over PM: archive moves to PROCESSED with no further predecessor config
 ```
 
 Notes:
