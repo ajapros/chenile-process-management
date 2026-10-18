@@ -11,7 +11,9 @@ The application owns entity scanning of `org.chenile.trigger.cron` and repositor
 scanning of the same package; framework configuration does not declare scans.
 
 Crontabs retain their table, JSON format, Java package names and Quartz job keys.
-Each firing supplies a stable trigger ID of the form
+Each firing supplies a stable submission idempotency key of the form
 `crontab:{crontabId}:{quartzFireInstanceId}`. Duplicate handling belongs to the
-chosen trigger service implementation. See [trigger-service](../trigger-service/README.md)
+chosen trigger service implementation. The acknowledgement supplies the assigned outbox/trigger ID.
+Cron identity, Quartz timing and generated/configured x-headers go into triggerContext metadata.
+The event payload string is passed unchanged; subscriber conversion belongs to Chenile. See [trigger-service](../trigger-service/README.md)
 for Chenile's dispatch and idempotency behavior.

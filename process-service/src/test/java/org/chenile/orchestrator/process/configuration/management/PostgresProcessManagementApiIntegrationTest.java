@@ -32,12 +32,11 @@ class PostgresProcessManagementApiIntegrationTest extends AbstractProcessManagem
     }
     @Test void historyMigrationCreatesTablesAndIsRerunnable() throws Exception {
         // Only drop test-owned tables inside this test's randomly allocated schema.
-        jdbc.execute("drop table trigger_log");
-        var migration = new ResourceDatabasePopulator(new ClassPathResource("chenile-trigger-schema.sql"), new ClassPathResource("chenile-process-management-history-schema.sql"));
+        var migration = new ResourceDatabasePopulator(new ClassPathResource("chenile-process-management-history-schema.sql"));
         migration.execute(jdbc.getDataSource()); migration.execute(jdbc.getDataSource());
-        definition("source", true, ""); generate("alpha", "migration", "source");
+        definition("source", true, ""); generate("alpha", "migration", "source"); dispatcher.drainAll(30);
         var root = processes.findAll().get(0); complete(root.id, "alpha");
-        assertEquals(1, executions.count());
+        assertEquals(1, executions.findCommands(org.chenile.trigger.DispatchTriggerCommand.TYPE, "alpha", null, null, null, 0, 10).totalElements());
         assertEquals(0, jdbc.queryForObject("select count(*) from information_schema.tables where table_schema=current_schema() and table_name='chenile_process_completion_event'", Integer.class));
         assertEquals(1, response(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(BASE + "/executions"), "alpha", 200).get("totalElements").asInt());
     }

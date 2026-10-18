@@ -1,28 +1,25 @@
 package org.chenile.trigger.configuration;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chenile.core.event.EventProcessor;
-import org.chenile.trigger.store.*;
-import org.chenile.trigger.EventTriggerService;
-import org.chenile.trigger.TriggerService;
-import org.chenile.trigger.TriggerObserver;
+import org.chenile.orchestrator.process.configuration.ProcessOutboxConfiguration;
+import org.chenile.orchestrator.process.outbox.ProcessOutboxRepository;
+import org.chenile.trigger.*;
 import org.chenile.trigger.configuration.controller.TriggerController;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.transaction.PlatformTransactionManager;
 
 @Configuration
-@Import(TriggerController.class)
+@Import({TriggerController.class, ProcessOutboxConfiguration.class})
 public class ChenileTriggerConfiguration {
-    @Bean public TriggerLogStore triggerLogStore(TriggerLogRepository repository) {
-        return new DatabaseTriggerLogStore(repository);
+    private final ObjectMapper mapper = new ObjectMapper().findAndRegisterModules();
+    @Bean public DispatchTriggerCommand dispatchTriggerCommand(ProcessOutboxRepository outbox, EventProcessor events) {
+        return new DispatchTriggerCommand(outbox, events, mapper);
     }
-    @Bean public TriggerService triggerService(TriggerLogStore triggerLogStore, EventProcessor eventProcessor,
-                                               TriggerObserver observer) {
-        return new EventTriggerService(triggerLogStore, eventProcessor, observer);
-    }
-    @Bean @ConditionalOnMissingBean(TriggerObserver.class)
-    public TriggerObserver triggerObserver() {
-        return TriggerObserver.NONE;
+    @Bean public EventTriggerService triggerService(ProcessOutboxRepository outbox, DispatchTriggerCommand command,
+            PlatformTransactionManager manager) {
+        return new EventTriggerService(outbox, command, mapper, manager);
     }
 }

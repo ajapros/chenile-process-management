@@ -67,10 +67,10 @@ class ProcessAdminServerTest {
         String source = "source-" + suffix, successor = "index-" + suffix;
         ok("POST", api + "/definitions", "{\"processType\":\"" + source + "\",\"leaf\":true}", 201);
         ok("POST", api + "/definitions", "{\"processType\":\"" + successor + "\",\"leaf\":true,\"predecessorProcessType\":\"" + source + "\"}", 201);
-        String trigger = "{\"triggerId\":\"" + suffix + "\",\"payload\":{\"processDefName\":\"" + source + "\",\"args\":{\"rows\":2}}}";
-        var accepted = ok("POST", api + "/triggers", trigger, 200);
-        assertTrue(accepted.get("dispatched").asBoolean());
-        assertTrue(ok("POST", api + "/triggers", trigger, 200).get("duplicate").asBoolean());
+        String trigger = "{\"idempotencyKey\":\"" + suffix + "\",\"payload\":{\"processDefName\":\"" + source + "\",\"args\":{\"rows\":2}}}";
+        var accepted = ok("POST", api + "/triggers", trigger, 202);
+        assertEquals(accepted, ok("POST", api + "/triggers", trigger, 202));
+        dispatch();
         var roots = ok("GET", api + "/processes?processType=" + source, null, 200);
         assertEquals(1, roots.get("totalElements").asInt());
         String id = roots.get("content").get(0).get("id").asText();

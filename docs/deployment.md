@@ -36,7 +36,7 @@ flowchart LR
         direction TB
         TS[trigger-service plus cron]
         PM[process-api plus process-service STM]
-        OB[(process-outbox poller)]
+        OB[(shared outbox poller)]
         WS[q-based worker starter]
         TS --> PM
         PM --> OB
@@ -94,9 +94,9 @@ A Chenile mini monolith that packages the orchestration engine and everything th
 |---|---|
 | `process-api` | model (`Process`, `ProcessDto`, `WorkerDto`, `WorkerType`), `WorkerStarter` contract, config abstraction |
 | `process-service` | the STM (`PROCESS_FLOW`), `ProcessManagerImpl`, `ProcessEntryAction`, the controllers, the configurators, the management API |
-| `process-outbox` | the always-on durable transactional outbox and its draining poller (`OutboxDispatcher`) |
+| `chenile-outbox` | the always-on durable transactional outbox and its draining poller (`OutboxDispatcher`) |
 | **one** `WorkerStarter` — preferably `q-based-process-starter` | turns a `START_WORKER` command into a message on the queue |
-| `trigger-api` plus `trigger-service` | `EventTriggerService` and the unified `trigger_log` (idempotency plus dispatch history) |
+| `trigger-api` plus `trigger-service` | durable acceptance, status queries and DISPATCH_TRIGGER outbox delivery |
 | `crontab-trigger` | durable Quartz crontabs (`chenile_crontab`) that fire activations |
 | `process-ui` (optional) | the React admin console behind the management API |
 
@@ -104,8 +104,8 @@ What the server does:
 
 - **Receives triggers.** A crontab row fires in Quartz, or an external adapter posts an
   activation. Either way it reaches `TriggerService.trigger(TriggerInput)`, which claims
-  idempotency in `trigger_log` on `(trigger_id, event_name)` and raises the `ProcessCreate`
-  Chenile event.
+  submission idempotency in the outbox and returns the outbox ID. Later, the dispatcher raises
+  the ProcessCreate event using that ID as x-chenile-trigger-id.
 - **Creates and advances processes.** `ProcessManagerImpl.create(ProcessDto)` persists a
   root `Process` and drives it through the STM. Every transition records its consequences
   as rows in `chenile_process_outbox` **in the same transaction that saves the process**.
@@ -139,7 +139,7 @@ chenile.process.outbox.poll-interval-millis=1000
 chenile.process.management.enabled=true
 chenile.process.management.api-key=${PROCESS_MANAGEMENT_API_KEY}   # >= 32 chars
 
-# PostgreSQL: state, outbox, receipts, trigger_log, crontab all share ONE datasource
+# PostgreSQL: state, outbox, receipts and crontab all share ONE datasource
 spring.datasource.url=jdbc:postgresql://db:5432/process
 ```
 
@@ -215,9 +215,10 @@ sequenceDiagram
     Note over Cron,Out: Process Manager Server monolith
     Note over WL,Wk: Process Manager Worker monolith
 
-    Cron->>Trig: Quartz fires, trigger(TriggerInput)
-    Note over Trig: claims trigger_log on (trigger_id, event_name)
-    Trig->>PM: ProcessCreate event (ProcessDto)
+    Cron->>Trig: Quartz fires, submit TriggerInput with idempotencyKey
+    Note over Trig: commits DISPATCH_TRIGGER, acknowledges its outbox ID
+    Trig->>Out: persist DISPATCH_TRIGGER; return ID
+    Out->>PM: later dispatch ProcessCreate using command ID
     PM->>PM: persist root Process, enter STM
     PM->>Out: record START_WORKER in outbox (same tx)
     Out->>Q: publish WorkerDto (q-based starter, ChenilePub)

@@ -12,7 +12,9 @@ import org.chenile.orchestrator.process.service.defs.DatabaseProcessConfigurator
 import org.chenile.trigger.TriggerService;
 import org.chenile.trigger.cron.*;
 import org.chenile.trigger.model.*;
-import org.chenile.trigger.store.TriggerLogRepository;
+import org.chenile.orchestrator.process.outbox.ProcessOutboxRepository;
+import org.chenile.trigger.DispatchTriggerCommand;
+import org.chenile.trigger.EventTriggerService;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
@@ -30,13 +32,13 @@ public class ProcessManagementService {
     private final ProcessConfigurator configurator;
     private final CrontabRepository crontabs;
     private final ObjectProvider<CrontabService> cronServices;
-    private final TriggerLogRepository executions;
+    private final ProcessOutboxRepository executions;
     private final TriggerService triggers;
-    private final ObjectMapper json = new ObjectMapper();
+    private final ObjectMapper json = new ObjectMapper().findAndRegisterModules();
     public ProcessManagementService(ProcessRepository processes,
             ProcessDefinitionRepository definitions, ProcessConfigurator configurator,
             CrontabRepository crontabs, ObjectProvider<CrontabService> cronServices,
-            TriggerLogRepository executions, TriggerService triggers) {
+            ProcessOutboxRepository executions, TriggerService triggers) {
         this.processes = processes; this.definitions = definitions;
         this.configurator = configurator; this.crontabs = crontabs; this.cronServices = cronServices;
         this.executions = executions; this.triggers = triggers;
@@ -69,7 +71,7 @@ public class ProcessManagementService {
     public record Edge(String source, String target, String kind) {}
     public record Trace(List<Node> nodes, List<Edge> edges) {}
     public record CronRequest(String name, String cronExpression, String timezone, boolean enabled, ProcessDto payload) {}
-    public record ManualRequest(String triggerId, ProcessDto payload) {}
+    public record ManualRequest(String idempotencyKey, ProcessDto payload) {}
 
     public Map<String, Object> info() {
         return Map.of("definitionSource", configurator instanceof DatabaseProcessConfigurator ? "database" : "json",
@@ -91,25 +93,19 @@ public class ProcessManagementService {
                 .and((r,q,c) -> c.equal(r.get("id"), id))).orElseThrow(ProcessManagementService::notFound);
         return new ProcessDetail(ProcessView.of(p));
     }
-    public PageResult<TriggerLog> executions(String tenant, String triggerId, String crontabId,
+    public PageResult<TriggerStatus> executions(String tenant, String triggerId, String crontabId,
             String status, int page, int size) {
-        Specification<TriggerLog> query = filter(tenant(tenant), "triggerId", triggerId);
+        String fragment = null;
         if (present(crontabId)) {
-            // Adapter context is stored as compact JSON; escape both JSON and LIKE metacharacters.
-            String fragment;
-            try { fragment = json.writeValueAsString(Map.of("x-chenile-crontab-id", crontabId)); }
-            catch (com.fasterxml.jackson.core.JsonProcessingException invalid) { throw bad("Invalid crontab ID"); }
-            String pattern = "%" + fragment.substring(1, fragment.length() - 1)
-                    .replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
-            query = query.and((r, q, c) -> c.like(r.get("triggerContext"), pattern, '!'));
+            String jsonObject = encode(Map.of("x-chenile-crontab-id", crontabId));
+            fragment = jsonObject.substring(1, jsonObject.length() - 1);
         }
-        if (present(status)) {
-            TriggerLogStatus selected;
-            try { selected = TriggerLogStatus.valueOf(status); }
-            catch (IllegalArgumentException invalid) { throw bad("Invalid trigger status"); }
-            query = query.and((r, q, c) -> c.equal(r.get("status"), selected));
-        }
-        return PageResult.of(executions.findAll(query, page(page, size, "startedAt")));
+        try {
+            var commands = executions.findCommands(DispatchTriggerCommand.TYPE, tenant, triggerId,
+                    present(status) ? status : null, fragment, page, size);
+            return new PageResult<>(commands.content().stream().map(c -> EventTriggerService.describe(c, json)).toList(),
+                    commands.totalElements(), commands.page(), commands.size(), commands.totalPages());
+        } catch (IllegalArgumentException invalid) { throw bad(invalid.getMessage()); }
     }
     public PageResult<Crontab> crontabs(String tenant, int page, int size) {
         return PageResult.of(crontabs.findAll(tenant(tenant), page(page, size, "createdTime")));
@@ -132,11 +128,11 @@ public class ProcessManagementService {
     }
     public TriggerResult generate(String tenant, ManualRequest request) {
         if (request == null) throw bad("Payload is required");
-        if (present(request.triggerId()) && request.triggerId().length() > 80) throw bad("Manual trigger key must be at most 80 characters");
+        if (present(request.idempotencyKey()) && request.idempotencyKey().length() > 80) throw bad("Manual trigger key must be at most 80 characters");
         validatePayload(request.payload());
         TriggerInput input = new TriggerInput();
         // Namespace caller keys by tenant: trigger idempotency is globally unique.
-        input.triggerId = "manual:" + tenant + ":" + (present(request.triggerId()) ? request.triggerId() : UUID.randomUUID());
+        input.idempotencyKey = "manual:" + tenant + ":" + (present(request.idempotencyKey()) ? request.idempotencyKey() : UUID.randomUUID());
         input.eventId = "ProcessCreate"; input.payload = request.payload();
         input.headers.put("x-chenile-tenant-id", tenant);
         input.headers.put("x-chenile-trigger-source", "MANUAL");
@@ -217,14 +213,14 @@ public class ProcessManagementService {
                 throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "Execution exceeds 1000 processes; use paginated process queries to inspect branches");
         } while (!frontier.isEmpty());
         List<Node> nodes = new ArrayList<>(); List<Edge> edges = new ArrayList<>();
-        var histories = executions.findAll(ProcessManagementService.<TriggerLog>tenant(tenant)
-            .and((r,q,c) -> r.get("triggerId").in(triggerIds)), PageRequest.of(0, 1001)).getContent();
-        if (histories.size() > 1000) throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "Too many trigger events for one trace");
+        var histories = executions.findByIds(DispatchTriggerCommand.TYPE, tenant, triggerIds);
         Map<String, String> triggerNodes = new HashMap<>();
-        for (var e : histories) {
-            String id = "trigger:" + e.id;
-            if ("ProcessCreate".equals(e.eventName)) triggerNodes.put(e.triggerId, id);
-            nodes.add(new Node(id, "TRIGGER", e.eventName + " · " + (e.source == null ? "UNKNOWN" : e.source), e.status.name(), (e.startedAt == null ? e.triggerTime : e.startedAt).toString(), e));
+        for (var command : histories) {
+            var e = EventTriggerService.describe(command, json);
+            String id = "trigger:" + e.triggerId();
+            if ("ProcessCreate".equals(e.eventName())) triggerNodes.put(e.triggerId(), id);
+            nodes.add(new Node(id, "TRIGGER", e.eventName() + " · " + e.source(), e.status(),
+                    (e.startedAt() == null ? e.triggerTime() : e.startedAt()).toString(), e));
         }
         for (var p : found.values()) {
             String id = "process:" + p.id; var view = ProcessView.of(p);

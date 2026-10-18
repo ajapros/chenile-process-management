@@ -36,7 +36,7 @@ function Notice({ resource }) {
 }
 function Badge({ children }) {
   const value = String(children || 'UNKNOWN');
-  const style = /ERROR|FAIL|DEAD/.test(value) ? 'bad' : /PROCESSED$|COMPLETED/.test(value) ? 'good' : 'active';
+  const style = /ERROR|FAIL|DEAD/.test(value) ? 'bad' : /PROCESSED$|DONE/.test(value) ? 'good' : 'active';
   return <span className={`badge ${style}`}>{value.replaceAll('_', ' ')}</span>;
 }
 function Json({ value }) { return <pre>{typeof value === 'string' ? value : pretty(value)}</pre>; }
@@ -48,7 +48,7 @@ function Pager({ data, page, setPage }) {
 }
 function Table({ columns, rows, empty = 'No records yet.' }) {
   return <div className="table-wrap"><table><thead><tr>{columns.map(c => <th key={c.label}>{c.label}</th>)}</tr></thead>
-    <tbody>{rows.map(row => <tr key={row.id || row.processType}>{columns.map(c => <td key={c.label}>{c.render(row)}</td>)}</tr>)}</tbody></table>
+    <tbody>{rows.map(row => <tr key={row.id || row.triggerId || row.processType}>{columns.map(c => <td key={c.label}>{c.render(row)}</td>)}</tr>)}</tbody></table>
     {!rows.length && <p className="empty">{empty}</p>}</div>;
 }
 
@@ -187,9 +187,8 @@ function Crons({ api, revision, definitions, info, mutate, busy, history }) {
       <button className="primary" disabled={busy || !info?.cronAvailable}>Save schedule</button>
       {editing && <button type="button" onClick={() => { setEditing(null); setName(''); }}>Cancel edit</button>}</form>
       <form className="card" onSubmit={async e => { e.preventDefault(); setError(''); try {
-        await mutate('/triggers', { method: 'POST', body: { triggerId: manualKey, payload: payload(manualType, manualArgs) } }, result => {
-          if (!result.dispatched) throw new Error('This key was already claimed but dispatch did not complete. Inspect its history; retrying the same key cannot replay it.');
-          return result.duplicate ? 'This trigger was already dispatched. No duplicate process was created.' : 'Trigger dispatched. Inspect Trigger history for its process and trace.';
+        await mutate('/triggers', { method: 'POST', body: { idempotencyKey: manualKey, payload: payload(manualType, manualArgs) } }, result => {
+          return `Trigger accepted: ${result.triggerId}. Track its status in Trigger history.`;
         });
         setManualKey(crypto.randomUUID());
       } catch (e) { setError(e.message); } }}><h3>Generate an event now</h3><p className="muted">Uses the same trigger ingress and idempotency as scheduled events.</p>
@@ -205,16 +204,16 @@ function Executions({ api, revision, filters, reset, trace }) {
   const list = useResource(api, query('/executions', { ...filters, status, page }), revision);
   return <><div className="section-heading"><div><h2>Trigger history</h2><p className="muted">All trigger sources. Completion means event dispatch finished, not that the resulting process finished.</p></div></div>
     <div className="filters"><label>Dispatch status<select value={status} onChange={e => { setStatus(e.target.value); setPage(0); }}>
-      <option value="">All statuses</option>{['RECEIVED', 'RUNNING', 'COMPLETED', 'FAILED'].map(s => <option key={s}>{s}</option>)}</select></label>
+      <option value="">All statuses</option>{['PENDING', 'RUNNING', 'DONE', 'DEAD'].map(s => <option key={s}>{s}</option>)}</select></label>
       {Object.keys(filters).length > 0 && <button onClick={() => { reset(); setPage(0); }}>Clear schedule/trigger filter</button>}</div>
     <Notice resource={list}/>{list.data && <><Table rows={list.data.content} columns={[
       { label: 'Started', render: e => <>{time(e.startedAt)}<small>Finished: {time(e.finishedAt)}</small></> },
       { label: 'Event / source', render: e => <><strong>{e.eventName}</strong><small>{e.source || 'Unknown'}</small></> },
-      { label: 'Trigger', render: e => <button className="link mono" onClick={() => setExpanded(expanded === e.id ? null : e.id)}>{e.triggerId}</button> },
+      { label: 'Trigger', render: e => <button className="link mono" onClick={() => setExpanded(expanded === e.triggerId ? null : e.triggerId)}>{e.triggerId}</button> },
       { label: 'Status', render: e => <Badge>{e.status}</Badge> },
       { label: 'Execution', render: e => <button className="link" onClick={() => trace({ triggerId: e.triggerId })}>Processes & trace →</button> },
     ]}/><Pager data={list.data} page={page} setPage={setPage}/>
-      {list.data.content.filter(e => e.id === expanded).map(e => <div className="card" key={e.id}><h3>{e.eventName} · {e.triggerId}</h3><p>Scheduled/received: {time(e.triggerTime)}</p>
+      {list.data.content.filter(e => e.triggerId === expanded).map(e => <div className="card" key={e.triggerId}><h3>{e.eventName} · {e.triggerId}</h3><p>Scheduled/received: {time(e.triggerTime)}</p>
         {e.error && <p className="notice error">{e.error}</p>}<Json value={e.payload}/></div>)}</>}</>;
 }
 

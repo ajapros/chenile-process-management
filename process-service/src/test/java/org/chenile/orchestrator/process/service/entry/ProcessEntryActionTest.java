@@ -10,7 +10,7 @@ import org.chenile.orchestrator.process.model.ProcessDto;
 import org.chenile.orchestrator.process.WorkerStarter;
 import org.chenile.orchestrator.process.config.reader.IProcessConfigurator;
 import org.chenile.orchestrator.process.service.outbox.*;
-import org.chenile.orchestrator.process.outbox.OutboxCommandRegistry;
+import org.chenile.orchestrator.process.outbox.OutboxCommandProducer;
 import org.chenile.orchestrator.process.configuration.dao.ProcessRepository;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.chenile.stm.State;
@@ -32,7 +32,7 @@ class ProcessEntryActionTest {
     @SuppressWarnings("unchecked")
     void savesProcessBeforeEnqueuingItsTransition() throws Exception {
         EntityStore<Process> store = mock(EntityStore.class);
-        OutboxCommandRegistry<ProcessTransition> commands = mock(OutboxCommandRegistry.class);
+        OutboxCommandProducer<ProcessTransition> commands = mock(OutboxCommandProducer.class);
         ProcessEntryAction action = new ProcessEntryAction(store, mock(STMActionsInfoProvider.class));
         ReflectionTestUtils.setField(action, "commands", commands);
         Process process = new Process("feed", false);
@@ -67,7 +67,7 @@ class ProcessEntryActionTest {
         var outbox = mock(org.chenile.orchestrator.process.outbox.ProcessOutboxRepository.class);
         var emitter = new EmitCompletedCommand(outbox, mapper, transactions, processor);
         when(processor.handleEvent(anyString(), any(), anyMap())).thenReturn(List.of(new org.chenile.core.context.ChenileExchange()));
-        var commands = new OutboxCommandRegistry<ProcessTransition>(List.of(emitter));
+        var commands = new OutboxCommandProducer<ProcessTransition>(List.of(emitter));
         ReflectionTestUtils.setField(action, "commands", commands);
         Process process = new Process("feed", false);
         process.setId("process-1");

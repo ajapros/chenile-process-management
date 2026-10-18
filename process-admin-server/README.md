@@ -86,7 +86,7 @@ java -jar process-admin-server/target/process-admin-server-exec.jar
 
 Provision the complete existing process/trigger/JPA schema first, plus:
 
-- `process-outbox/src/main/resources/chenile-process-outbox-schema.sql`
+- `chenile-outbox/src/main/resources/chenile-process-outbox-schema.sql`
 - `jdbc-process-starter/src/main/resources/chenile-process-work-schema.sql`
 - `process-service/src/main/resources/chenile-process-management-history-schema.sql`
 - `trigger-service/src/main/resources/chenile-trigger-schema.sql` for fresh trigger storage

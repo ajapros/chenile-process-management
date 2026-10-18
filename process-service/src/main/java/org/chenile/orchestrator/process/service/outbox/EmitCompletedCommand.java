@@ -25,8 +25,9 @@ public class EmitCompletedCommand extends AbstractProcessOutboxCommand {
     }
     @Override public String type() { return TYPE; }
 
+    @Override public boolean shouldEnqueue(ProcessTransition transition) { return terminal(transition); }
+
     @Override public void enqueue(ProcessTransition transition) throws Exception {
-        if (!terminal(transition)) return;
         var event = completedEvent(transition.process(), transition.state());
 
         store(transition.process(), transition.process().getId() + ":completed", event);

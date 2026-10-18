@@ -4,7 +4,8 @@ import java.time.Instant;
 import java.util.Map;
 
 public class TriggerInput {
-    public String triggerId;
+    /** Optional submission retry key; the accepted trigger ID is assigned by the outbox. */
+    public String idempotencyKey;
     public String eventId;
     public Instant triggerTime = Instant.now();
     public Map<String, String> headers = new java.util.LinkedHashMap<>();

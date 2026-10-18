@@ -103,7 +103,7 @@ Filters are exact matches and combined with AND.
 | GET `/crontabs?page=0&size=25` | Tenant's schedules |
 | POST `/crontabs` | Add a ProcessCreate schedule |
 | PUT `/crontabs/{id}` | Edit/enable/disable an existing tenant's schedule |
-| POST `/triggers` | Generate ProcessCreate through the normal trigger ingress |
+| POST `/triggers` (202 acceptance) | Generate ProcessCreate through the normal trigger ingress |
 | GET `/executions` | Trigger history; filters `triggerId`, `crontabId` (from context JSON), `status`, `page`, `size` |
 | GET `/definitions` | Global active definitions (database or JSON configurator) |
 | POST `/definitions` | Add a database-backed definition |
@@ -140,7 +140,7 @@ and durable Quartz job-store coordination are outside this first version.
 Manual trigger body:
 
 ```json
-{"triggerId":"a-client-retry-key","payload":{"processDefName":"Import","args":{"source":"feed-A"}}}
+{"idempotencyKey":"a-client-retry-key","payload":{"processDefName":"Import","args":{"source":"feed-A"}}}
 ```
 
 The optional retry key is limited to 80 characters and namespaced by tenant. Without a key,
@@ -168,13 +168,11 @@ not implemented in this first version.
 
 ## History and execution relationships
 
-`TriggerLog` / `trigger_log` is the unified idempotency and
-accepted-dispatch record with source, scheduled/received time, actual start/finish times,
-event name, payload, failure details and cron ID. Duplicate claims do not create new history.
-COMPLETED means dispatch/subscriber handling returned, not that its processes completed.
-RECEIVED and RUNNING may remain after a host crash; this is an observation, not a liveness guarantee.
-Non-API external callers should supply `x-chenile-tenant-id` for tenant-visible history.
-Cron events propagate their persisted tenant, overriding any conflicting configured header.
+Trigger history is the DISPATCH_TRIGGER view of the shared outbox. Acknowledgement contains
+only the accepted command/trigger ID. Reusing the same submission idempotencyKey returns that ID;
+it does not synchronously invoke the event. PENDING and RUNNING show queued/in-flight delivery;
+DONE means subscriber changes committed; DEAD means attempts were exhausted. The original
+payload and generic triggerContext metadata remain available for diagnosis. All queries are tenant-scoped.
 
 Completion is read from terminal process state. Process views expose `completedAt` from the
 terminal state-entry timestamp; nonterminal processes return null. There is no separate completion

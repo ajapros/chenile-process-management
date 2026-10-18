@@ -107,7 +107,7 @@
           <text class="lbl" x="135" y="86" text-anchor="middle">Cron / Trigger</text></g>
         <g id="c-trig"><rect class="comp" x="70" y="172" width="150" height="46" rx="11"/>
           <text class="lbl" x="145" y="193" text-anchor="middle">trigger-service</text>
-          <text class="lbl small" x="145" y="209" text-anchor="middle">trigger_log</text></g>
+          <text class="lbl small" x="145" y="209" text-anchor="middle">outbox ack</text></g>
         <g id="c-stm"><rect class="comp" x="70" y="246" width="150" height="46" rx="11"/>
           <text class="lbl" x="145" y="267" text-anchor="middle">ProcessManager</text>
           <text class="lbl small" x="145" y="283" text-anchor="middle">STM + ProcessEntryAction</text></g>
@@ -226,7 +226,7 @@
 <script>
 /* ---------------- SCENE 1: the loop ---------------- */
 const steps = [
-  {seg:"seg1", lit:["c-cron","c-trig"], title:"Cron fires", text:"A Quartz crontab (or any external trigger) fires on the server and calls trigger-service. Idempotency is claimed in trigger_log on (trigger_id, event_name)."},
+  {seg:"seg1", lit:["c-cron","c-trig"], title:"Cron fires", text:"A Quartz crontab (or any external trigger) fires on the server and calls trigger-service. A DISPATCH_TRIGGER command commits before acknowledging its outbox ID. The submission key suppresses duplicate acceptance."},
   {seg:"seg2", lit:["c-trig","c-stm"], title:"ProcessCreate", text:"trigger-service raises the ProcessCreate event. ProcessManager persists a root Process and enters the state machine."},
   {seg:"seg3", lit:["c-stm","c-outbox"], title:"Record consequence", text:"In the SAME transaction that saves the Process, the transition records a START_WORKER command in the durable outbox. State and consequence commit atomically."},
   {seg:"seg4", lit:["c-outbox","c-starter"], title:"Poller drains", text:"The outbox poller drains the due command and hands the WorkerDto to the configured worker starter — here, the queue-based one."},

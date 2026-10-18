@@ -4,7 +4,7 @@
 	<packaging>pom</packaging>
 	<modules>
 		<module>process-api</module>
-		<module>process-outbox</module>
+		<module>chenile-outbox</module>
 		<module>trigger-api</module>
 		<module>trigger-service</module>
 		<module>crontab-trigger</module>

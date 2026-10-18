@@ -1,9 +1,10 @@
 # Trigger API
 
-`trigger-api` provides `TriggerService`, `TriggerObserver`, `TriggerInput`, and
-`TriggerResult`. It has no runtime dependencies on Spring, persistence, Quartz,
-or the process manager. Java package names remain `org.chenile.trigger` and
-`org.chenile.trigger.model`.
+`trigger-api` provides TriggerService, TriggerInput, TriggerResult (acceptance ID only), and
+TriggerStatus. It has no runtime dependency on Spring, persistence, cron or process management.
 
-Adapters depend on this contract. Applications choose a `TriggerService`
-implementation; `trigger-service` supplies Chenile's event dispatcher.
+Adapters supply an optional idempotencyKey, eventId, payload, x-prefixed headers, triggerContext
+and triggerTime. The implementation assigns the trigger ID. TriggerService.trigger returns only
+that durable acknowledgement; TriggerService.status queries it in the current tenant context.
+The standard implementation in trigger-service uses the outbox ID as the trigger ID and executes
+later through Chenile's event transformation pipeline.

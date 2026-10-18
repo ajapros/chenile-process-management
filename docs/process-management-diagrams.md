@@ -1,6 +1,6 @@
 # Chenile Process Management — Diagrams
 
-These diagrams reflect the current code (unified `trigger_log`; no `chenile_trigger_execution` or
+These diagrams reflect the current code (shared trigger outbox; no trigger table or
 `chenile_process_completion_event` tables; pluggable outbox command registry). They supersede the older
 sketches under `docs/puml/`.
 
@@ -13,7 +13,7 @@ created with `predecessor_id` set to the leaf child.
 
 Participants: **Cron** = `CrontabScheduler` (crontab-trigger); **Trig** = `EventTriggerService`
 (trigger-service); **EP** = `EventProcessor`; **PM** = `ProcessManager` (STM, process-service); **Reg** =
-`ProcessEntryAction` + the outbox command registry (process-outbox); **W** = `WorkerStarter`
+`ProcessEntryAction` + the outbox command registry (chenile-outbox); **W** = `WorkerStarter`
 (splitter / executor).
 
 ```mermaid
@@ -28,14 +28,15 @@ sequenceDiagram
 
     Note over Cron: Quartz fires an enabled crontab row
     Cron->>Trig: trigger(TriggerInput{eventId="ProcessCreate", payload=ProcessDto})
-    Note over Trig: trigger_log RECEIVED → RUNNING<br/>unique (trigger_id, event_name)
-    Trig->>EP: handleEvent("ProcessCreate", ProcessDto, headers)
+    Trig->>Reg: commit DISPATCH_TRIGGER (PENDING)
+    Trig-->>Cron: acknowledgement = outbox ID
+    Note over Reg: later claim RUNNING; retry on rollback
+    Reg->>EP: handleEvent("ProcessCreate", original payload, x-headers)
     EP->>PM: create(ProcessDto)  [processDefName = "feed"]
     Note over PM: root Process "feed" (leaf=false) saved<br/>STM → SPLIT_PENDING
     PM->>Reg: enqueue(ProcessTransition{feed, SPLIT_PENDING})
     Reg->>W: START_WORKER (SPLITTER)
-    Trig-->>Cron: TriggerResult(dispatched)
-    Note over Trig: trigger_log COMPLETED
+    Note over Reg: DONE commits with local subscriber effects
 
     Note over W: splitter decides the children
     W->>PM: processById(feed, splitDone, {subProcesses:[file]})
@@ -93,8 +94,8 @@ erDiagram
     PROCESS_TABLE ||--o{ SUBPROCESS_ERROR : "errors (OneToMany)"
     SUBPROCESS_ERROR ||--o{ SUBPROCESS_ERROR_VALIDATION_ERRORS : "validation strings"
     PROCESS_DEFINITION ||..o{ PROCESS_TABLE : "process_type (config, logical)"
-    CHENILE_CRONTAB ||..o{ TRIGGER_LOG : "adapter metadata in trigger_context"
-    TRIGGER_LOG ||..o{ PROCESS_TABLE : "trigger_id (correlation, logical)"
+    CHENILE_CRONTAB ||..o{ CHENILE_PROCESS_OUTBOX : "trigger adapter metadata in command JSON"
+    CHENILE_PROCESS_OUTBOX ||..o{ PROCESS_TABLE : "DISPATCH_TRIGGER.id = trigger_id (logical)"
     PROCESS_TABLE ||..o{ CHENILE_PROCESS_WORK_ITEM : "process_id (logical)"
     PROCESS_TABLE ||..o{ CHENILE_PROCESS_OUTBOX : "process_id (logical)"
     CHENILE_PROCESS_RECEIPT || ..o{ CHENILE_PROCESS_OUTBOX : "receipt_key = idempotency_key (logical)"
@@ -137,21 +138,6 @@ erDiagram
         text definition "JSON: leaf, parentProcessType, predecessorProcessType, predecessorArgs, config"
     }
 
-    TRIGGER_LOG {
-        varchar id PK
-        varchar trigger_id
-        varchar event_name
-        timestamptz trigger_time
-        varchar status "RECEIVED|RUNNING|COMPLETED|FAILED"
-        varchar tenant
-        varchar source "CRON|EXTERNAL"
-        text trigger_context "adapter metadata JSON"
-        timestamptz started_at
-        timestamptz finished_at
-        text error
-        text payload
-    }
-
     CHENILE_CRONTAB {
         varchar id PK
         varchar name UK
@@ -176,6 +162,7 @@ erDiagram
         int attempt
         varchar locked_by
         timestamp locked_until
+        timestamp started_at
         timestamp created_at
         timestamp updated_at
         timestamp finished_at
@@ -232,10 +219,9 @@ erDiagram
 - **`chenile_process_receipt`** — the effect-level idempotency ledger. One row per `(consumer, receipt_key)`
   business fact, inserted in the same transaction as the effect so a redelivered command is a no-op. This is
   what makes parent counting and successor chaining exactly-once across retries and replays.
-- **`trigger_log`** (entity `TriggerLog`, trigger-service) — one row per accepted trigger, serving double duty:
-  the unique `(trigger_id, event_name)` claim that makes dispatch idempotent, plus the dispatch history
-  (status `RECEIVED` → `RUNNING` → `COMPLETED`/`FAILED`, source, timings, payload, error). It is what the
-  management API's execution view reads.
+- **DISPATCH_TRIGGER in `chenile_process_outbox`** — accepted trigger identity, original payload,
+  headers, adapter context and current dispatch status. There is no separate trigger table.
+  Its command ID is the trigger ID stored on resulting processes. Keep these identities for queries and deduplication.
 - **`chenile_crontab`** (entity `Crontab`, crontab-trigger) — durable Quartz schedules: one row per cron,
   holding the expression, timezone, the event to fire (`ProcessCreate`), and its headers/payload JSON. Saving
   or deleting a row registers or removes the Quartz job.

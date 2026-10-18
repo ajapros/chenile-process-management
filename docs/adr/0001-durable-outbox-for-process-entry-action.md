@@ -1,6 +1,6 @@
 # ADR 0001 — Durable outbox for ProcessEntryAction and framework process chaining
 
-Status: Accepted — implemented, opt-in
+Status: Accepted — implemented, mandatory (durable delivery is always on)
 Date: 2026-10-01
 Related: [process-management guide](../process-management.md), [operations](../process-outbox.md)
 
@@ -12,6 +12,9 @@ Related: [process-management guide](../process-management.md), [operations](../p
 > Subscriber failures trigger rollback and retry; the direct manager call and
 > best-effort after-commit fan-out and the outbox enablement setting have been removed. See [current operations](../process-outbox.md). The original ADR
 > below is preserved as historical context.
+
+> Subsequent consolidation: the shared artifact is now `chenile-outbox`. Trigger acceptance and history use
+> `DISPATCH_TRIGGER` commands; `TriggerLog` and its independent table have been removed.
 
 ## Context and decision
 

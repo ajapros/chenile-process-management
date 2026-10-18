@@ -35,16 +35,13 @@ worker jobs. Business worker execution requires your application's worker implem
 {"processDefName":"feed","args":{"file":"input.csv"},"triggerId":"run-123"}
 ```
 
-`crontab-trigger` schedules crontabs through the contracts in `trigger-api`;
-`trigger-service` dispatches events. Its `x-chenile-trigger-id`
-header supplies correlation when the payload omits `triggerId`. `TriggerLog` in
-`trigger-service` stores trigger identity, dispatch status, timestamps, payload and error in one row. Its table is
-`trigger_log`, with a unique constraint on `(trigger_id, event_name)`.
-Direct process creation is not deduplicated using this table and does not write to it.
-`crontab-trigger` depends on `trigger-api`, not `trigger-service`. Applications choose
-the dispatcher implementation; the admin host explicitly includes both implementation modules.
-Tenant identity comes from `x-chenile-tenant-id`, and terminal processes emit
-`ProcessCompleted` with the tenant header for subscribers.
+`crontab-trigger` schedules through `trigger-api`; `trigger-service` accepts durable commands
+into `chenile-outbox`. Submission returns only the outbox ID, which is also the trigger ID.
+Use an optional idempotencyKey for retries; execution happens later. `GET /trigger/{id}` queries
+PENDING/RUNNING/DONE/DEAD in the caller tenant. Dispatch supplies the authoritative
+`x-chenile-trigger-id`, and any resulting process stores it for correlation. There is no trigger table.
+Cron metadata belongs to the command's triggerContext JSON; payload conversion belongs to Chenile.
+`crontab-trigger` depends on `trigger-api`, not `trigger-service`. The admin host includes both.
 
 The process manager subscribes to `ProcessCompleted` and exposes `POST /process/completed`.
 `ProcessCompletedEvent` extends `ProcessDto`, so it can be used as the creation DTO.
@@ -66,8 +63,8 @@ to choose `INPUT`, `OUTPUT`, or `BOTH` (the default when omitted or null).
 ```
 
 Valid JSON values are decoded; plain text stays a string and absent values become null.
-The completion event is not mutated when starting processes. Chaining does not consult
-`TriggerLog`; repeated completion ingress can create additional processes unless durable mode is enabled.
+The completion event is not mutated when starting processes. Transactional receipts prevent
+repeated completion ingress from creating the same successor twice.
 
 Every splitter, executor, and aggregator receives a copy of `ProcessDef.config`.
 Use this single map for all worker settings for a process type.

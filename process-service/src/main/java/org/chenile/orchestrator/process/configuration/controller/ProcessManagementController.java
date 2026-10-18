@@ -34,7 +34,7 @@ public class ProcessManagementController {
     public Object addCron(@RequestHeader("x-chenile-tenant-id") String tenant, @RequestBody CronRequest request) { return service.saveCron(tenant, null, request); }
     @PutMapping("/crontabs/{id}") public Object updateCron(@RequestHeader("x-chenile-tenant-id") String tenant,
             @PathVariable String id, @RequestBody CronRequest request) { return service.saveCron(tenant, id, request); }
-    @PostMapping("/triggers") public Object generate(@RequestHeader("x-chenile-tenant-id") String tenant,
+    @PostMapping("/triggers") @ResponseStatus(HttpStatus.ACCEPTED) public Object generate(@RequestHeader("x-chenile-tenant-id") String tenant,
             @RequestBody ManualRequest request) { return service.generate(tenant, request); }
     @GetMapping("/definitions") public Object definitions() { return service.definitions(); }
     @PostMapping("/definitions") @ResponseStatus(HttpStatus.CREATED) public Object addDefinition(@RequestBody ProcessDef definition) { return service.saveDefinition(definition.processType, definition, true); }

@@ -12,7 +12,7 @@ import static org.mockito.Mockito.mock;
 
 class CrontabTriggerConfigurationTest {
     @Test void wiresCronWithAnApplicationDefinedTriggerService() {
-        TriggerService triggers = input -> new TriggerResult(input.triggerId, input.eventId, null, true, false);
+        TriggerService triggers = org.mockito.Mockito.mock(TriggerService.class);
         new ApplicationContextRunner()
                 .withUserConfiguration(CrontabTriggerConfiguration.class)
                 .withBean(TriggerService.class, () -> triggers)

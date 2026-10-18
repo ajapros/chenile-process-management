@@ -54,7 +54,7 @@ public class CrontabScheduler {
         Crontab crontab = repository.findById(id).orElse(null);
         if (crontab == null || !crontab.enabled) return;
         TriggerInput input = new TriggerInput();
-        input.triggerId = "crontab:" + crontab.id + ":" + context.getFireInstanceId();
+        input.idempotencyKey = "crontab:" + crontab.id + ":" + context.getFireInstanceId();
         input.triggerTime = context.getFireTime().toInstant();
         input.eventId = crontab.eventName;
         input.headers.putAll(map(crontab.headersJson));

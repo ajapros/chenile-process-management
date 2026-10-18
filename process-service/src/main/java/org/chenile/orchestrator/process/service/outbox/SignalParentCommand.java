@@ -28,9 +28,12 @@ public class SignalParentCommand extends AbstractProcessOutboxCommand {
     }
     @Override public String type() { return TYPE; }
 
+    @Override public boolean shouldEnqueue(ProcessTransition transition) {
+        return terminal(transition) && transition.process().parentId != null;
+    }
+
     @Override public void enqueue(ProcessTransition transition) throws Exception {
         var process = transition.process();
-        if (!terminal(transition) || process.parentId == null) return;
         Object payload;
         String event;
         if (Constants.States.PROCESSED.equals(transition.state().getStateId())) {

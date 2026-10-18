@@ -110,9 +110,8 @@ public class ProcessManagerImpl extends StateEntityServiceImpl<Process> implemen
     private StateEntityServiceResponse<Process> createFromDto(ProcessDto processDto, String processDefName,
                                                               String predecessorId, String tenantId,
                                                               Map<String, Object> args) {
-        String triggerId = processDto.triggerId;
-        if (triggerId == null || triggerId.isBlank())
-            triggerId = ContextContainer.getInstance().get("x-chenile-trigger-id");
+        String triggerId = ContextContainer.getInstance().get("x-chenile-trigger-id");
+        if (triggerId == null || triggerId.isBlank()) triggerId = processDto.triggerId;
         if (triggerId != null && triggerId.isBlank()) triggerId = null;
         Process process = new Process(processDefName, false);
         process.predecessorId = predecessorId;

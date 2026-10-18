@@ -5,4 +5,5 @@ import org.chenile.trigger.model.TriggerResult;
 
 public interface TriggerService {
     TriggerResult trigger(TriggerInput input);
+    org.chenile.trigger.model.TriggerStatus status(String triggerId);
 }

@@ -25,9 +25,13 @@ public class CreateSubProcessCommand extends AbstractProcessOutboxCommand {
     }
     @Override public String type() { return TYPE; }
 
+    @Override public boolean shouldEnqueue(ProcessTransition transition) {
+        return Constants.States.SUB_PROCESSES_PENDING.equals(transition.state().getStateId())
+                && transition.process().subProcesses != null && !transition.process().subProcesses.isEmpty();
+    }
+
     @Override public void enqueue(ProcessTransition transition) throws Exception {
         Process parent = transition.process();
-        if (!Constants.States.SUB_PROCESSES_PENDING.equals(transition.state().getStateId()) || parent.subProcesses == null) return;
         for (Process child : parent.subProcesses) {
             if (child.getId() == null) child.setId(UUID.randomUUID().toString());
             child.tenant = parent.tenant;

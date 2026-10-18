@@ -47,7 +47,7 @@ class DurableProcessIntegrationTest {
     @Autowired ProcessRepository processes;
     @Autowired ProcessOutboxRepository outbox;
     @Autowired OutboxDispatcher dispatcher;
-    @Autowired OutboxCommandRegistry<ProcessTransition> commands;
+    @Autowired OutboxCommandRegistry commands;
     @MockitoBean WorkerStarter workers;
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager transactionManager;
@@ -144,7 +144,7 @@ class DurableProcessIntegrationTest {
     @Test void enqueueFailureRollsBackTheProcessSave() {
         assertThrows(RuntimeException.class, () -> new TransactionTemplate(transactionManager).executeWithoutResult(tx -> {
             create();
-            outbox.enqueue(OutboxCommand.create(null, EmitCompletedCommand.TYPE, "invalid", "{}"));
+            outbox.enqueue(OutboxCommand.create(null, EmitCompletedCommand.TYPE, "invalid", null));
         }));
         assertEquals(0L, processes.count());
         assertEquals(0L, outbox.backlogCount());

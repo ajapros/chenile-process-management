@@ -1,7 +1,7 @@
 package org.chenile.orchestrator.process.service.entry;
 
 import org.chenile.orchestrator.process.model.Process;
-import org.chenile.orchestrator.process.outbox.OutboxCommandRegistry;
+import org.chenile.orchestrator.process.outbox.OutboxCommandProducer;
 import org.chenile.orchestrator.process.service.outbox.ProcessTransition;
 import org.chenile.stm.State;
 import org.chenile.stm.impl.STMActionsInfoProvider;
@@ -11,7 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 /** Save the transition and record its commands atomically; dispatch happens after commit. */
 public class ProcessEntryAction extends GenericEntryAction<Process> {
-    @Autowired private OutboxCommandRegistry<ProcessTransition> commands;
+    @Autowired private OutboxCommandProducer<ProcessTransition> commands;
 
     public ProcessEntryAction(EntityStore<Process> entityStore, STMActionsInfoProvider stmActionsInfoProvider) {
         super(entityStore, stmActionsInfoProvider);

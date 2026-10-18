@@ -25,30 +25,29 @@ class ProcessManagementApiIntegrationTest extends AbstractProcessManagementApiIn
     @Test void triggerEndpointUsesChenileDispatchAndRetainsDuplicateIdentity() throws Exception {
         definition("source", true, "");
         String body = """
-                {"triggerId":"http-trigger", "eventId":"ProcessCreate",
+                {"idempotencyKey":"http-trigger", "eventId":"ProcessCreate",
                  "triggerTime":"2026-10-16T00:00:00Z",
                  "headers":{"x-chenile-tenant-id":"alpha", "x-chenile-trigger-source":"HTTP"},
-                 "payload":{"processDefName":"source", "args":{"rows":2}}}
+                 "payload":{"processDefName":"source", "triggerId":"spoofed", "args":{"rows":2}}}
                 """;
-        var first = response(post("/trigger").content(body), "alpha", 200).get("payload");
+        var first = response(post("/trigger").content(body), "alpha", 202).get("payload");
         assertNotNull(first);
-        assertEquals("http-trigger", first.get("triggerId").asText());
-        assertEquals("ProcessCreate", first.get("eventId").asText());
-        assertTrue(first.get("dispatched").asBoolean());
-        assertFalse(first.get("duplicate").asBoolean());
-        var duplicate = response(post("/trigger").content(body), "alpha", 200).get("payload");
-        assertTrue(duplicate.get("duplicate").asBoolean());
-        assertEquals(first.get("logId"), duplicate.get("logId"));
-        assertEquals(1, processes.count());
-        assertEquals(1, executions.count());
-        var process = processes.findAll().getFirst();
-        assertEquals("http-trigger", process.triggerId);
-        assertEquals("alpha", process.tenant);
-        var log = executions.findAll().getFirst();
-        assertEquals("HTTP", log.source);
-        assertEquals(java.time.Instant.parse("2026-10-16T00:00:00Z"), log.triggerTime);
+        assertNotEquals("http-trigger", first.get("triggerId").asText());
+        var duplicate = response(post("/trigger").content(body), "alpha", 202).get("payload");
+        assertEquals(first, duplicate);
+        assertEquals(0, processes.count());
+        String id = first.get("triggerId").asText();
+        assertEquals("PENDING", response(get("/trigger/" + id), "alpha", 200).get("payload").get("status").asText());
+        response(get("/trigger/" + id), "beta", 404);
         org.mockito.Mockito.verifyNoInteractions(workers);
         dispatcher.drainAll(30);
+        assertEquals(1, processes.count());
+        var process = processes.findAll().getFirst();
+        assertEquals(id, process.triggerId);
+        assertEquals("alpha", process.tenant);
+        var status = response(get("/trigger/" + id), "alpha", 200).get("payload");
+        assertEquals("HTTP", status.get("source").asText());
+        assertEquals("DONE", status.get("status").asText());
         verify(workers).start(any());
     }
 

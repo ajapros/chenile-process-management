@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
   Optional Liquibase changelog for the base-less reference entity tables that Hibernate would otherwise
-  create: process_definition (database configurator). Trigger records are owned by trigger-service. Opt-in via the
+  create: process_definition (database configurator). Trigger commands are stored in the shared outbox. Opt-in via the
   "chenile-process-reference" context, for teams that want Liquibase to own these tables instead of
   Hibernate ddl-auto. Changesets no-op if the tables already exist.
 

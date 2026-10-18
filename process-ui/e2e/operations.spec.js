@@ -5,7 +5,7 @@ const root = { id: 'import-1', processType: 'Import', status: 'PROCESSED', compl
   createdAt: date, completedAt: '2026-10-02T10:01:00Z', numSubProcesses: 2, numCompletedSubProcesses: 2, input: '{"source":"feed-A"}', output: '{"rows":100}', errors: [] };
 const children = [1, 2].map(n => ({ ...root, id: `chunk-${n}`, processType: 'Chunk', parentId: root.id, numSubProcesses: 0, numCompletedSubProcesses: 0 }));
 const successor = { ...root, id: 'index-1', processType: 'Index', predecessorId: root.id, status: 'EXECUTING', completedAt: null, createdAt:'2026-10-02T10:01:01Z', completedPercent: 20, numSubProcesses: 0, numCompletedSubProcesses: 0 };
-const history = { id: 'run-1', triggerId: 'cron:daily:run-1', source: 'CRON', eventName: 'ProcessCreate', status: 'COMPLETED',
+const history = { id: 'run-1', triggerId: 'cron:daily:run-1', source: 'CRON', eventName: 'ProcessCreate', status: 'DONE',
   startedAt: date, triggerTime: date, finishedAt: '2026-10-02T10:00:01Z', payload: '{"processDefName":"Import"}' };
 const paged = content => ({ content, totalElements: content.length, page: 0, size: 25, totalPages: 1 });
 
@@ -26,7 +26,7 @@ test.beforeEach(async ({ page }) => {
       if (method === 'POST') { body = { id: 'new-cron', ...route.request().postDataJSON(), eventName: 'ProcessCreate' }; schedules.push(body); }
       else body = paged(schedules);
     } else if (path.startsWith('/crontabs/')) body = { id: 'daily', ...route.request().postDataJSON() };
-    else if (path === '/triggers') body = { triggerId: 'manual:acme:one', eventId: 'ProcessCreate', dispatched: true, duplicate: false };
+    else if (path === '/triggers') body = { triggerId: 'accepted-outbox-1' };
     else if (path === '/executions') body = paged([history]);
     else if (path === '/processes') body = paged(url.searchParams.has('parentId') ? children : url.searchParams.has('predecessorId') ? [successor] : [root, successor]);
     else if (path.startsWith('/processes/')) body = { process: [root, ...children, successor].find(p => p.id === path.split('/').at(-1)) };
@@ -77,7 +77,7 @@ test('adds schedules and definitions and generates ProcessCreate events', async 
   const manual = page.getByRole('heading', { name:'Generate an event now' }).locator('..');
   await manual.getByRole('combobox', { name:'Process definition', exact:true }).selectOption('Import');
   await manual.getByRole('button', { name:'Generate ProcessCreate' }).click();
-  await expect(page.getByText('Trigger dispatched. Inspect Trigger history for its process and trace.')).toBeVisible();
+  await expect(page.getByText('Trigger accepted: accepted-outbox-1. Track its status in Trigger history.')).toBeVisible();
   await page.getByRole('button', { name:'Trigger history', exact:true }).click();
   await expect(page.getByRole('cell', { name:'ProcessCreate CRON' })).toBeVisible();
   await page.getByRole('button', { name:'Processes & trace →' }).click();

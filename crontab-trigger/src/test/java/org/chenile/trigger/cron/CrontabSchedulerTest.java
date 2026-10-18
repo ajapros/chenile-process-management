@@ -35,7 +35,7 @@ class CrontabSchedulerTest {
         verify(triggerService).trigger(input.capture());
         assertEquals("ProcessCreate", input.getValue().eventId);
         assertSame(tab.eventPayloadJson, input.getValue().payload);
-        assertEquals("crontab:nightly:fire-1", input.getValue().triggerId);
+        assertEquals("crontab:nightly:fire-1", input.getValue().idempotencyKey);
         assertEquals("alpha", input.getValue().headers.get("x-chenile-tenant-id"));
         assertEquals("nightly", input.getValue().headers.get("x-chenile-crontab-id"));
         assertEquals(input.getValue().headers, input.getValue().triggerContext);

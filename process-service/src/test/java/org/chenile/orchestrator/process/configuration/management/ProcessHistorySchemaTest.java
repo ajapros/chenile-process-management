@@ -16,11 +16,11 @@ class ProcessHistorySchemaTest {
             var jdbc = new JdbcTemplate(source);
             jdbc.execute("create table process_table (id varchar primary key, tenant varchar, created_time timestamp, trigger_id varchar, parent_id varchar, predecessor_id varchar, status varchar)");
             jdbc.update("insert into process_table (id, status) values ('process-1', 'PROCESSED')");
-            var schema = new ResourceDatabasePopulator(new ClassPathResource("chenile-trigger-schema.sql"), new ClassPathResource("chenile-process-management-history-schema.sql"));
+            var schema = new ResourceDatabasePopulator(new ClassPathResource("chenile-process-outbox-schema.sql"), new ClassPathResource("chenile-process-management-history-schema.sql"));
             schema.execute(source);
             schema.execute(source);
             assertEquals(0, jdbc.queryForObject("select count(*) from information_schema.tables where table_name='CHENILE_PROCESS_COMPLETION_EVENT'", Integer.class));
-            jdbc.update("insert into trigger_log (id, trigger_id, event_name, trigger_time, started_at, status) values ('trigger-1', 'key-1', 'ProcessCreate', current_timestamp, current_timestamp, 'COMPLETED')");
+            jdbc.update("insert into chenile_process_outbox (id,command_type,payload,idempotency_key,status,attempt,visible_after,created_at,updated_at) values ('trigger-1','DISPATCH_TRIGGER','{}','key-1','DONE',1,current_timestamp,current_timestamp,current_timestamp)");
             jdbc.execute("create table chenile_process_completion_event (process_id varchar primary key, payload clob)");
             jdbc.update("insert into chenile_process_completion_event values ('process-1', '{}')");
 
@@ -30,7 +30,7 @@ class ProcessHistorySchemaTest {
 
             assertEquals(0, jdbc.queryForObject("select count(*) from information_schema.tables where table_name='CHENILE_PROCESS_COMPLETION_EVENT'", Integer.class));
             assertEquals("PROCESSED", jdbc.queryForObject("select status from process_table where id='process-1'", String.class));
-            assertEquals(1, jdbc.queryForObject("select count(*) from trigger_log", Integer.class));
+            assertEquals(1, jdbc.queryForObject("select count(*) from chenile_process_outbox", Integer.class));
         } finally {
             source.destroy();
         }

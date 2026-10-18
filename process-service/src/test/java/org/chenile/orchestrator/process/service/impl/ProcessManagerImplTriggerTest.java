@@ -43,7 +43,7 @@ class ProcessManagerImplTriggerTest {
     }
 
     @Test
-    void usesTheAdapterHeaderForCorrelationButPreservesAnExplicitPayloadId() {
+    void usesTheAuthoritativeAdapterHeaderEvenWhenPayloadHasAnId() {
         ContextContainer context = ContextContainer.getInstance();
         var snapshot = context.snapshot();
         try {
@@ -57,7 +57,7 @@ class ProcessManagerImplTriggerTest {
             ArgumentCaptor<Process> capture = ArgumentCaptor.forClass(Process.class);
             verify(manager, times(2)).create(capture.capture());
             assertEquals("crontab:nightly:fire-1", capture.getAllValues().get(0).triggerId);
-            assertEquals("explicit-id", capture.getAllValues().get(1).triggerId);
+            assertEquals("crontab:nightly:fire-1", capture.getAllValues().get(1).triggerId);
         } finally {
             context.restore(snapshot);
         }

@@ -33,9 +33,14 @@ public class StartWorkerCommand extends AbstractProcessOutboxCommand {
     }
     @Override public String type() { return TYPE; }
 
+    @Override public boolean shouldEnqueue(ProcessTransition transition) {
+        var process = transition.process();
+        return !process.skipPostWorkerCreation && workerType(process) != null
+                && configurator.findByName(process.processType) != null;
+    }
+
     @Override public void enqueue(ProcessTransition transition) throws Exception {
         WorkerDto worker = prepare(transition.process());
-        if (worker == null) return;
         worker.dispatchId = transition.process().getId() + ":" + worker.workerType;
         store(transition.process(), worker.dispatchId, worker);
     }
@@ -51,16 +56,8 @@ public class StartWorkerCommand extends AbstractProcessOutboxCommand {
 
     /** Snapshot the work definition before durable delivery. */
     private WorkerDto prepare(Process process) {
-        if (process.skipPostWorkerCreation) return null;
         var definition = configurator.findByName(process.processType);
-        if (definition == null) return null;
-        WorkerType type = switch (process.getCurrentState().getStateId()) {
-            case Constants.States.SPLIT_PENDING -> WorkerType.SPLITTER;
-            case Constants.States.EXECUTING -> WorkerType.EXECUTOR;
-            case Constants.States.AGGREGATION_PENDING -> WorkerType.AGGREGATOR;
-            default -> null;
-        };
-        if (type == null) return null;
+        WorkerType type = workerType(process);
         LOG.info("State = {}. Starting worker type = {}", process.getCurrentState().getStateId(), type);
         WorkerDto worker = new WorkerDto();
         worker.process = process;
@@ -68,6 +65,15 @@ public class StartWorkerCommand extends AbstractProcessOutboxCommand {
         worker.execDef = new HashMap<>();
         if (definition.config != null) worker.execDef.putAll(definition.config);
         return worker;
+    }
+
+    private WorkerType workerType(Process process) {
+        return switch (process.getCurrentState().getStateId()) {
+            case Constants.States.SPLIT_PENDING -> WorkerType.SPLITTER;
+            case Constants.States.EXECUTING -> WorkerType.EXECUTOR;
+            case Constants.States.AGGREGATION_PENDING -> WorkerType.AGGREGATOR;
+            default -> null;
+        };
     }
 
     @Override protected void deadCommand(OutboxCommand entry) throws Exception {

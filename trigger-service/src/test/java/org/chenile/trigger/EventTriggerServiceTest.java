@@ -1,165 +1,141 @@
 package org.chenile.trigger;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.chenile.core.context.ChenileExchange;
+import org.chenile.core.context.ContextContainer;
 import org.chenile.core.event.EventProcessor;
-import org.chenile.trigger.store.TriggerLogStore;
-import org.chenile.trigger.model.TriggerLog;
-import org.chenile.trigger.model.TriggerLogStatus;
-import org.chenile.trigger.model.TriggerInput;
-import org.junit.jupiter.api.Test;
-
+import org.chenile.orchestrator.process.outbox.*;
+import org.chenile.trigger.model.*;
+import org.h2.jdbcx.JdbcDataSource;
+import org.junit.jupiter.api.*;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.chenile.base.exception.NotFoundException;
+import org.chenile.base.exception.BadRequestException;
 import java.util.*;
-
+import java.util.concurrent.*;
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+/** Real durable acceptance and dispatch, including transaction rollback and concurrent submissions. */
 class EventTriggerServiceTest {
-    @Test void persistsLifecycleAndMetadataWithoutAnObserver() {
-        var store = new InMemoryTriggerLogStore();
-        var processor = mock(EventProcessor.class);
-        TriggerInput input = new TriggerInput();
-        input.triggerId = "metadata"; input.eventId = "CustomerEvent";
-        input.headers.put("x-chenile-tenant-id", "alpha");
-        input.headers.put("x-chenile-trigger-source", "CRON");
-        input.headers.put("x-chenile-crontab-id", "daily");
-        input.triggerContext.putAll(input.headers);
-        input.triggerContext.put("adapterDetail", Map.of("attempt", 1));
-        input.payload = "  {\"customerId\":\"one\"}  ";
-        when(processor.handleEvent(anyString(), any(), anyMap())).thenAnswer(call -> {
-            var record = store.logs.get(0);
-            assertEquals(TriggerLogStatus.RUNNING, record.status);
-            assertNotNull(record.startedAt);
-            assertNull(record.finishedAt);
-            assertEquals("alpha", record.tenant);
-            assertEquals("CRON", record.source);
-            assertEquals(new com.fasterxml.jackson.databind.ObjectMapper().valueToTree(input.triggerContext),
-                    new com.fasterxml.jackson.databind.ObjectMapper().readTree(record.triggerContext));
-            assertEquals(input.payload, record.payload);
-            assertSame(input.payload, call.getArgument(1));
-            return List.of();
+    final ContextContainer context = ContextContainer.getInstance();
+    ContextContainer.ContextSnapshot previous;
+    JdbcTemplate jdbc;
+    DataSourceTransactionManager manager;
+    ProcessOutboxRepository repository;
+    EventProcessor events;
+    EventTriggerService service;
+    OutboxDispatcher dispatcher;
+    ObjectMapper mapper = new ObjectMapper().findAndRegisterModules();
+
+    @BeforeEach void setUp() {
+        previous = context.snapshot(); context.clear(); context.setTenant("alpha");
+        var data = new JdbcDataSource();
+        data.setURL("jdbc:h2:mem:trigger-" + UUID.randomUUID() + ";MODE=PostgreSQL;DB_CLOSE_DELAY=-1");
+        new ResourceDatabasePopulator(new ClassPathResource("chenile-process-outbox-schema.sql")).execute(data);
+        jdbc = new JdbcTemplate(data);
+        jdbc.execute("create table local_effect (trigger_id varchar primary key)");
+        manager = new DataSourceTransactionManager(data);
+        repository = new ProcessOutboxRepository(jdbc, manager);
+        events = mock(EventProcessor.class);
+        var command = new DispatchTriggerCommand(repository, events, mapper);
+        service = new EventTriggerService(repository, command, mapper, manager);
+        var policy = OutboxRetryPolicy.defaults(); policy.initialIntervalMillis = 0; policy.maxAttempts = 2;
+        dispatcher = new OutboxDispatcher(repository, new OutboxCommandRegistry(List.of(command)), policy, "worker", 300);
+    }
+    @AfterEach void restore() { context.restore(previous); }
+
+    TriggerInput input(String key) {
+        var input = new TriggerInput(); input.idempotencyKey = key; input.eventId = "CustomerEvent";
+        input.headers.put("x-chenile-tenant-id", "alpha"); input.headers.put("x-request-id", "request-1");
+        input.headers.put("x-chenile-trigger-id", "spoofed");
+        input.triggerContext.put("adapter", "test"); input.payload = "  {\"customerId\":7}  ";
+        return input;
+    }
+
+    @Test void acceptanceReturnsOnlyTheDurableIdAndDispatchPropagatesThatIdentity() throws Exception {
+        context.put("x-caller-correlation", "caller-1");
+        var input = input("same-key");
+        var ack = service.trigger(input);
+        assertEquals(ack, service.trigger(input));
+        assertEquals("PENDING", service.status(ack.triggerId()).status());
+        verifyNoInteractions(events);
+        assertEquals(1, jdbc.queryForObject("select count(*) from chenile_process_outbox", Integer.class));
+        assertNull(repository.findById(ack.triggerId()).orElseThrow().processId);
+        assertEquals(Set.of("triggerId"), mapper.convertValue(ack, Map.class).keySet());
+        when(events.handleEvent(anyString(), any(), anyMap())).thenAnswer(call -> {
+            assertEquals(input.payload, call.getArgument(1));
+            Map<String,String> headers = call.getArgument(2);
+            assertEquals(ack.triggerId(), headers.get("x-chenile-trigger-id"));
+            assertEquals("alpha", context.getTenant());
+            assertEquals(ack.triggerId(), context.get("x-chenile-trigger-id"));
+            assertEquals("request-1", context.get("x-request-id"));
+            assertEquals("caller-1", headers.get("x-caller-correlation"));
+            var exchange = new ChenileExchange(); exchange.setResponse("only logged"); return List.of(exchange);
         });
-        var service = new EventTriggerService(store, processor);
-        assertTrue(service.trigger(input).dispatched());
-        assertEquals(1, store.logs.size());
-        assertEquals(TriggerLogStatus.COMPLETED, store.logs.get(0).status);
-        assertNotNull(store.logs.get(0).finishedAt);
+        context.setTenant("dispatcher-caller");
+        assertTrue(dispatcher.processOne()); assertFalse(dispatcher.processOne());
+        assertEquals("dispatcher-caller", context.getTenant());
+        context.setTenant("alpha");
+        var status = service.status(ack.triggerId());
+        assertEquals("DONE", status.status()); assertEquals(1, status.attempt());
+        assertNotNull(status.startedAt()); assertNotNull(status.finishedAt());
+        assertEquals(input.triggerContext, status.triggerContext());
+        assertEquals(input.payload, status.payload());
+        assertEquals(ack, service.trigger(input));
     }
 
-    @Test void observerFailuresCannotChangeThePersistedDispatchOutcome() {
-        var store = new InMemoryTriggerLogStore();
-        var observer = mock(TriggerObserver.class);
-        doThrow(new IllegalStateException("metrics offline")).when(observer).started(anyString(), any());
-        doThrow(new IllegalStateException("metrics offline")).when(observer).finished(anyString(), any());
-        var processor = mock(EventProcessor.class);
-        var service = new EventTriggerService(store, processor, observer);
-        var input = new TriggerInput(); input.triggerId = "observer"; input.eventId = "CustomerEvent";
-        assertTrue(service.trigger(input).dispatched());
-        assertEquals(TriggerLogStatus.COMPLETED, store.logs.get(0).status);
-        assertTrue(service.trigger(input).duplicate());
-        verify(processor).handleEvent(anyString(), any(), anyMap());
+    @Test void failedDispatchRollsBackEffectsAndRetriesTheSameCommandOnceToCompletion() {
+        var ack = service.trigger(input("retry"));
+        var calls = new java.util.concurrent.atomic.AtomicInteger();
+        when(events.handleEvent(anyString(), any(), anyMap())).thenAnswer(call -> {
+            jdbc.update("insert into local_effect values (?)", ack.triggerId());
+            if (calls.incrementAndGet() == 1) {
+                var failed = new ChenileExchange(); failed.setException(new IllegalStateException("temporary"));
+                return List.of(failed);
+            }
+            return List.of(new ChenileExchange());
+        });
+        assertTrue(dispatcher.processOne());
+        assertEquals(0, jdbc.queryForObject("select count(*) from local_effect", Integer.class));
+        assertEquals("PENDING", service.status(ack.triggerId()).status());
+        assertTrue(dispatcher.processOne()); assertFalse(dispatcher.processOne());
+        assertEquals(1, jdbc.queryForObject("select count(*) from local_effect", Integer.class));
+        assertEquals("DONE", service.status(ack.triggerId()).status());
+        assertEquals(2, service.status(ack.triggerId()).attempt());
+        assertEquals(ack, service.trigger(input("retry")));
     }
 
-    @Test void everyClaimStatusSuppressesRedispatchIncludingInterruptedClaims() {
-        for (var status : TriggerLogStatus.values()) {
-            var store = new InMemoryTriggerLogStore();
-            var claim = new TriggerLog(); claim.triggerId = "existing"; claim.eventName = "CustomerEvent"; claim.status = status;
-            store.record(claim);
-            var processor = mock(EventProcessor.class);
-            var service = new EventTriggerService(store, processor);
-            var input = new TriggerInput(); input.triggerId = "existing"; input.eventId = "CustomerEvent";
-            var result = service.trigger(input);
-            assertTrue(result.duplicate());
-            assertEquals(status == TriggerLogStatus.COMPLETED, result.dispatched());
-            assertEquals(1, store.logs.size());
-            verifyNoInteractions(processor);
-        }
+    @Test void concurrentSubmissionReturnsOneAcknowledgementAndAcceptanceSurvivesOuterRollback() throws Exception {
+        var pool = Executors.newFixedThreadPool(2);
+        try {
+            var start = new CountDownLatch(1);
+            Callable<TriggerResult> submit = () -> { start.await(); return service.trigger(input("concurrent")); };
+            var first = pool.submit(submit); var second = pool.submit(submit); start.countDown();
+            assertEquals(first.get(10, TimeUnit.SECONDS), second.get(10, TimeUnit.SECONDS));
+            assertEquals(1, jdbc.queryForObject("select count(*) from chenile_process_outbox", Integer.class));
+        } finally { pool.shutdownNow(); }
+        var outer = new TransactionTemplate(manager);
+        var ack = outer.execute(tx -> { var accepted = service.trigger(input("outer")); tx.setRollbackOnly(); return accepted; });
+        assertEquals("PENDING", service.status(ack.triggerId()).status());
+        assertNotEquals(service.trigger(input(null)).triggerId(), service.trigger(input(null)).triggerId());
     }
 
-    @Test
-    void dispatchesTheOriginalPayloadOnlyOnce() {
-        InMemoryTriggerLogStore logger = new InMemoryTriggerLogStore();
-        TriggerObserver observer = mock(TriggerObserver.class);
-        EventProcessor processor = mock(EventProcessor.class);
-        when(processor.handleEvent(eq("CustomerEvent"), any(), anyMap())).thenReturn(List.of());
-        EventTriggerService service = new EventTriggerService(logger, processor, observer);
-        TriggerInput input = new TriggerInput();
-        input.triggerId = "trigger-1";
-        input.eventId = "CustomerEvent";
-        input.headers.put("x-source", "HTTP");
-        input.payload = Map.of("customerId", "customer-7", "triggerId", "trigger-1");
-
-        assertTrue(service.trigger(input).dispatched());
-        assertTrue(service.trigger(input).duplicate());
-        var payload = org.mockito.ArgumentCaptor.forClass(Object.class);
-        @SuppressWarnings("unchecked")
-        var headers = org.mockito.ArgumentCaptor.forClass(Map.class);
-        verify(processor, times(1)).handleEvent(eq("CustomerEvent"), payload.capture(), headers.capture());
-        assertSame(input.payload, payload.getValue());
-        assertEquals("trigger-1", headers.getValue().get("x-chenile-trigger-id"));
-        assertEquals("HTTP", headers.getValue().get("x-source"));
-        assertFalse(input.headers.containsKey("x-chenile-trigger-id"));
-        input.headers.put("invalid-header", "value");
-        assertThrows(IllegalArgumentException.class, () -> service.trigger(input));
-        assertEquals(TriggerLogStatus.COMPLETED, logger.logs.get(0).status);
-        verify(observer, times(1)).started("log-0", input);
-        verify(observer, times(1)).finished("log-0", null);
-    }
-
-    @Test
-    void failedDispatchRetainsTheClaimAndSuppressesAnotherAttempt() {
-        InMemoryTriggerLogStore store = new InMemoryTriggerLogStore();
-        TriggerObserver observer = mock(TriggerObserver.class);
-        EventProcessor processor = mock(EventProcessor.class);
-        when(processor.handleEvent(anyString(), any(), anyMap()))
-                .thenThrow(new IllegalStateException("subscriber failed"));
-        EventTriggerService service = new EventTriggerService(store, processor, observer);
-        TriggerInput input = new TriggerInput();
-        input.triggerId = "failed-trigger";
-        input.eventId = "CustomerEvent";
-
-        assertThrows(IllegalStateException.class, () -> service.trigger(input));
-        assertEquals(TriggerLogStatus.FAILED, store.logs.get(0).status);
-        assertEquals("subscriber failed", store.logs.get(0).error);
-        assertNotNull(store.logs.get(0).finishedAt);
-        var duplicate = service.trigger(input);
-        assertTrue(duplicate.duplicate());
-        assertFalse(duplicate.dispatched());
-        verify(processor, times(1)).handleEvent(anyString(), any(), anyMap());
-        verify(observer, times(1)).started("log-0", input);
-        verify(observer, times(1)).finished(eq("log-0"), isA(IllegalStateException.class));
-    }
-
-    @Test
-    void aConcurrentClaimPreventsTheLosingDispatch() {
-        TriggerLogStore store = mock(TriggerLogStore.class);
-        TriggerLog winner = new TriggerLog();
-        winner.id = "winning-claim";
-        winner.status = TriggerLogStatus.RECEIVED;
-        when(store.findByTriggerIdAndEventName("trigger-1", "CustomerEvent"))
-                .thenReturn(Optional.empty(), Optional.of(winner));
-        when(store.record(any())).thenThrow(new org.springframework.dao.DataIntegrityViolationException("duplicate"));
-        EventProcessor processor = mock(EventProcessor.class);
-        EventTriggerService service = new EventTriggerService(store, processor);
-        TriggerInput input = new TriggerInput();
-        input.triggerId = "trigger-1";
-        input.eventId = "CustomerEvent";
-
-        var result = service.trigger(input);
-        assertTrue(result.duplicate());
-        assertFalse(result.dispatched());
-        assertEquals("winning-claim", result.logId());
-        verifyNoInteractions(processor);
-    }
-
-    static class InMemoryTriggerLogStore implements TriggerLogStore {
-        final List<TriggerLog> logs = new ArrayList<>();
-        @Override public TriggerLog record(TriggerLog log) { log.id = "log-" + logs.size(); logs.add(log); return log; }
-        @Override public Optional<TriggerLog> findByTriggerIdAndEventName(String triggerId, String eventName) {
-            return logs.stream().filter(l -> Objects.equals(l.triggerId, triggerId) && Objects.equals(l.eventName, eventName)).findFirst();
-        }
-        @Override public TriggerLog markRunning(String id) { TriggerLog log = find(id); log.status = TriggerLogStatus.RUNNING; log.startedAt = java.time.Instant.now(); return log; }
-        @Override public TriggerLog markCompleted(String id) { TriggerLog log = find(id); log.status = TriggerLogStatus.COMPLETED; log.finishedAt = java.time.Instant.now(); return log; }
-        @Override public TriggerLog markFailed(String id, RuntimeException failure) { TriggerLog log = find(id); log.status = TriggerLogStatus.FAILED; log.error = failure.getMessage(); log.finishedAt = java.time.Instant.now(); return log; }
-        private TriggerLog find(String id) { return logs.stream().filter(l -> l.id.equals(id)).findFirst().orElseThrow(); }
+    @Test void permanentFailuresRemainQueryableAndTenantsCannotReadOrDeduplicateEachOther() {
+        var input = input("failed"); var ack = service.trigger(input);
+        when(events.handleEvent(anyString(), any(), anyMap())).thenReturn(List.of());
+        assertTrue(dispatcher.processOne()); assertTrue(dispatcher.processOne()); assertFalse(dispatcher.processOne());
+        assertEquals("DEAD", service.status(ack.triggerId()).status());
+        assertNotNull(service.status(ack.triggerId()).error());
+        context.setTenant("beta");
+        assertThrows(NotFoundException.class, () -> service.status(ack.triggerId()));
+        input.headers.put("x-chenile-tenant-id", "beta");
+        assertNotEquals(ack.triggerId(), service.trigger(input).triggerId());
+        input.headers.put("invalid-header", "bad");
+        assertThrows(BadRequestException.class, () -> service.trigger(input));
     }
 }

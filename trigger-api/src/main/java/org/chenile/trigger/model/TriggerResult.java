@@ -1,3 +1,4 @@
 package org.chenile.trigger.model;
 
-public record TriggerResult(String triggerId, String eventId, String logId, boolean dispatched, boolean duplicate) { }
+/** Durable acceptance only: this ID identifies both the outbox command and the trigger. */
+public record TriggerResult(String triggerId) { }

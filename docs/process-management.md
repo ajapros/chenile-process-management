@@ -25,7 +25,7 @@ to be composed in sequence.
 The moving parts: **process definitions** describe each type and its worker configuration, sourced from a
 JSON file or a database table; **workers** run in one of three interchangeable modes — in-VM, a pub/sub
 queue, or a durable JDBC work queue; **triggers** (durable Quartz crontabs, deduplicated through
-`trigger_log`) activate the system; and **tenancy** is carried from a framework header through the whole
+`DISPATCH_TRIGGER` outbox commands) activate the system; and **tenancy** is carried from a framework header through the whole
 tree. So that every consequence of a transition survives a crash, a **transactional outbox** — always on,
 not a mode you turn on — writes each consequence in the same transaction as the state save and executes it
 through a dispatcher with at-least-once delivery, consumer-receipt idempotency, lease-fenced claiming,
@@ -54,7 +54,7 @@ durable-execution wiring, and the Spring configuration.
 The former `process-utils` module has been merged into this artifact. Existing Java packages under
 `org.chenile.orchestrator.process.utils` and `org.chenile.orchestrator.delegate` are unchanged.
 
-`process-outbox` is the transactional outbox infrastructure used for durable execution (see below). It is
+`chenile-outbox` is the transactional outbox infrastructure used for durable execution (see below). It is
 independent and database-only so that it can be depended on without creating a cycle.
 
 `invm-process-starter`, `q-based-process-starter`, and `jdbc-process-starter` are the three
@@ -328,45 +328,36 @@ for the design rationale.
 
 ## Triggering
 
-`trigger-service` converts an external activation into a synchronously dispatched in-JVM Chenile event; it
-does not introduce another event bus. A `TriggerInput` (trigger id, event id, payload, headers, time) is
-recorded and passed unchanged to `EventProcessor`. Chenile's transformation pipeline converts raw JSON
-or decoded JSON objects to the subscriber's selected input type. The trigger id plus
-event id form an idempotency claim.
+`trigger-service` commits a DISPATCH_TRIGGER command in an independent acceptance transaction
+and returns only its outbox ID. That ID is the authoritative trigger ID. POST /trigger returns 202;
+GET /trigger/{id} returns tenant-scoped status. No invocation output is returned: it is logged
+when the dispatcher invokes EventProcessor later.
 
-Idempotency is enforced by `TriggerLog` (the `trigger_log` table), which retains dispatch metadata alongside `id`,
-`trigger_id`, `event_name`, `trigger_time`, and `status`, with a unique constraint on
-`(trigger_id, event_name)`. Competing dispatches cannot both claim the same pair; a duplicate is detected
-and suppressed in every status, and failed claims are not automatically retried. Claims and status updates
-run in independent transactions so they survive the surrounding event transaction.
+TriggerInput has an optional idempotencyKey, eventId, payload, x-prefixed headers, triggerContext
+and triggerTime. Retries using the same tenant/event/key return the original ID, including after
+failure; submissions without a key are new invocations. Concurrent acceptance uses the outbox's
+unique key. Status is PENDING, RUNNING, DONE or DEAD. Local subscriber changes and acknowledgement
+commit together; retries roll back partial local changes. External effects need receiver idempotency.
 
-The shipped adapter in `crontab-trigger` is a durable Quartz crontab (`chenile_crontab`, managed through `CrontabService`;
-saving or deleting a row registers or removes its Quartz job, and enabled crontabs are rescheduled on
-application start). Each firing supplies a stable trigger id of the form
-`crontab:{id}:{quartzFireInstanceId}`, so duplicate dispatches are suppressed while each scheduled run
-remains distinct. A `ProcessCreate` crontab stores its `ProcessDto` as the event payload. Cron expressions
-use Quartz syntax (with seconds), not five-field Unix cron.
+`crontab-trigger` owns durable Quartz schedules and still depends only on trigger-api. A firing
+uses `crontab:{id}:{quartzFireInstanceId}` as its submission key, not the accepted trigger ID.
+Cron identity, Quartz fire times and configured/generated x-headers are adapter-owned triggerContext
+JSON. The scheduler passes eventPayloadJson unchanged to the trigger. Chenile's transformation
+pipeline selects the subscriber type and converts raw JSON or decoded JSON objects.
 
-Schedules can come from the database or from a classpath JSON resource (`JsonCrontabRepository`), both behind
-the `CrontabReader` interface; `CrontabValidator` enforces a valid cron expression, timezone, tenant format,
-and JSON headers with `x-` names for either source. Event payloads are opaque to the cron adapter: it
-passes `eventPayloadJson` unchanged, including null or blank values; payload validation belongs to the
-subscriber's transformation pipeline. The JSON form accepts structured `headers` / `payload` objects as
-an alternative to pre-encoded `headersJson` / `eventPayloadJson` strings, and derives a stable id from
-`tenant:name` when none is given. Cron ownership assumes a single scheduler instance; distributed Quartz
-job-store coordination is out of scope.
+Schedules can come from the database or JsonCrontabRepository behind CrontabReader. Schedule,
+timezone, tenant and x-header validation happens before registration. Payload validation happens
+only in the subscriber pipeline. Cron ownership assumes one scheduler unless the host configures
+clustered Quartz independently.
 
-### Trigger execution history (`TriggerObserver`)
+### Trigger execution history
 
-`trigger_log` is the single record of an accepted trigger. Alongside its idempotency key it stores tenant,
-source, adapter-owned `triggerContext` JSON, input payload, start/finish times and an error. Lifecycle writes are owned by
-`EventTriggerService` through `TriggerLogStore`, independently of the event transaction. `RECEIVED`
-means accepted but not started; `RUNNING` means dispatch began. Both can remain after a crash and
-continue to suppress duplicate dispatch, just as `COMPLETED` and `FAILED` do.
-
-`TriggerObserver` remains optional for metrics or custom observation. The default is `NONE`; replacing
-or disabling it does not disable persisted history. Callback failures are logged without changing a
-successful dispatch outcome. The management API queries the unified records, including unstarted claims.
+There is no trigger_log table or TriggerObserver. History is a filtered view of DISPATCH_TRIGGER
+outbox commands. It retains accepted input, adapter context, status, attempts, timestamps and the
+latest error. DONE means subscriber handling committed, not that a resulting process completed.
+Keep trigger command identities for status queries and duplicate suppression; pruning completed
+process commands must not delete trigger identities. The outbox records current/last attempt
+state, not an immutable record of every attempt.
 
 ## Multi-tenancy
 
@@ -464,7 +455,7 @@ Hibernate-generated join table (default `process_table_errors`).
 `chenile_process_outbox` — the transactional outbox: `id` (PK), `process_id`, `command_type` (registry
 discriminator), `payload` (TEXT, command-owned JSON), `idempotency_key` (unique), `status`
 (PENDING/RUNNING/DONE/DEAD), `attempt` (int), `visible_after` (timestamp — durable timer + backoff),
-`locked_by`, `claim_token`, `tenant_id`, `locked_until`, `created_at`, `updated_at`, `finished_at`,
+`locked_by`, `claim_token`, `tenant_id`, `locked_until`, `started_at`, `created_at`, `updated_at`, `finished_at`,
 `error_message`. Indexes: `(status, visible_after, locked_until)`, `(process_id)`.
 
 `chenile_process_receipt` — the effect-level idempotency ledger behind `checkIdempotency(consumer, key)` (see
@@ -473,16 +464,10 @@ effect and acknowledgement so a redelivered command is a no-op. Append-only — 
 
 ### Triggering
 
-`trigger_log` (entity `TriggerLog`) — `id`, `trigger_id`, `event_name`, `trigger_time`, `status`
-(RECEIVED/RUNNING/COMPLETED/FAILED), tenant, source, nullable `started_at` / `finished_at`,
-error, payload and `trigger_context` JSON, plus inherited `BaseJpaEntity` audit/version columns.
-Unique `(trigger_id,event_name)`; indexes on `(tenant,started_at)` and `(tenant,trigger_id)`.
-The log has no cron-specific columns. Crontab supplies its ID, Quartz fire identity and times,
-and configured/generated headers through `TriggerInput.triggerContext`; the trigger service
-serializes this adapter-owned object without knowing its schema. All trigger headers must start
-with `x-` so Chenile propagates them between JVMs. Cron metadata uses `x-chenile-crontab-id`,
-`x-chenile-trigger-source` and `x-chenile-quartz-*` keys in both headers and context JSON. Retain claim rows; prune bulky payload/error fields
-separately if needed. The former execution table is merged and removed.
+Trigger acceptance and execution history use `chenile_process_outbox` with command type
+DISPATCH_TRIGGER. There is no separate trigger table. The envelope contains the event, unchanged
+payload, trigger time, x-headers and triggerContext; id is the public trigger ID and process_id
+remains null for trigger commands; resulting process rows refer back through trigger_id.
 
 `chenile_crontab` (entity `Crontab`, durable schedules) — `name` (unique), `enabled` (boolean, indexed),
 `cron_expression`, `timezone`, `event_name`, `headers_json` (TEXT), `event_payload_json` (TEXT), plus base
@@ -490,16 +475,15 @@ columns. (JSON-file schedules via `JsonCrontabRepository` use the same shape wit
 
 Completion has no separate table: terminal status, terminal state-entry time, and `predecessor_id`
 provide completion and successor lineage on `process_table`. Trigger claims and dispatch
-history share `trigger_log`.
+history share the outbox command.
 
 ### Schema management (explicit SQL or optional Liquibase)
 
 Each owning module ships raw-SQL scripts you can apply with any tool:
-`trigger-service/.../chenile-trigger-schema.sql` for fresh trigger storage, and
-`trigger-service/.../chenile-trigger-unification.sql` for the PostgreSQL upgrade (single transaction; stop producers first).
-See [trigger-service](../trigger-service/README.md) for reconciliation and retention rules.
+Trigger acceptance uses the shared outbox schema; no trigger-specific DDL is required.
+See [trigger-service](../trigger-service/README.md) for acknowledgement and retention rules.
 `jdbc-process-starter/.../chenile-process-work-schema.sql`,
-`process-outbox/.../chenile-process-outbox-schema.sql` (plus `...-json-migration.sql` for the one-time
+`chenile-outbox/.../chenile-process-outbox-schema.sql` (plus `...-json-migration.sql` for the one-time
 upgrade of an older outbox layout), and
 `process-service/.../chenile-process-management-history-schema.sql`.
 
@@ -515,8 +499,8 @@ Hibernate may already have created:
 |---|---|
 | `chenile-process-jdbc` | `chenile_process_work_item` |
 | `chenile-process-outbox` | `chenile_process_outbox`, `chenile_process_receipt` |
-| `chenile-process-history` | unified `trigger_log`, management indexes on `process_table` |
-| `chenile-process-reference` | unified `trigger_log`, `process_definition` |
+| `chenile-process-history` | management indexes on `process_table` |
+| `chenile-process-reference` | `process_definition` |
 
 Example: `spring.liquibase.contexts=chenile-process-outbox,chenile-process-history`. The STM/base-entity
 tables (`process_table`, `subprocess_error`, `chenile_crontab`) are intentionally left to Hibernate or to a
@@ -552,9 +536,9 @@ Integration tests (`TestFeeds`, `TestFile`, `TestChunks`) drive the full recursi
 with fake workers resolved by naming convention, in both synchronous and latch-stepped asynchronous modes.
 `ProcessManagerImplTriggerTest` covers `ProcessDto` creation and trigger correlation. BDD/REST suites drive
 the transition matrix over the REST surface. `DatabaseProcessConfiguratorTest` checks the database
-configurator. The `trigger-service` tests cover unchanged payload dispatch and the `trigger_log` uniqueness
+configurator. The `trigger-service` tests cover durable acknowledgement, unchanged payload dispatch, tenant isolation and submission uniqueness
 guarantee. The `crontab-trigger` tests cover JSON loading, Quartz dispatch, transactional schedule updates,
-and wiring with an application-defined trigger implementation. The `process-outbox` tests cover rollback-together, idempotent enqueue, `SKIP LOCKED`, backoff,
+and wiring with an application-defined trigger implementation. The `chenile-outbox` tests cover rollback-together, idempotent enqueue, `SKIP LOCKED`, backoff,
 retry-then-DEAD, dead-letter compensation, and replay-safe parent counting, with an opt-in suite that runs
 the same guarantees against a real PostgreSQL instance. The durable integration tests in `process-service`
 exercise the outbox end to end.
@@ -581,3 +565,12 @@ no longer built or managed by the parent. Worker APIs, helper classes and client
 classes retain their existing Java package names, so source imports do not change.
 Use only the consolidated artifact to avoid duplicate classes from an old
 `process-utils` JAR. No database or runtime behavior changes are required.
+
+## Migration to shared trigger commands
+
+Replace the process-outbox Maven dependency with chenile-outbox (same group and version). Java packages,
+SQL resource/table names and chenile.process.outbox settings are unchanged. A process owner is optional.
+TriggerInput.idempotencyKey replaces caller-assigned trigger identity; acknowledgements contain only the
+assigned outbox/trigger ID. HTTP submission returns 202 and dispatch occurs later. TriggerLog, its JPA
+repositories, TriggerObserver and trigger-specific schemas are removed. Do not include their scans or DDL.
+Status values are PENDING/RUNNING/DONE/DEAD. Retain trigger command identities for query and deduplication.

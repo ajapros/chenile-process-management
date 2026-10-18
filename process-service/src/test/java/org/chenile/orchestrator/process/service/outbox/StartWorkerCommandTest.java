@@ -99,13 +99,13 @@ class StartWorkerCommandTest {
         var command = command(outbox);
         var suppressed = process(Constants.States.EXECUTING);
         suppressed.skipPostWorkerCreation = true;
-        command.enqueue(new ProcessTransition(suppressed, suppressed.getCurrentState()));
+        assertFalse(command.shouldEnqueue(new ProcessTransition(suppressed, suppressed.getCurrentState())));
         var terminal = process(Constants.States.PROCESSED);
-        command.enqueue(new ProcessTransition(terminal, terminal.getCurrentState()));
+        assertFalse(command.shouldEnqueue(new ProcessTransition(terminal, terminal.getCurrentState())));
         when(configurator.findByName("feed")).thenReturn(null);
         var unknown = process(Constants.States.EXECUTING);
-        command.enqueue(new ProcessTransition(unknown, unknown.getCurrentState()));
-        verifyNoInteractions(starter);
+        assertFalse(command.shouldEnqueue(new ProcessTransition(unknown, unknown.getCurrentState())));
+        verifyNoInteractions(starter, outbox);
     }
 
     @Test void durableWorkSnapshotsConfigurationAndMissingStarterFailsOnlyAtDispatch() throws Exception {

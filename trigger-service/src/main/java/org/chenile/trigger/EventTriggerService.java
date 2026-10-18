@@ -1,115 +1,90 @@
 package org.chenile.trigger;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.chenile.core.context.ContextContainer;
 import org.chenile.core.context.HeaderUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.chenile.core.context.ChenileExchange;
-import org.chenile.core.event.EventProcessor;
-import org.chenile.trigger.store.TriggerLogStore;
-import org.chenile.trigger.model.TriggerLog;
-import org.chenile.trigger.model.TriggerLogStatus;
-import org.chenile.trigger.model.TriggerInput;
-import org.chenile.trigger.model.TriggerResult;
-import org.springframework.dao.DataIntegrityViolationException;
-
+import org.chenile.orchestrator.process.outbox.*;
+import org.chenile.trigger.model.*;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.chenile.base.exception.NotFoundException;
+import org.chenile.base.exception.BadRequestException;
 import java.time.Instant;
-import java.util.List;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 
-/** Dispatches a fully-formed trigger event through Chenile's existing EventProcessor. */
+/** Commits durable acceptance before returning; execution is exclusively the dispatcher's job. */
 public class EventTriggerService implements TriggerService {
-    private static final Logger LOG = LoggerFactory.getLogger(EventTriggerService.class);
-    private final ObjectMapper historyMapper = new ObjectMapper().findAndRegisterModules();
-    private final TriggerLogStore triggerLogStore;
-    private final EventProcessor eventProcessor;
-    private TriggerObserver observer = TriggerObserver.NONE;
-
-    public EventTriggerService(TriggerLogStore store, EventProcessor processor, TriggerObserver observer) {
-        this(store, processor);
-        this.observer = observer;
+    private final ProcessOutboxRepository outbox;
+    private final OutboxCommandProducer<DispatchTriggerCommand.Submission> producer;
+    private final ObjectMapper mapper;
+    private final TransactionTemplate acceptance;
+    public EventTriggerService(ProcessOutboxRepository outbox, DispatchTriggerCommand command,
+            ObjectMapper mapper, PlatformTransactionManager manager) {
+        this.outbox = outbox; this.mapper = mapper;
+        producer = new OutboxCommandProducer<>(List.of(command));
+        acceptance = new TransactionTemplate(manager);
+        acceptance.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
-
-    public EventTriggerService(TriggerLogStore triggerLogStore, EventProcessor eventProcessor) {
-        this.triggerLogStore = triggerLogStore;
-        this.eventProcessor = eventProcessor;
-    }
-
-    @Override
-    public TriggerResult trigger(TriggerInput input) {
+    @Override public TriggerResult trigger(TriggerInput input) {
         require(input != null, "Trigger input is required");
         require(input.eventId != null && !input.eventId.isBlank(), "Trigger eventId is required");
-        for (String header : safeHeaders(input.headers).keySet())
-            require(header != null && header.toLowerCase(java.util.Locale.ROOT).startsWith("x-"),
-                    "Trigger headers must start with x-");
-        if (input.triggerId == null || input.triggerId.isBlank()) input.triggerId = UUID.randomUUID().toString();
-        if (input.triggerTime == null) input.triggerTime = Instant.now();
-        Optional<TriggerLog> existing = triggerLogStore.findByTriggerIdAndEventName(input.triggerId, input.eventId);
-        if (existing.isPresent()) return result(input, existing.get(), true);
-
-        TriggerLog log;
+        var headers = new LinkedHashMap<String, String>();
+        ContextContainer.getInstance().toMap().forEach((key, value) -> {
+            if (key.startsWith("x-")) headers.put(key, value);
+        });
+        if (input.headers != null) input.headers.forEach((key, value) -> {
+            require(key != null && key.startsWith("x-"), "Trigger headers must start with x-");
+            headers.put(key, value);
+        });
+        String tenant = headers.get(HeaderUtils.TENANT_ID_KEY);
+        String callerTenant = ContextContainer.getInstance().get(HeaderUtils.TENANT_ID_KEY);
+        if (callerTenant != null && !callerTenant.isBlank()) {
+            require(tenant == null || callerTenant.equals(tenant), "Trigger tenant must match caller context");
+            tenant = callerTenant;
+        }
+        if (tenant == null) tenant = "";
+        headers.put(HeaderUtils.TENANT_ID_KEY, tenant);
+        // An incoming correlation header cannot choose or spoof the accepted trigger identity.
+        headers.remove("x-chenile-trigger-id");
+        String id = UUID.randomUUID().toString();
+        var data = new DispatchTriggerCommand.Data(input.eventId,
+                input.triggerTime == null ? Instant.now() : input.triggerTime, headers,
+                input.triggerContext == null ? Map.of() : input.triggerContext, input.payload);
+        OutboxCommand entry;
         try {
-            log = receivedLog(input);
-        } catch (DataIntegrityViolationException duplicate) {
-            return result(input, triggerLogStore.findByTriggerIdAndEventName(input.triggerId, input.eventId)
-                    .orElseThrow(() -> duplicate), true);
-        }
+            String key = input.idempotencyKey == null || input.idempotencyKey.isBlank() ? "trigger:" + id
+                    : "trigger:" + HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(
+                        mapper.writeValueAsBytes(List.of(tenant, input.eventId, input.idempotencyKey))));
+            entry = OutboxCommand.create(null, DispatchTriggerCommand.TYPE, key, mapper.writeValueAsString(data));
+            entry.id = id; entry.tenantId = tenant;
+        } catch (Exception failure) { throw new IllegalArgumentException("Cannot persist trigger submission", failure); }
+        String acceptedId = acceptance.execute(tx -> {
+            try { producer.enqueue(new DispatchTriggerCommand.Submission(entry)); }
+            catch (Exception failure) { throw new IllegalStateException("Cannot enqueue trigger", failure); }
+            return outbox.findByIdempotencyKey(entry.idempotencyKey).orElseThrow().id;
+        });
+        return new TriggerResult(acceptedId);
+    }
+    @Override public TriggerStatus status(String triggerId) {
+        String tenant = ContextContainer.getInstance().getTenant();
+        var command = outbox.findById(triggerId).filter(c -> DispatchTriggerCommand.TYPE.equals(c.commandType)
+                && Objects.equals(tenant, c.tenantId)).orElseThrow(() ->
+                    new NotFoundException("TRIGGER_NOT_FOUND", "Trigger not found in this tenant"));
+        return describe(command, mapper);
+    }
+    public static TriggerStatus describe(OutboxCommand command, ObjectMapper mapper) {
         try {
-            triggerLogStore.markRunning(log.id);
-            notifyStarted(log.id, input);
-            Map<String, String> headers = new HashMap<>(safeHeaders(input.headers));
-            headers.put("x-chenile-trigger-id", input.triggerId);
-            List<ChenileExchange> exchanges = eventProcessor.handleEvent(input.eventId, input.payload, headers);
-            Optional<ChenileExchange> failed = exchanges.stream().filter(e -> e.getException() != null).findFirst();
-            if (failed.isPresent()) throw new IllegalStateException(failed.get().getException().getMessage(), failed.get().getException());
-            triggerLogStore.markCompleted(log.id);
-            notifyFinished(log.id, null);
-            return new TriggerResult(input.triggerId, input.eventId, log.id, true, false);
-        } catch (RuntimeException exception) {
-            try { triggerLogStore.markFailed(log.id, exception); }
-            catch (RuntimeException persistenceFailure) { exception.addSuppressed(persistenceFailure); }
-            notifyFinished(log.id, exception);
-            throw exception;
-        }
+            var data = mapper.readValue(command.payload, DispatchTriggerCommand.Data.class);
+            return new TriggerStatus(command.id, data.eventId(), command.status, command.attempt,
+                    data.triggerTime(), command.createdAt, command.startedAt, command.finishedAt,
+                    command.errorMessage, data.headers().getOrDefault("x-chenile-trigger-source", "EXTERNAL"),
+                    data.triggerContext(), data.payload());
+        } catch (Exception failure) { throw new IllegalStateException("Invalid trigger envelope " + command.id, failure); }
     }
-
-    private TriggerResult result(TriggerInput input, TriggerLog log, boolean duplicate) {
-        return new TriggerResult(input.triggerId, input.eventId, log.id, log.status == TriggerLogStatus.COMPLETED, duplicate);
+    private static void require(boolean condition, String message) {
+        if (!condition) throw new BadRequestException("INVALID_TRIGGER", message);
     }
-
-    private TriggerLog receivedLog(TriggerInput input) {
-        TriggerLog log = new TriggerLog();
-        log.status = TriggerLogStatus.RECEIVED;
-        log.triggerId = input.triggerId;
-        log.eventName = input.eventId;
-        log.triggerTime = input.triggerTime;
-        var headers = safeHeaders(input.headers);
-        log.tenant = headers.get(HeaderUtils.TENANT_ID_KEY);
-        log.source = headers.getOrDefault("x-chenile-trigger-source", "EXTERNAL");
-        try {
-            log.payload = input.payload instanceof String text ? text : historyMapper.writeValueAsString(input.payload);
-            log.triggerContext = historyMapper.writeValueAsString(input.triggerContext);
-        }
-        catch (Exception failure) { throw new IllegalArgumentException("Cannot serialize trigger payload or context", failure); }
-        return triggerLogStore.record(log);
-    }
-
-    private void notifyStarted(String id, TriggerInput input) {
-        try { observer.started(id, input); }
-        catch (RuntimeException failure) { LOG.warn("Trigger observer start failed for {}", id, failure); }
-    }
-
-    private void notifyFinished(String id, RuntimeException dispatchFailure) {
-        try { observer.finished(id, dispatchFailure); }
-        catch (RuntimeException failure) {
-            if (dispatchFailure != null) dispatchFailure.addSuppressed(failure);
-            LOG.warn("Trigger observer finish failed for {}", id, failure);
-        }
-    }
-
-    private Map<String, String> safeHeaders(Map<String, String> headers) { return headers == null ? Map.of() : headers; }
-    private void require(boolean condition, String message) { if (!condition) throw new IllegalArgumentException(message); }
 }

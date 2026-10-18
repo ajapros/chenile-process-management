@@ -21,11 +21,9 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 @EntityScan(basePackages = {
     "org.chenile.orchestrator.process.model",
     "org.chenile.orchestrator.process.configuration.model",
-    "org.chenile.trigger.model",
     "org.chenile.trigger.cron"})
 @EnableJpaRepositories(basePackages = {
     "org.chenile.orchestrator.process.configuration.dao",
-    "org.chenile.trigger.store",
     "org.chenile.trigger.cron"})
 public class ProcessAdminApplication {
     public static void main(String[] args) {

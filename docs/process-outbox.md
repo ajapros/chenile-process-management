@@ -1,6 +1,6 @@
 # Durable process outbox
 
-Apply `process-outbox/src/main/resources/chenile-process-outbox-schema.sql` with your migration tool. Durable delivery is mandatory; configure polling with:
+Apply `chenile-outbox/src/main/resources/chenile-process-outbox-schema.sql` with your migration tool. Durable delivery is mandatory; configure polling with:
 
 ```properties
 chenile.process.outbox.run-dispatcher=true
@@ -20,7 +20,7 @@ spring.sql.init.schema-locations=classpath:chenile-process-outbox-schema.sql
 This is an initial schema, not an upgrade migration. Existing prototype tables need the new `claim_token`
 and `tenant_id` columns and the receipt table added before enabling this version. For the earlier
 column-based command schema, stop producers/dispatchers, back up the table, and apply
-`process-outbox/src/main/resources/chenile-process-outbox-json-migration.sql` with your PostgreSQL
+`chenile-outbox/src/main/resources/chenile-process-outbox-json-migration.sql` with your PostgreSQL
 migration tool (or psql). It wraps existing parent-signal bodies in JSON and drops `target_id`,
 `event_name`, and `worker_type`, preserving row IDs, delivery state, idempotency keys, and receipts.
 The script is transactional and can be reapplied; malformed/null legacy payloads must be corrected
@@ -30,7 +30,7 @@ database. Process JPA, outbox JDBC, and the JDBC starter must share a DataSource
 Provision at least two connections per concurrent dispatch thread plus request traffic, for independent
 handler transactions and request traffic. Use consistent UTC database/JDBC timezones for leases.
 
-`ProcessOutboxConfiguration` is supplied by `process-outbox` in the existing
+`ProcessOutboxConfiguration` is supplied by `chenile-outbox` in the existing
 `org.chenile.orchestrator.process.configuration` package. The application's normal
 configuration scan discovers it; `ProcessConfiguration` does not import it.
 It accepts the generic command registry without depending on `process-service`.
@@ -41,7 +41,7 @@ There is no enablement setting; only background polling can be disabled.
 and reports DEAD commands. The configured fixed-delay task is registered only when
 `run-dispatcher` is true (the default). Disabling it leaves the dispatcher available
 for manual `processOne()` and `drainAll(...)` calls without registering a polling task.
-`process-service` still depends on `process-outbox` for the shared command contracts;
+`process-service` still depends on `chenile-outbox` for the shared command contracts;
 this configuration move does not make that artifact dependency optional.
 
 Every enabled replica polls concurrently using row locks. Set `run-dispatcher=false` only when another
@@ -93,7 +93,7 @@ DEAD commits; they are not a durable compensation queue and are not automaticall
 ## Guarantees
 
 State and consequences commit atomically. Framework child creation, parent counting, and chaining use
-transactional receipts separate from TriggerLog. Repeated completion ingress creates each matching successor
+transactional receipts. Repeated completion ingress creates each matching successor
 once. Direct ProcessDto creation remains non-deduplicated. Non-durable execution is no longer supported.
 
 Application ProcessCompleted listeners run in the command transaction and failures trigger retries. External starters must deduplicate
@@ -141,3 +141,18 @@ mvn test -Dchenile.outbox.test.jdbc-url=jdbc:postgresql://localhost:5432/test_da
 Use a test database/user with CREATE SCHEMA permission. Each test creates/removes its own UUID-named schema,
 never existing application tables. Set `chenile.outbox.test.password` if needed without exposing production
 credentials in shell history. See [ADR 0001](adr/0001-durable-outbox-for-process-entry-action.md).
+
+## Trigger acceptance uses the same outbox
+
+DISPATCH_TRIGGER stores an event envelope without a process owner. Submission commits before returning
+only its command ID; that is also its trigger ID and the x-chenile-trigger-id used by resulting processes.
+An optional tenant/event-scoped submission idempotency key returns the original ID on retries.
+GET /trigger/{id} reads status in the current tenant. There is no trigger_log table.
+
+OutboxCommandRegistry registers dispatch handlers of any context type. OutboxCommandProducer<C>
+selects only the handlers belonging to that producer's context. It calls shouldEnqueue(context), which
+performs no writes, then enqueue(context). Process transitions never fan out into trigger submission.
+
+Retain DISPATCH_TRIGGER identities and decodable envelopes for status and duplicate suppression.
+The current table records the latest attempt/error, not an immutable full attempt history. The existing
+SQL table/resource names and Java packages remain compatible; the artifact is now chenile-outbox.

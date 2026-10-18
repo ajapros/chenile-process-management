@@ -15,7 +15,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.any;
 import org.chenile.trigger.cron.CrontabRepository;
-import org.chenile.trigger.store.*;
+import org.chenile.trigger.*;
+import org.chenile.trigger.model.*;
+import org.chenile.orchestrator.process.outbox.ProcessOutboxRepository;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -43,7 +45,8 @@ abstract class AbstractProcessManagementApiIntegrationTest {
     @Autowired ProcessRepository processes;
     @Autowired ProcessDefinitionRepository definitions;
     @Autowired ProcessConfigurator configurator;
-    @Autowired TriggerLogRepository executions;
+    @Autowired ProcessOutboxRepository executions;
+    @Autowired EventTriggerService triggers;
     @Autowired CrontabRepository crontabs;
     @Autowired ProcessManager manager;
     @MockitoBean WorkerStarter workers;
@@ -57,7 +60,7 @@ abstract class AbstractProcessManagementApiIntegrationTest {
         ContextContainer.CONTEXT_CONTAINER.clear();
         mvc = MockMvcBuilders.webAppContextSetup(application).addFilters(filter.getFilter()).build();
         new TransactionTemplate(transactions).executeWithoutResult(tx -> {
-            executions.deleteAll(); crontabs.deleteAll();
+            crontabs.deleteAll();
             processes.deleteAll(); definitions.deleteAll();
             jdbc.update("delete from chenile_process_outbox"); jdbc.update("delete from chenile_process_receipt");
         });
@@ -69,8 +72,9 @@ abstract class AbstractProcessManagementApiIntegrationTest {
                 .contentType("application/json");
     }
     JsonNode response(MockHttpServletRequestBuilder request, String tenant, int expected) throws Exception {
-        var result = mvc.perform(authorized(request, tenant)).andExpect(status().is(expected)).andReturn();
+        var result = mvc.perform(authorized(request, tenant)).andReturn();
         String body = result.getResponse().getContentAsString();
+        assertEquals(expected, result.getResponse().getStatus(), body);
         return body.isEmpty() ? json.nullNode() : json.readTree(body);
     }
     void definition(String name, boolean leaf, String predecessor) throws Exception {
@@ -78,8 +82,8 @@ abstract class AbstractProcessManagementApiIntegrationTest {
                 "predecessorProcessType", predecessor, "predecessorArgs", "BOTH"))), "alpha", 201);
     }
     JsonNode generate(String tenant, String key, String type) throws Exception {
-        return response(post(BASE + "/triggers").content(json.writeValueAsString(Map.of("triggerId", key,
-                "payload", Map.of("processDefName", type, "args", Map.of("rows", 2))))), tenant, 200);
+        return response(post(BASE + "/triggers").content(json.writeValueAsString(Map.of("idempotencyKey", key,
+                "payload", Map.of("processDefName", type, "args", Map.of("rows", 2))))), tenant, 202);
     }
     void complete(String id, String tenant) {
         var context = ContextContainer.CONTEXT_CONTAINER; var original = context.snapshot();
@@ -91,43 +95,40 @@ abstract class AbstractProcessManagementApiIntegrationTest {
         } finally { context.restore(original); }
     }
 
-    @Test void unifiedTriggerHistoryDeduplicatesAndNamespacesTenantKeys() throws Exception {
+    @Test void durableTriggerAcknowledgementsDeduplicateAndNamespaceTenantKeys() throws Exception {
         definition("source", true, "");
         var first = generate("alpha", "same-key", "source");
-        assertFalse(first.get("duplicate").asBoolean());
         var duplicate = generate("alpha", "same-key", "source");
-        assertTrue(duplicate.get("duplicate").asBoolean());
+        assertEquals(first, duplicate);
         generate("beta", "same-key", "source");
-        assertEquals(2, processes.count()); assertEquals(2, executions.count());
+        assertEquals(0, processes.count());
+        var pending = response(get(BASE + "/executions"), "alpha", 200);
+        assertEquals(1, pending.get("totalElements").asInt());
+        assertEquals("PENDING", pending.get("content").get(0).get("status").asText());
+        dispatcher.drainAll(30);
+        assertEquals(2, processes.count());
         var history = response(get(BASE + "/executions"), "alpha", 200);
-        assertEquals(1, history.get("totalElements").asInt());
         var event = history.get("content").get(0);
-        assertEquals("COMPLETED", event.get("status").asText());
+        assertEquals("DONE", event.get("status").asText());
         assertNotNull(event.get("startedAt")); assertNotNull(event.get("finishedAt"));
         assertEquals("ProcessCreate", event.get("eventName").asText());
         assertEquals("MANUAL", event.get("source").asText());
-        assertEquals(1, response(get(BASE + "/executions").param("status", "COMPLETED"), "alpha", 200).get("totalElements").asInt());
+        assertEquals(1, response(get(BASE + "/executions").param("status", "DONE"), "alpha", 200).get("totalElements").asInt());
         response(get(BASE + "/executions").param("status", "UNKNOWN"), "alpha", 400);
-        var interrupted = new org.chenile.trigger.model.TriggerLog();
-        interrupted.triggerId = "interrupted"; interrupted.eventName = "ProcessCreate";
-        interrupted.triggerTime = java.time.Instant.now(); interrupted.tenant = "alpha";
-        interrupted.status = org.chenile.trigger.model.TriggerLogStatus.RECEIVED;
         String cronId = "nightly_%\"";
-        interrupted.triggerContext = json.writeValueAsString(Map.of("x-chenile-crontab-id", cronId));
-        var context = ContextContainer.getInstance();
-        var snapshot = context.snapshot();
-        try {
-            context.setTenant("alpha");
-            executions.saveAndFlush(interrupted);
-        } finally { context.restore(snapshot); }
-        assertEquals(1, response(get(BASE + "/executions").param("status", "RECEIVED"), "alpha", 200).get("totalElements").asInt());
+        var interrupted = new TriggerInput(); interrupted.eventId = "ProcessCreate";
+        interrupted.headers.put("x-chenile-tenant-id", "alpha");
+        interrupted.triggerContext.put("x-chenile-crontab-id", cronId);
+        var accepted = triggers.trigger(interrupted);
+        assertEquals(1, response(get(BASE + "/executions").param("status", "PENDING"), "alpha", 200).get("totalElements").asInt());
         assertEquals(1, response(get(BASE + "/executions").param("crontabId", cronId), "alpha", 200).get("totalElements").asInt());
         assertEquals(0, response(get(BASE + "/executions").param("crontabId", "nightly"), "alpha", 200).get("totalElements").asInt());
         assertEquals(0, response(get(BASE + "/executions").param("crontabId", cronId), "beta", 200).get("totalElements").asInt());
-        assertEquals(1, response(get(BASE + "/trace").param("triggerId", interrupted.triggerId), "alpha", 200).get("nodes").size());
+        assertEquals(1, response(get(BASE + "/trace").param("triggerId", accepted.triggerId()), "alpha", 200).get("nodes").size());
         var roots = response(get(BASE + "/processes").param("triggerId", event.get("triggerId").asText()), "alpha", 200);
         assertEquals(1, roots.get("totalElements").asInt());
         String processId = roots.get("content").get(0).get("id").asText();
+        assertEquals(first.get("triggerId").asText(), processes.findById(processId).orElseThrow().triggerId);
         response(get(BASE + "/processes/" + processId), "beta", 404);
         response(get(BASE + "/trace").param("processId", processId), "beta", 404);
         response(get(BASE + "/trace").param("triggerId", event.get("triggerId").asText()), "beta", 404);
@@ -139,6 +140,7 @@ abstract class AbstractProcessManagementApiIntegrationTest {
         definition("source", true, ""); definition("successor", true, "source");
         var accepted = generate("alpha", "chain", "source");
         String triggerId = accepted.get("triggerId").asText();
+        dispatcher.drainAll(30);
         var root = processes.findAll().get(0); complete(root.id, "alpha");
         var successor = processes.findByPredecessorId(root.id).get(0);
         assertEquals("alpha", successor.tenant); assertEquals(triggerId, successor.triggerId);

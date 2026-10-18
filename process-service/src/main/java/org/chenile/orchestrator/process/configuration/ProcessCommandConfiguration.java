@@ -43,7 +43,7 @@ public class ProcessCommandConfiguration {
         return new StartWorkerCommand(repository, managers, mapper, transactionManager, configurator, starters);
     }
 
-    @Bean OutboxCommandRegistry<ProcessTransition> processOutboxCommands(List<OutboxCommandLifecycle<ProcessTransition>> commands) {
-        return new OutboxCommandRegistry<>(commands);
+    @Bean OutboxCommandProducer<ProcessTransition> processOutboxCommands(List<OutboxCommandLifecycle<ProcessTransition>> commands) {
+        return new OutboxCommandProducer<>(commands);
     }
 }

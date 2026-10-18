@@ -58,7 +58,7 @@ Two mini monoliths, one durable orchestration engine.
 
 ## Slide 5 — The server monolith: the brain
 
-- Packages: `process-api` + `process-service` (the STM), `process-outbox` (always-on),
+- Packages: `process-api` + `process-service` (the STM), `chenile-outbox` (always-on),
   **one** worker starter — the **q-based** one — plus `trigger-service` + `crontab-trigger`,
   and the management API / admin UI.
 - Owns the **only** PostgreSQL datasource; runs the outbox poller.
@@ -100,7 +100,7 @@ Two mini monoliths, one durable orchestration engine.
 
 ## Slide 8 — The loop (the heart of the talk)
 
-- Cron → trigger (idempotent via `trigger_log`) → create root → outbox records
+- Cron → durable trigger acceptance (outbox ID acknowledgement) → later event dispatch → create root → outbox records
   `START_WORKER` in the same transaction → poller publishes `WorkerDto` → worker's
   `ProcessWorkListener` dispatches to the right `IWorker` → work runs → HTTP callback
   (`splitDone` / `doneSuccessfully` / `aggregationDone`) → STM advances → records the next

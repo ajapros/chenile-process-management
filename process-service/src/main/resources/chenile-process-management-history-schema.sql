@@ -1,5 +1,5 @@
 -- Additive PostgreSQL migration. Apply before deploying the updated process/trigger modules.
--- Apply trigger-service/chenile-trigger-schema.sql for a fresh unified trigger table.
+-- Trigger acceptance/history use DISPATCH_TRIGGER rows in the shared outbox.
 -- Match the host's Hibernate physical naming strategy if it differs from Spring's snake_case.
 CREATE INDEX IF NOT EXISTS idx_process_management_tenant_created ON process_table(tenant, created_time, id);
 CREATE INDEX IF NOT EXISTS idx_process_management_tenant_trigger ON process_table(tenant, trigger_id);
