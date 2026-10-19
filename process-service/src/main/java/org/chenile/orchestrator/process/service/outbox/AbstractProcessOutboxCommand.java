@@ -57,22 +57,21 @@ public abstract class AbstractProcessOutboxCommand implements OutboxCommandLifec
     }
 
     @Override public final void dispatch(OutboxCommand entry) throws Exception {
-        var context = ContextContainer.getInstance();
-        var snapshot = context.snapshot();
-        try {
-            context.setTenant(entry.tenantId);
-            dispatchCommand(entry);
-            flushTenantScopedChanges();
-        }
-        finally { context.restore(snapshot); }
+        inTenantContext(entry.tenantId, () -> { dispatchCommand(entry); flushTenantScopedChanges(); });
     }
 
     @Override public final void onDead(OutboxCommand entry) throws Exception {
+        inTenantContext(entry.tenantId, () -> deadCommand(entry));
+    }
+
+    /** Install the command tenant, run the body, and always restore the caller's context. */
+    private void inTenantContext(String tenantId, ThrowingRunnable body) throws Exception {
         var context = ContextContainer.getInstance();
         var snapshot = context.snapshot();
-        try { context.setTenant(entry.tenantId); deadCommand(entry); }
+        try { context.setTenant(tenantId); body.run(); }
         finally { context.restore(snapshot); }
     }
+    @FunctionalInterface private interface ThrowingRunnable { void run() throws Exception; }
 
     protected abstract void dispatchCommand(OutboxCommand entry) throws Exception;
     protected void deadCommand(OutboxCommand entry) throws Exception { } // operator replay by default
