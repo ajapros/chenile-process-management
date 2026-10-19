@@ -175,3 +175,6 @@ See `chenile-samples/bulk-upload-process-sample` for a complete reference:
 
 `crontab-api` now owns the shared model and contracts; `crontab-service` provides their
 implementations and Chenile HTTP endpoints. See [Crontab service](crontab-service/README.md).
+
+Process definitions are also exposed through the standalone Chenile
+[process definition REST service](docs/process-definitions.md), independently of the management dashboard.

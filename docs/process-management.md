@@ -588,3 +588,13 @@ highway. Every operation delegates to `process(...)`; the service owns validatio
 isolation, and transactions. Successful responses use standard Chenile envelopes with HTTP 200;
 invalid input returns 400 and absent/foreign-tenant records return 404. Quartz changes run after
 commit. See [the service contract](../crontab-service/README.md) for request examples and BDD coverage.
+
+## Dedicated process-definition service
+
+`ProcessDefinitionService` in `process-api` exposes create, update, retrieve, and list operations.
+The Chenile controller in `process-service` serves `/process-definitions` and
+`/process-definitions/{processType}` independently of the optional dashboard. Creation returns 201;
+other successful operations return 200, all with standard Chenile envelopes. Existing management
+definition endpoints delegate to the same implementation and retain their response format.
+See [Process definition REST service](process-definitions.md) for global scope, JSON read-only
+behavior, validation, transaction/cache semantics, and BDD coverage.

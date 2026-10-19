@@ -2,9 +2,9 @@ package org.chenile.orchestrator.process.configuration.management;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chenile.orchestrator.process.config.model.ProcessDef;
+import org.chenile.orchestrator.process.api.ProcessDefinitionService;
 import org.chenile.orchestrator.process.config.reader.ProcessConfigurator;
 import org.chenile.orchestrator.process.configuration.dao.*;
-import org.chenile.orchestrator.process.configuration.model.*;
 import org.chenile.orchestrator.process.model.Constants;
 import org.chenile.orchestrator.process.model.Process;
 import org.chenile.orchestrator.process.model.ProcessDto;
@@ -19,8 +19,6 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.*;
 import org.springframework.web.server.ResponseStatusException;
 import java.time.Instant;
 import java.util.*;
@@ -28,7 +26,7 @@ import java.util.*;
 /** Administration queries: definitions are global; execution data is always tenant-scoped. */
 public class ProcessManagementService {
     private final ProcessRepository processes;
-    private final ProcessDefinitionRepository definitions;
+    private final ProcessDefinitionService definitionService;
     private final ProcessConfigurator configurator;
     private final CrontabRepository crontabs;
     private final ObjectProvider<CrontabService> cronServices;
@@ -36,10 +34,10 @@ public class ProcessManagementService {
     private final TriggerService triggers;
     private final ObjectMapper json = new ObjectMapper().findAndRegisterModules();
     public ProcessManagementService(ProcessRepository processes,
-            ProcessDefinitionRepository definitions, ProcessConfigurator configurator,
+            ProcessDefinitionService definitionService, ProcessConfigurator configurator,
             CrontabRepository crontabs, ObjectProvider<CrontabService> cronServices,
             ProcessOutboxRepository executions, TriggerService triggers) {
-        this.processes = processes; this.definitions = definitions;
+        this.processes = processes; this.definitionService = definitionService;
         this.configurator = configurator; this.crontabs = crontabs; this.cronServices = cronServices;
         this.executions = executions; this.triggers = triggers;
     }
@@ -145,38 +143,9 @@ public class ProcessManagementService {
         // Correlation is assigned by the trigger service, never accepted from caller payload.
         payload.triggerId = null;
     }
-    public List<ProcessDef> definitions() {
-        if (!(configurator instanceof DatabaseProcessConfigurator)) return configurator.processes.processMap.values()
-                .stream().sorted(Comparator.comparing(d -> d.processType)).toList();
-        return definitions.findAll(Sort.by("processType")).stream().map(row -> {
-            try { ProcessDef d = json.readValue(row.definition, ProcessDef.class); d.processType = row.processType; return d; }
-            catch (Exception failure) { throw new IllegalStateException("Invalid definition " + row.processType, failure); }
-        }).toList();
-    }
-    @Transactional
+    public List<ProcessDef> definitions() { return definitionService.findAll(); }
     public ProcessDef saveDefinition(String name, ProcessDef definition, boolean create) {
-        if (!(configurator instanceof DatabaseProcessConfigurator database))
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "JSON definitions are read-only; select the database configurator to edit");
-        if (definition == null || !present(name) || name.length() > 255 || definition.predecessorArgs == null)
-            throw bad("Process type and predecessor argument selection are required");
-        if (present(definition.processType) && !name.equals(definition.processType)) throw bad("Process type must match the URL");
-        if (name.equals(definition.predecessorProcessType)) throw bad("A process cannot be its own predecessor");
-        var current = definitions();
-        Map<String, String> predecessors = new HashMap<>();
-        current.forEach(d -> predecessors.put(d.processType, d.predecessorProcessType));
-        predecessors.put(name, definition.predecessorProcessType);
-        Set<String> visited = new HashSet<>();
-        for (String type = name; type != null; type = predecessors.get(type))
-            if (!visited.add(type)) throw bad("Predecessor chain must not contain a cycle");
-        boolean exists = definitions.existsById(name);
-        if (create && exists) throw new ResponseStatusException(HttpStatus.CONFLICT, "Definition already exists");
-        if (!create && !exists) throw notFound();
-        definition.processType = name;
-        definitions.saveAndFlush(new ProcessDefinition(name, encode(definition)));
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override public void afterCommit() { database.clearCache(); }
-        });
-        return definition;
+        return create ? definitionService.create(definition) : definitionService.update(name, definition);
     }
     public void refreshDefinitions() {
         if (configurator instanceof DatabaseProcessConfigurator database) database.clearCache();

@@ -1,6 +1,7 @@
 package org.chenile.orchestrator.process.configuration;
 
 import org.chenile.orchestrator.process.config.reader.ProcessConfigurator;
+import org.chenile.orchestrator.process.api.ProcessDefinitionService;
 import org.chenile.orchestrator.process.configuration.dao.*;
 import org.chenile.orchestrator.process.configuration.management.*;
 import org.chenile.trigger.TriggerService;
@@ -16,7 +17,7 @@ import org.springframework.context.annotation.*;
 @ConditionalOnProperty(name = "chenile.process.management.enabled", havingValue = "true")
 public class ProcessManagementConfiguration {
     @Bean ProcessManagementService processManagementService(ProcessRepository processes,
-            ProcessDefinitionRepository definitions, ProcessConfigurator configurator, CrontabRepository crontabs,
+            ProcessDefinitionService definitions, ProcessConfigurator configurator, CrontabRepository crontabs,
             ObjectProvider<CrontabService> cronServices, ProcessOutboxRepository executions, TriggerService triggers) {
         return new ProcessManagementService(processes, definitions, configurator, crontabs, cronServices, executions, triggers);
     }

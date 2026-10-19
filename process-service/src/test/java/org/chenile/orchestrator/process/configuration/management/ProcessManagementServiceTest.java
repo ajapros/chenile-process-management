@@ -36,14 +36,15 @@ class ProcessManagementServiceTest {
         var definitions = mock(ProcessDefinitionRepository.class);
         @SuppressWarnings("unchecked") ObjectProvider<CrontabService> cron = mock(ObjectProvider.class);
         var service = new ProcessManagementService(mock(ProcessRepository.class),
-                definitions, configurator, mock(CrontabRepository.class), cron,
+                new org.chenile.orchestrator.process.service.defs.ProcessDefinitionServiceImpl(configurator, definitions),
+                configurator, mock(CrontabRepository.class), cron,
                 mock(ProcessOutboxRepository.class), mock(TriggerService.class));
         assertEquals("json", service.info().get("definitionSource"));
         assertEquals(false, service.info().get("definitionsWritable"));
         assertEquals(false, service.info().get("cronAvailable"));
-        assertEquals(java.util.List.of(definition), service.definitions());
-        assertEquals(409, assertThrows(ResponseStatusException.class,
-                () -> service.saveDefinition("source", definition, false)).getStatusCode().value());
+        assertEquals("source", service.definitions().get(0).processType);
+        assertEquals(409, assertThrows(org.chenile.base.exception.ErrorNumException.class,
+                () -> service.saveDefinition("source", definition, false)).getErrorNum());
         verifyNoInteractions(definitions);
         ProcessDto dto = new ProcessDto(); dto.processDefName = "source";
         assertEquals(503, assertThrows(ResponseStatusException.class, () -> service.saveCron("alpha", null,
