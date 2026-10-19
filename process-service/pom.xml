@@ -16,7 +16,7 @@
 
 	<dependencies>
         <dependency><groupId>org.chenile.orchestrator.process</groupId><artifactId>trigger-api</artifactId><version>${revision}</version></dependency>
-        <dependency><groupId>org.chenile.orchestrator.process</groupId><artifactId>crontab-trigger</artifactId><version>${revision}</version><optional>true</optional></dependency>
+        <dependency><groupId>org.chenile.orchestrator.process</groupId><artifactId>crontab-service</artifactId><version>${revision}</version><optional>true</optional></dependency>
 
         <dependency><groupId>org.chenile.orchestrator.process</groupId><artifactId>chenile-outbox</artifactId><version>${revision}</version></dependency>
         <dependency><groupId>org.postgresql</groupId><artifactId>postgresql</artifactId><scope>test</scope></dependency>

@@ -60,9 +60,15 @@ class EventTriggerServiceTest {
     @Test void acceptanceReturnsOnlyTheDurableIdAndDispatchPropagatesThatIdentity() throws Exception {
         context.put("x-caller-correlation", "caller-1");
         var input = input("same-key");
+        input.source = "CUSTOM";
+        input.headers.put("x-chenile-trigger-source", "HEADER-MUST-NOT-WIN");
         var ack = service.trigger(input);
         assertEquals(ack, service.trigger(input));
         assertEquals("PENDING", service.status(ack.triggerId()).status());
+        assertEquals("CUSTOM", service.status(ack.triggerId()).source());
+        var persisted = mapper.readValue(repository.findById(ack.triggerId()).orElseThrow().payload,
+                org.chenile.trigger.model.Trigger.class);
+        assertEquals("CUSTOM", persisted.source());
         verifyNoInteractions(events);
         assertEquals(1, jdbc.queryForObject("select count(*) from chenile_process_outbox", Integer.class));
         assertNull(repository.findById(ack.triggerId()).orElseThrow().processId);
@@ -90,7 +96,11 @@ class EventTriggerServiceTest {
     }
 
     @Test void failedDispatchRollsBackEffectsAndRetriesTheSameCommandOnceToCompletion() {
-        var ack = service.trigger(input("retry"));
+        var withoutSource = input("retry");
+        withoutSource.source = null;
+        withoutSource.headers.put("x-chenile-trigger-source", "IGNORED");
+        var ack = service.trigger(withoutSource);
+        assertEquals("EXTERNAL", service.status(ack.triggerId()).source());
         var calls = new java.util.concurrent.atomic.AtomicInteger();
         when(events.handleEvent(anyString(), any(), anyMap())).thenAnswer(call -> {
             jdbc.update("insert into local_effect values (?)", ack.triggerId());

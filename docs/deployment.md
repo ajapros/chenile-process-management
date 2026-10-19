@@ -97,7 +97,8 @@ A Chenile mini monolith that packages the orchestration engine and everything th
 | `chenile-outbox` | the always-on durable transactional outbox and its draining poller (`OutboxDispatcher`) |
 | **one** `WorkerStarter` — preferably `q-based-process-starter` | turns a `START_WORKER` command into a message on the queue |
 | `trigger-api` plus `trigger-service` | durable acceptance, status queries and DISPATCH_TRIGGER outbox delivery |
-| `crontab-trigger` | durable Quartz crontabs (`chenile_crontab`) that fire activations |
+| `crontab-api` | shared schedule model and external contracts |
+| `crontab-service` | durable Quartz crontabs (`chenile_crontab`) that fire activations |
 | `process-ui` (optional) | the React admin console behind the management API |
 
 What the server does:

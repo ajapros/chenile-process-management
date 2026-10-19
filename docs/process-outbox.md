@@ -129,6 +129,46 @@ Archive/delete DONE rows after your operational horizon with a scoped, batched p
 at least as long as any corresponding child/predecessor/completion can be redelivered; keep them indefinitely
 by default. Receipt cleanup needs an application-defined retention policy and must not overlap possible replay.
 
+## Why the repository is JDBC, not JPA
+
+`ProcessOutboxRepository` is deliberately hand-written JDBC (`JdbcTemplate` + native SQL) rather than a JPA
+entity with an `EntityManager`/Spring Data repository. This is a design choice, not unfinished work: the table
+is a concurrent work queue, and its correctness depends on database primitives that JPA cannot express
+portably — or, in one case, cannot express safely.
+
+- **Set-based compare-and-set is the concurrency model.** `claimNext` uses
+  `select … limit 1 for update skip locked`; `acknowledge`, `markFailure`, and the lease hand-off in
+  `handleAndComplete` are each a single `update … where id=? and status='RUNNING' and claim_token=?` whose
+  **affected-row count (== 1)** is the fence. One atomic statement is race-safe and auditable in one place.
+  Re-expressing it in JPA means load → check → mutate → flush, which either reopens a time-of-check/
+  time-of-use window or needs pessimistic locks and extra round-trips, and the managed-entity lifecycle
+  (dirty checking, first-level cache, flush ordering) adds risk for no benefit on a hot poller.
+- **`ON CONFLICT DO NOTHING` is required for safety, not convenience.** `enqueue` and `checkIdempotency` run
+  **inside the caller's business transaction** — the same transaction that saves the `Process`. In PostgreSQL
+  a unique-constraint violation marks the whole transaction for rollback, so the idiomatic JPA pattern
+  (`persist` then catch `DataIntegrityViolationException`) would poison the `Process` save it shares a
+  transaction with. `insert … on conflict do nothing` avoids aborting the transaction and returns a rowcount
+  the caller reads to detect the duplicate. Routing these through JPA would force a native `insert … on
+  conflict` through the `EntityManager` anyway — JDBC with extra ceremony.
+- **JPA buys no portability here.** `SKIP LOCKED` and `ON CONFLICT` pin the implementation to PostgreSQL
+  regardless of the access layer (Hibernate 6 can emit `SKIP_LOCKED` only via a non-standard lock hint, and
+  has no `ON CONFLICT` equivalent). The reference database is PostgreSQL either way, so the usual headline
+  reason to adopt JPA does not apply.
+- **The row is mapped to a plain DTO on purpose.** `map(...)` produces a detached `OutboxCommand`, never a
+  managed entity, so nothing is tracked or accidentally flushed. Conditional/bulk SQL
+  (`coalesce(started_at, ?)`, `case when …='DEAD'`, the lease-expiry `DEAD` sweep, `tenant_id is not distinct
+  from ?`) is clean in SQL and clumsy in JPQL — and JPQL bulk updates bypass the persistence context anyway.
+
+The shared-datasource invariant holds either way: because `JdbcTemplate` and the process JPA share one
+`DataSource` and transaction manager (enforced at runtime by `requireTransaction()`), the native enqueue and
+receipt inserts already commit in the same transaction as the `Process` save.
+
+If a future change wants more ORM consistency, the defensible shape is a **hybrid, not a conversion**: keep
+the hot path (`enqueue`, `claimNext`, `acknowledge`, `markFailure`, `checkIdempotency`) as native SQL, and
+optionally model the table as a read-only `@Entity` only for the cold read/admin surface (`findById`,
+`findByIdempotencyKey`, the paginated `findCommands`/`findByIds`). The queue mechanics should not move into
+the persistence context.
+
 ## Verification
 
 Normal `mvn test` runs H2 durable delivery and recursive worker regressions. PostgreSQL tests are opt-in:
@@ -156,3 +196,15 @@ performs no writes, then enqueue(context). Process transitions never fan out int
 Retain DISPATCH_TRIGGER identities and decodable envelopes for status and duplicate suppression.
 The current table records the latest attempt/error, not an immutable full attempt history. The existing
 SQL table/resource names and Java packages remain compatible; the artifact is now chenile-outbox.
+
+## Execution context and transaction completion
+
+The shared outbox execution boundary installs the command tenant and optional lifecycle
+`executionHeaders(command)` in an isolated Chenile context after validating the lease. Handler
+headers cannot override the row tenant. It reinstalls this context when dispatch returns, since
+Chenile event processing may clear it, and retains it through transaction commit or rollback.
+This keeps tenant and audit headers available for deferred JPA flushes and transaction callbacks.
+The caller's complete context is restored only after the transaction finishes, on both success
+and failure. Ordinary commands default to no invocation headers. Trigger commands supply persisted
+headers and their authoritative trigger ID; they contain no transaction synchronization or context
+cleanup code. `chenile-outbox` depends on the core Chenile context runtime, not on trigger or process APIs.

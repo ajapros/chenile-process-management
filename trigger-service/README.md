@@ -1,7 +1,7 @@
 # Durable trigger service
 
 `trigger-service` accepts an event invocation into `chenile-outbox`. It depends on neither
-Quartz nor the process manager. `crontab-trigger` continues to depend only on `trigger-api`.
+Quartz nor the process manager. `crontab-service` continues to depend only on `trigger-api`.
 There is no trigger table, trigger JPA entity, trigger repository, or trigger observer.
 
 ## Submit and acknowledge
@@ -10,6 +10,7 @@ There is no trigger table, trigger JPA entity, trigger repository, or trigger ob
 {
   "idempotencyKey": "optional-client-retry-key",
   "eventId": "ProcessCreate",
+  "source": "HTTP",
   "headers": {"x-chenile-tenant-id": "alpha"},
   "triggerContext": {"adapter": "HTTP"},
   "payload": {"processDefName": "feed", "args": {"file": "input.csv"}}
@@ -27,6 +28,12 @@ header without adding metadata to the JSON payload. The controller only delegate
 its `@ChenileResponseCodes(success = 202, warning = 202)` annotation supplies both HTTP status and
 envelope code. Chenile handles response headers uniformly for both HTTP entry-point styles.
 
+The persisted invocation is the `Trigger` record in `trigger-api`. Its `source` is copied from
+`TriggerInput.source`, independently of headers. Missing or blank sources default to `EXTERNAL`;
+cron and management submissions supply `CRON` and `MANUAL` explicitly. An
+`x-chenile-trigger-source` header, if supplied, remains an ordinary invocation header and does not
+select the recorded source.
+
 The optional idempotency key is scoped by tenant and event. Concurrent submissions with the
 same key return the original acknowledgement. Without a key, every submission is new.
 The caller cannot supply the accepted trigger ID: it is the outbox command ID. Dispatch
@@ -40,7 +47,9 @@ States are PENDING, RUNNING, DONE and DEAD. Retries retain the same ID, incremen
 count, and use the shared outbox backoff, lease fencing and operator replay facilities.
 A missing subscriber is a dispatch failure, not a successful no-op.
 
-The dispatcher restores persisted x-headers and tenant context. It passes the original event
+The shared outbox execution boundary restores persisted x-headers and tenant context through
+transaction completion, then restores the caller context after commit or rollback. The trigger
+command only supplies invocation headers; it does not manage transaction synchronization. It passes the original event
 payload to EventProcessor; Chenile selects and converts the subscriber's input type. Cron
 payload strings remain strings until that framework transformation. Local subscriber changes
 and DONE acknowledgement commit together. Failed attempts roll back local effects before retry.

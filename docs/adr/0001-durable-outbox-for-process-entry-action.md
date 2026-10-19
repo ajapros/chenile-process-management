@@ -119,3 +119,9 @@ H2 remains a fast regression fixture, not proof of PostgreSQL locking semantics.
 
 Costs include extra rows, connection capacity, explicit schema migration, monitoring, and asynchronous
 cascades. Shared transaction resources and external consumer deduplication are deployment requirements.
+
+The repository is implemented in hand-written JDBC (native SQL), not JPA, by design: the table is a
+concurrent work queue whose correctness rests on `FOR UPDATE SKIP LOCKED`, `ON CONFLICT DO NOTHING`
+(required so an idempotency/enqueue conflict cannot abort the shared business transaction), and
+single-statement rowcount-fenced compare-and-set. See
+[Why the repository is JDBC, not JPA](../process-outbox.md#why-the-repository-is-jdbc-not-jpa).

@@ -27,18 +27,18 @@ public class ProcessAdminConfiguration {
             }
         };
     }
-    /** JDBC worker snapshots use Jackson 2; Boot's HTTP JSON support may use Jackson 3. */
+    /** Outbox command snapshots use Jackson 2; Boot's HTTP JSON support may use Jackson 3. */
     @Bean @ConditionalOnMissingBean(ObjectMapper.class)
     ObjectMapper processAdminObjectMapper() {
         return new ObjectMapper().findAndRegisterModules();
     }
     @Bean ApplicationRunner verifyDeliverySchema(JdbcTemplate jdbc, Environment environment) {
         return args -> {
-            String[] tables = {"chenile_process_outbox", "chenile_process_receipt", "chenile_process_work_item"};
+            String[] tables = {"chenile_process_outbox", "chenile_process_receipt"};
             for (String table : tables) {
                 try { jdbc.queryForList("select 1 from " + table + " where 1=0"); }
                 catch (org.springframework.dao.DataAccessException failure) {
-                    throw new IllegalStateException("Required delivery table " + table + " is unavailable; apply the outbox/worker schema before starting", failure);
+                    throw new IllegalStateException("Required delivery table " + table + " is unavailable; apply the outbox schema before starting", failure);
                 }
             }
         };

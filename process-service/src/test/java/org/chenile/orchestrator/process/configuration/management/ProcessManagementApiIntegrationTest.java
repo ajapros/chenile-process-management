@@ -27,7 +27,7 @@ class ProcessManagementApiIntegrationTest extends AbstractProcessManagementApiIn
         String body = """
                 {"idempotencyKey":"http-trigger", "eventId":"ProcessCreate",
                  "triggerTime":"2026-10-16T00:00:00Z",
-                 "headers":{"x-chenile-tenant-id":"alpha", "x-chenile-trigger-source":"HTTP"},
+                 "source":"HTTP", "headers":{"x-chenile-tenant-id":"alpha"},
                  "payload":{"processDefName":"source", "triggerId":"spoofed", "args":{"rows":2}}}
                 """;
         var first = response(post("/trigger").content(body), "alpha", 202).get("payload");
@@ -37,7 +37,9 @@ class ProcessManagementApiIntegrationTest extends AbstractProcessManagementApiIn
         assertEquals(first, duplicate);
         assertEquals(0, processes.count());
         String id = first.get("triggerId").asText();
-        assertEquals("PENDING", response(get("/trigger/" + id), "alpha", 200).get("payload").get("status").asText());
+        var pending = response(get("/trigger/" + id), "alpha", 200).get("payload");
+        assertEquals("PENDING", pending.get("status").asText());
+        assertEquals("HTTP", pending.get("source").asText());
         response(get("/trigger/" + id), "beta", 404);
         org.mockito.Mockito.verifyNoInteractions(workers);
         dispatcher.drainAll(30);

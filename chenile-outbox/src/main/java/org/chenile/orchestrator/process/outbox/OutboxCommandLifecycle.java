@@ -10,6 +10,10 @@ public interface OutboxCommandLifecycle<C> {
     String type();
     default boolean shouldEnqueue(C context) { return true; }
     void enqueue(C context) throws Exception;
+    /** Persisted invocation headers only; the execution boundary owns installing and restoring context. */
+    default java.util.Map<String, String> executionHeaders(OutboxCommand command) throws Exception {
+        return java.util.Map.of();
+    }
     void dispatch(OutboxCommand command) throws Exception;
     default void onDead(OutboxCommand command) throws Exception { }
 }

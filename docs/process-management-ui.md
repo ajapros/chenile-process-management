@@ -53,7 +53,7 @@ Hosts using explicit imports instead of Chenile configuration-package scanning m
 `ProcessConfiguration`, entity scans and repository scans. Include
 `org.chenile.orchestrator.process.configuration.model` and `.configuration.dao` in those scans.
 
-Hosts must include `trigger-service` and `crontab-trigger` explicitly, because these dependencies
+Hosts must include `trigger-service` and `crontab-service` explicitly, because these dependencies
 are optional in `process-service`. Scan `org.chenile.configuration.trigger` and
 `org.chenile.configuration.crontab`, or import `ChenileTriggerConfiguration` and
 `CrontabTriggerConfiguration` respectively. The standalone admin host already does this.

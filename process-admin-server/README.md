@@ -2,7 +2,9 @@
 
 Runnable Spring Boot host for the management API, process workflow/event ingress,
 Quartz cron triggers, database process definitions, durable process commands and
-JDBC worker delivery. No separate service registry is required.
+in-VM worker delivery. No separate service registry is required. (Generate production
+hosts with a durable starter — JDBC or queue-based — using the process-deployment JGen
+blueprint; this stock host keeps the shipping surface small.)
 
 ## Start locally
 
@@ -15,7 +17,7 @@ java -jar process-admin-server/target/process-admin-server-exec.jar --spring.pro
 ```
 
 The API listens on `http://127.0.0.1:8080`. Keep that terminal running. The dev profile
-creates/updates the JPA tables and initializes the outbox/worker tables in a file-backed
+creates/updates the JPA tables and initializes the outbox tables in a file-backed
 H2 database at `./.process-admin/data`, relative to your launch directory. Restarting
 preserves definitions, schedules and history; Git ignores that directory. This is local
 development configuration, not a production migration strategy. Do not run two servers
@@ -60,17 +62,19 @@ generating their ProcessCreate events. No sample/business definitions are instal
 
 ## What executes work?
 
-The server enqueues splitter/executor/aggregator jobs into `chenile_process_work_item`
-through the existing JDBC starter. It does **not** ship business worker implementations
-or run the worker poller. A new leaf process can therefore show EXECUTING while its job
-waits in PENDING; composite processes wait at SPLIT_PENDING until their split is performed.
+This stock host uses the **in-VM** worker starter and does **not** ship business worker
+implementations. A `START_WORKER` command therefore raises a worker-dispatch event with no
+subscriber and no-ops, so a new leaf process can show EXECUTING while nothing runs it;
+composite processes wait at SPLIT_PENDING until their split is performed. The host is meant
+to run the orchestration engine, management API and scheduler — not real work.
 
-Run your application's JDBC workers with access to the same database and registered
-`BatchService` implementations. Workers reporting results through this host's `/process`
-HTTP endpoints must include the administrator key and tenant headers. Do not enable
-`chenile.process.worker.jdbc.run-worker` in this stock host without supplying business workers.
-The outbox dispatcher is enabled by default and delivers process commands to the JDBC queue.
-Outbox delivery is mandatory. Use `chenile.process.outbox.run-dispatcher=false` only when another instance drains the commands. There is no outbox enablement setting.
+To execute work, generate a production deployment with the **process-deployment JGen
+blueprint**: a server monolith with a durable starter (JDBC or queue-based) plus one or more
+worker monoliths that package your splitters/executors/aggregators and report results back
+through the `/process` HTTP endpoints (with the administrator key and tenant headers).
+The outbox dispatcher is enabled by default and delivers process commands. Outbox delivery is
+mandatory. Use `chenile.process.outbox.run-dispatcher=false` only when another instance drains
+the commands. There is no outbox enablement setting.
 
 ## PostgreSQL deployment
 
@@ -84,17 +88,17 @@ export PROCESS_DATABASE_USERNAME='process_admin'
 java -jar process-admin-server/target/process-admin-server-exec.jar
 ```
 
-Provision the complete existing process/trigger/JPA schema first, plus:
+Provision the process/JPA schema first, plus:
 
-- `chenile-outbox/src/main/resources/chenile-process-outbox-schema.sql`
-- `jdbc-process-starter/src/main/resources/chenile-process-work-schema.sql`
+- `chenile-outbox/src/main/resources/chenile-process-outbox-schema.sql` (outbox + receipt)
 - `process-service/src/main/resources/chenile-process-management-history-schema.sql`
-- `trigger-service/src/main/resources/chenile-trigger-schema.sql` for fresh trigger storage
 
-To upgrade the former separate trigger claim/execution tables, stop all trigger producers and
-apply `trigger-service/src/main/resources/chenile-trigger-unification.sql` in one PostgreSQL
-transaction before starting the new server. The admin Liquibase master includes this guarded
-upgrade too. See [trigger-service](../trigger-service/README.md) for reconciliation and retention.
+Triggers need no separate table — they are durable `DISPATCH_TRIGGER` rows in the outbox. This
+stock host uses in-VM delivery, so `chenile_process_work_item` is not required; a production host
+that uses the JDBC starter additionally provisions
+`jdbc-process-starter/src/main/resources/chenile-process-work-schema.sql`. The admin Liquibase
+master (`db/changelog/db.changelog-master.xml`) aggregates the outbox, history and reference
+changelogs. See [process-outbox](../docs/process-outbox.md) and [trigger-service](../trigger-service/README.md).
 
 The history migration assumes that `process_table` already exists. This server does not
 replace your schema migration tooling or automatically upgrade existing production tables.

@@ -112,7 +112,7 @@ dependencies = [
   chenile-outbox,
   q-based-process-starter,          # the preferred decoupling starter
   trigger-service, trigger-api,
-  crontab-trigger,
+  crontab-service,
   chenile-pubsub-<transport>,       # publisher side
   <app>-api, <app>-process-config
 ]

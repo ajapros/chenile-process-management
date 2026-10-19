@@ -26,8 +26,8 @@ mvn install -q -pl process-admin-server -am -DskipTests
 java -jar process-admin-server/target/process-admin-server-exec.jar --spring.profiles.active=dev
 ```
 
-It listens on localhost:8080, persists local development data in H2, and enqueues JDBC
-worker jobs. Business worker execution requires your application's worker implementations.
+It listens on localhost:8080, persists local development data in H2, and uses in-VM
+worker delivery. Business worker execution requires your application's worker implementations.
 
 `POST /process` and the `ProcessCreate` event accept a `ProcessDto`:
 
@@ -35,13 +35,13 @@ worker jobs. Business worker execution requires your application's worker implem
 {"processDefName":"feed","args":{"file":"input.csv"},"triggerId":"run-123"}
 ```
 
-`crontab-trigger` schedules through `trigger-api`; `trigger-service` accepts durable commands
+`crontab-service` schedules through `trigger-api`; `trigger-service` accepts durable commands
 into `chenile-outbox`. Submission returns only the outbox ID, which is also the trigger ID.
 Use an optional idempotencyKey for retries; execution happens later. `GET /trigger/{id}` queries
 PENDING/RUNNING/DONE/DEAD in the caller tenant. Dispatch supplies the authoritative
 `x-chenile-trigger-id`, and any resulting process stores it for correlation. There is no trigger table.
 Cron metadata belongs to the command's triggerContext JSON; payload conversion belongs to Chenile.
-`crontab-trigger` depends on `trigger-api`, not `trigger-service`. The admin host includes both.
+`crontab-service` depends on `trigger-api`, not `trigger-service`. The admin host includes both.
 
 The process manager subscribes to `ProcessCompleted` and exposes `POST /process/completed`.
 `ProcessCompletedEvent` extends `ProcessDto`, so it can be used as the creation DTO.
@@ -172,3 +172,6 @@ See `chenile-samples/bulk-upload-process-sample` for a complete reference:
 - executors validate row ranges and store idempotent row results.
 - aggregator stores a final result summary.
 - Docker Compose and Kubernetes/KEDA manifests are included.
+
+`crontab-api` now owns the shared model and contracts; `crontab-service` provides their
+implementations and Chenile HTTP endpoints. See [Crontab service](crontab-service/README.md).

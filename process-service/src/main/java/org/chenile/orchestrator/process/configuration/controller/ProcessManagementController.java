@@ -44,6 +44,12 @@ public class ProcessManagementController {
             @RequestParam(required=false) String processId, @RequestParam(required=false) String triggerId) { return service.trace(tenant, processId, triggerId); }
     @ExceptionHandler(IllegalArgumentException.class) @ResponseStatus(HttpStatus.BAD_REQUEST)
     public Object invalid(IllegalArgumentException e) { return Map.of("message", e.getMessage() == null ? "Invalid request" : e.getMessage()); }
+    // This existing Spring adapter also consumes services exposed through the Chenile highway.
+    @ExceptionHandler(org.chenile.base.exception.ErrorNumException.class)
+    public org.springframework.http.ResponseEntity<?> serviceError(org.chenile.base.exception.ErrorNumException e) {
+        return org.springframework.http.ResponseEntity.status(e.getErrorNum())
+                .body(Map.of("message", e.getMessage() == null ? "Request failed" : e.getMessage()));
+    }
     @ExceptionHandler(DataIntegrityViolationException.class) @ResponseStatus(HttpStatus.CONFLICT)
     public Object conflict() { return Map.of("message", "A record with this identifier or name already exists"); }
     @ExceptionHandler({org.springframework.http.converter.HttpMessageNotReadableException.class,

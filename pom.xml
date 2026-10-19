@@ -7,7 +7,8 @@
 		<module>chenile-outbox</module>
 		<module>trigger-api</module>
 		<module>trigger-service</module>
-		<module>crontab-trigger</module>
+		<module>crontab-api</module>
+		<module>crontab-service</module>
 		<module>process-service</module>
 		<module>process-delegate</module>
 		<module>jdbc-process-starter</module>

@@ -12,3 +12,7 @@ later through Chenile's event transformation pipeline.
 `TriggerResult` implements `ResponseHeadersAware` from `chenile-base` and supplies the HTTP
 Location `/trigger/<id>`. The interface adds no response payload fields and no servlet dependency.
 Direct callers continue to receive the same acknowledgement type.
+
+`Trigger` is the shared persisted invocation model: event ID, trigger time, headers, trigger
+context, original payload, and source. Set `TriggerInput.source` explicitly to identify the origin;
+it defaults to `EXTERNAL` and is never inferred from a header.

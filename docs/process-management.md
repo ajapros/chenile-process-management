@@ -55,18 +55,19 @@ The former `process-utils` module has been merged into this artifact. Existing J
 `org.chenile.orchestrator.process.utils` and `org.chenile.orchestrator.delegate` are unchanged.
 
 `chenile-outbox` is the transactional outbox infrastructure used for durable execution (see below). It is
-independent and database-only so that it can be depended on without creating a cycle.
+independent of process APIs and uses Chenile core context for transaction-scoped handler execution.
 
 `invm-process-starter`, `q-based-process-starter`, and `jdbc-process-starter` are the three
 interchangeable worker launch strategies.
 
-`trigger-api` contains trigger contracts and input/result DTOs without runtime dependencies.
+`trigger-api` contains trigger contracts and input/result DTOs, including response metadata from chenile-base.
 `trigger-service` supplies in-JVM event dispatch, trigger idempotency and execution history.
-`crontab-trigger` owns durable Quartz crontabs (via `chenile-scheduler`) and depends on `trigger-api`, not
+`crontab-api` owns crontab models and external service/reader contracts.
+`crontab-service` implements durable Quartz crontabs (via `chenile-scheduler`) and depends on `trigger-api`, not
 the trigger implementation. Schedules are read through a `CrontabReader` abstraction with two backends —
 database (`CrontabRepository`) and JSON (`JsonCrontabRepository`) — and validated by `CrontabValidator`.
 Its events include `ProcessCreate`, which starts a root process. The two implementation dependencies
-(`trigger-service`, `crontab-trigger`) are optional in `process-service`; applications select them
+(`trigger-service`, `crontab-service`) are optional in `process-service`; applications select them
 explicitly.
 
 `process-admin-server` is a runnable Spring Boot host that bundles the process controllers, the trigger and
@@ -339,7 +340,7 @@ failure; submissions without a key are new invocations. Concurrent acceptance us
 unique key. Status is PENDING, RUNNING, DONE or DEAD. Local subscriber changes and acknowledgement
 commit together; retries roll back partial local changes. External effects need receiver idempotency.
 
-`crontab-trigger` owns durable Quartz schedules and still depends only on trigger-api. A firing
+`crontab-service` implements the `crontab-api` contracts and depends on trigger-api for event submission, not trigger-service. A firing
 uses `crontab:{id}:{quartzFireInstanceId}` as its submission key, not the accepted trigger ID.
 Cron identity, Quartz fire times and configured/generated x-headers are adapter-owned triggerContext
 JSON. The scheduler passes eventPayloadJson unchanged to the trigger. Chenile's transformation
@@ -537,7 +538,7 @@ with fake workers resolved by naming convention, in both synchronous and latch-s
 `ProcessManagerImplTriggerTest` covers `ProcessDto` creation and trigger correlation. BDD/REST suites drive
 the transition matrix over the REST surface. `DatabaseProcessConfiguratorTest` checks the database
 configurator. The `trigger-service` tests cover durable acknowledgement, unchanged payload dispatch, tenant isolation and submission uniqueness
-guarantee. The `crontab-trigger` tests cover JSON loading, Quartz dispatch, transactional schedule updates,
+guarantee. The `crontab-service` tests cover JSON loading, Quartz dispatch, transactional schedule updates,
 and wiring with an application-defined trigger implementation. The `chenile-outbox` tests cover rollback-together, idempotent enqueue, `SKIP LOCKED`, backoff,
 retry-then-DEAD, dead-letter compensation, and replay-safe parent counting, with an opt-in suite that runs
 the same guarantees against a real PostgreSQL instance. The durable integration tests in `process-service`
@@ -574,3 +575,16 @@ TriggerInput.idempotencyKey replaces caller-assigned trigger identity; acknowled
 assigned outbox/trigger ID. HTTP submission returns 202 and dispatch occurs later. TriggerLog, its JPA
 repositories, TriggerObserver and trigger-specific schemas are removed. Do not include their scans or DDL.
 Status values are PENDING/RUNNING/DONE/DEAD. Retain trigger command identities for query and deduplication.
+
+## Crontab API and service split
+
+`crontab-api` contains the shared JPA model and service/reader contracts. `crontab-service`
+contains implementations, persistence, validation, Quartz integration, and the Chenile controller.
+Replace the old `crontab-trigger` Maven dependency with `crontab-service` (or only `crontab-api`
+for contract consumers). Public Java packages and database schema are unchanged.
+
+The controller exposes POST/GET `/crontab` and GET/DELETE `/crontab/{id}` through the Chenile
+highway. Every operation delegates to `process(...)`; the service owns validation, tenant
+isolation, and transactions. Successful responses use standard Chenile envelopes with HTTP 200;
+invalid input returns 400 and absent/foreign-tenant records return 404. Quartz changes run after
+commit. See [the service contract](../crontab-service/README.md) for request examples and BDD coverage.

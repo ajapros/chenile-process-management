@@ -11,7 +11,7 @@ runs and creates a **leaf** child. When that leaf child completes it chains a **
 names the leaf child as its predecessor in configuration (`predecessorProcessType`), so the successor is
 created with `predecessor_id` set to the leaf child.
 
-Participants: **Cron** = `CrontabScheduler` (crontab-trigger); **Trig** = `EventTriggerService`
+Participants: **Cron** = `CrontabScheduler` (crontab-service); **Trig** = `EventTriggerService`
 (trigger-service); **EP** = `EventProcessor`; **PM** = `ProcessManager` (STM, process-service); **Reg** =
 `ProcessEntryAction` + the outbox command registry (chenile-outbox); **W** = `WorkerStarter`
 (splitter / executor).
@@ -225,7 +225,7 @@ erDiagram
 - **DISPATCH_TRIGGER in `chenile_process_outbox`** — accepted trigger identity, original payload,
   headers, adapter context and current dispatch status. There is no separate trigger table.
   Its command ID is the trigger ID stored on resulting processes. Keep these identities for queries and deduplication.
-- **`chenile_crontab`** (entity `Crontab`, crontab-trigger) — durable Quartz schedules: one row per cron,
+- **`chenile_crontab`** (entity `Crontab`, crontab-service) — durable Quartz schedules: one row per cron,
   holding the expression, timezone, the event to fire (`ProcessCreate`), and its headers/payload JSON. Saving
   or deleting a row registers or removes the Quartz job.
 

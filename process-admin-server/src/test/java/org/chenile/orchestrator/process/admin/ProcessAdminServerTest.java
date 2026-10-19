@@ -6,7 +6,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import java.net.URI;
 import java.net.http.*;
@@ -19,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.*;
         "spring.datasource.url=jdbc:h2:mem:admin-server-test;MODE=PostgreSQL;DB_CLOSE_DELAY=-1",
         "spring.datasource.username=sa", "spring.datasource.password=",
         "spring.jpa.hibernate.ddl-auto=create-drop", "spring.sql.init.mode=always",
-        "spring.sql.init.schema-locations=classpath:chenile-process-outbox-schema.sql,classpath:chenile-process-work-schema.sql",
+        "spring.sql.init.schema-locations=classpath:chenile-process-outbox-schema.sql",
         "chenile.process.management.api-key=synthetic-server-test-administrator-key-123456",
         "chenile.process.outbox.run-dispatcher=false"})
 @ActiveProfiles("dev")
@@ -28,7 +27,6 @@ class ProcessAdminServerTest {
     @LocalServerPort int port;
     @Autowired ObjectMapper json;
     @Autowired OutboxDispatcher dispatcher;
-    @Autowired JdbcTemplate jdbc;
     private final HttpClient client = HttpClient.newHttpClient();
 
     private HttpResponse<String> request(String method, String path, String body, String key, String tenant) throws Exception {
@@ -62,7 +60,7 @@ class ProcessAdminServerTest {
         assertEquals(400, request("GET", api + "/info", null, KEY, null).statusCode());
     }
 
-    @Test void createsAndChainsProcessesThroughRealHttpAndEnqueuesJdbcWorkers() throws Exception {
+    @Test void createsAndChainsProcessesThroughRealHttp() throws Exception {
         String api = "/process-management/api", suffix = UUID.randomUUID().toString();
         String source = "source-" + suffix, successor = "index-" + suffix;
         ok("POST", api + "/definitions", "{\"processType\":\"" + source + "\",\"leaf\":true}", 201);
@@ -75,7 +73,8 @@ class ProcessAdminServerTest {
         assertEquals(1, roots.get("totalElements").asInt());
         String id = roots.get("content").get(0).get("id").asText();
         dispatch();
-        assertEquals(1L, jdbc.queryForObject("select count(*) from chenile_process_work_item where process_id=? and status='PENDING'", Long.class, id));
+        // In-VM delivery runs no business worker in this stock host, so the leaf process waits in
+        // EXECUTING; drive its completion over HTTP exactly as a real worker callback would.
         ok("PATCH", "/process/" + id + "/doneSuccessfully", "{\"output\":\"finished\"}", 200);
         dispatch();
         var detail = ok("GET", api + "/processes/" + id, null, 200);

@@ -135,7 +135,7 @@ public class ProcessManagementService {
         input.idempotencyKey = "manual:" + tenant + ":" + (present(request.idempotencyKey()) ? request.idempotencyKey() : UUID.randomUUID());
         input.eventId = "ProcessCreate"; input.payload = request.payload();
         input.headers.put("x-chenile-tenant-id", tenant);
-        input.headers.put("x-chenile-trigger-source", "MANUAL");
+        input.source = "MANUAL";
         input.triggerContext.putAll(input.headers);
         return triggers.trigger(input);
     }

@@ -1,6 +1,7 @@
 package org.chenile.orchestrator.process.outbox;
 
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.chenile.core.context.ContextContainer;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -76,17 +77,37 @@ public class ProcessOutboxRepository {
 
     /** Local handler mutations and acknowledgement commit together. External effects still require deduplication. */
     public void handleAndComplete(OutboxCommand command, OutboxCommandLifecycle<?> handler) {
-        independent.executeWithoutResult(tx -> {
-            // Lock and validate ownership BEFORE local mutations. A stale claimant must never run a handler.
-            Integer owned = jdbc.query("""
-                    select attempt from chenile_process_outbox
-                    where id=? and status='RUNNING' and claim_token=? for update
-                    """, rs -> rs.next() ? rs.getInt(1) : null, command.id, command.claimToken);
-            if (owned == null) throw new IllegalStateException("Outbox lease no longer owned: " + command.id);
-            try { handler.dispatch(command); }
-            catch (Exception exception) { throw new IllegalStateException("Outbox handler failed", exception); }
-            if (!acknowledge(command)) throw new IllegalStateException("Outbox acknowledgement lost: " + command.id);
-        });
+        var context = ContextContainer.getInstance();
+        var callerContext = context.snapshot();
+        try {
+            independent.executeWithoutResult(tx -> {
+                // Lock and validate ownership BEFORE installing command context or invoking the handler.
+                Integer owned = jdbc.query("""
+                        select attempt from chenile_process_outbox
+                        where id=? and status='RUNNING' and claim_token=? for update
+                        """, rs -> rs.next() ? rs.getInt(1) : null, command.id, command.claimToken);
+                if (owned == null) throw new IllegalStateException("Outbox lease no longer owned: " + command.id);
+                try {
+                    var headers = handler.executionHeaders(command);
+                    context.clear();
+                    headers.forEach(context::put);
+                    context.setTenant(command.tenantId);
+                    var commandContext = context.snapshot();
+                    try { handler.dispatch(command); }
+                    finally {
+                        // Chenile event processing may clear thread context. Restore it before JPA flush
+                        // and retain it through commit/rollback callbacks, not merely through dispatch().
+                        context.restore(commandContext);
+                    }
+                } catch (Exception exception) {
+                    throw new IllegalStateException("Outbox handler failed", exception);
+                }
+                if (!acknowledge(command)) throw new IllegalStateException("Outbox acknowledgement lost: " + command.id);
+            });
+        } finally {
+            // TransactionTemplate returns only after transaction completion, including on rollback.
+            context.restore(callerContext);
+        }
     }
 
     public boolean markDone(OutboxCommand command) {
