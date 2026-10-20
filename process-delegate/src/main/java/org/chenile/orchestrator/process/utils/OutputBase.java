@@ -4,5 +4,5 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class OutputBase {
-    public List<String> history = new ArrayList<>();
+  public List<String> history = new ArrayList<>();
 }

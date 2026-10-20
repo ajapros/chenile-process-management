@@ -8,11 +8,12 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class QueueBasedProcessStarterConfiguration {
-    final Logger logger = LoggerFactory.getLogger(QueueBasedProcessStarterConfiguration.class);
-    @Bean
-    QueueBasedProcessStarter queueBasedProcessStarter(){
-        logger.info("Initializing the queue based worker starter");
-        QueueBasedProcessStarter workerStarter = new QueueBasedProcessStarter();
-        return workerStarter;
-    }
+  final Logger logger = LoggerFactory.getLogger(QueueBasedProcessStarterConfiguration.class);
+
+  @Bean
+  QueueBasedProcessStarter queueBasedProcessStarter() {
+    logger.info("Initializing the queue based worker starter");
+    QueueBasedProcessStarter workerStarter = new QueueBasedProcessStarter();
+    return workerStarter;
+  }
 }

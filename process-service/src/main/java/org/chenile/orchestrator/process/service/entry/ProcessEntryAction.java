@@ -11,14 +11,16 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 /** Save the transition and record its commands atomically; dispatch happens after commit. */
 public class ProcessEntryAction extends GenericEntryAction<Process> {
-    @Autowired private OutboxCommandProducer<ProcessTransition> commands;
+  @Autowired private OutboxCommandProducer<ProcessTransition> commands;
 
-    public ProcessEntryAction(EntityStore<Process> entityStore, STMActionsInfoProvider stmActionsInfoProvider) {
-        super(entityStore, stmActionsInfoProvider);
-    }
+  public ProcessEntryAction(
+      EntityStore<Process> entityStore, STMActionsInfoProvider stmActionsInfoProvider) {
+    super(entityStore, stmActionsInfoProvider);
+  }
 
-    @Override public void execute(State fromState, State toState, Process process) throws Exception {
-        super.execute(fromState, toState, process);
-        commands.enqueue(new ProcessTransition(process, toState));
-    }
+  @Override
+  public void execute(State fromState, State toState, Process process) throws Exception {
+    super.execute(fromState, toState, process);
+    commands.enqueue(new ProcessTransition(process, toState));
+  }
 }

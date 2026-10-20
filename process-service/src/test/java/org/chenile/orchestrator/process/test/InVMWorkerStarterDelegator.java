@@ -1,5 +1,12 @@
 package org.chenile.orchestrator.process.test;
 
+import static org.chenile.orchestrator.process.test.SharedData.LATCHES;
+import static org.chenile.orchestrator.process.test.SharedData.SYNCH_MODE;
+
+import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.chenile.orchestrator.process.WorkerStarter;
 import org.chenile.orchestrator.process.model.Process;
 import org.chenile.orchestrator.process.model.WorkerDto;
@@ -7,68 +14,63 @@ import org.chenile.orchestrator.process.model.WorkerType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 
-import java.util.Map;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-
-import static org.chenile.orchestrator.process.test.SharedData.LATCHES;
-import static org.chenile.orchestrator.process.test.SharedData.SYNCH_MODE;
 /**
- * Starts a process within the same JVM by using a component that has been
- * defined within the Spring Bean factory. This delegates to the correct component name<br/>
- * The name of the actual worker is determined by convention.
- * The actual worker is supposed to implement the {@link WorkerStarter} interface as well.
+ * Starts a process within the same JVM by using a component that has been defined within the Spring
+ * Bean factory. This delegates to the correct component name<br>
+ * The name of the actual worker is determined by convention. The actual worker is supposed to
+ * implement the {@link WorkerStarter} interface as well.
  */
 public class InVMWorkerStarterDelegator implements WorkerStarter {
-    @Autowired
-    ApplicationContext applicationContext;
-    @Autowired org.chenile.orchestrator.process.outbox.OutboxDispatcher dispatcher;
-    @jakarta.annotation.PreDestroy void stopWorkers() { executorService.shutdownNow(); }
-    ExecutorService executorService = Executors.newFixedThreadPool(20);
-    @Override
-    public void start(WorkerDto workerDto){
-        Process process = workerDto.process;
-        Map<String, String> execDef = workerDto.execDef;
-        WorkerType workerType = workerDto.workerType;
-        String componentName = process.processType + camelCase(workerType);
-        try {
-            WorkerStarter actualWorker = (WorkerStarter) applicationContext.getBean(componentName);
-            if(SYNCH_MODE)
-                doSynchStart(actualWorker,workerDto);
-            else
-                doAsynchStart(actualWorker,workerDto);
-        }catch(Exception e){
-            e.printStackTrace();
-        }
-    }
+  @Autowired ApplicationContext applicationContext;
+  @Autowired org.chenile.orchestrator.process.outbox.OutboxDispatcher dispatcher;
 
-    protected void doAsynchStart(WorkerStarter actualWorker,
-                           WorkerDto workerDto) {
-        String latchKey = workerDto.process.id + "-" + workerDto.workerType.name();
-        String proceedKey = latchKey + "PROCEED";
-        CountDownLatch latch = new CountDownLatch(1);
-        LATCHES.put(latchKey, latch);
-        executorService.submit(() -> {
-            try {
-                latch.await();
-                actualWorker.start(workerDto);
-                // The worker's transition has committed; deliver its recorded consequences next.
-                dispatcher.drainAll(1000);
-                LATCHES.get(proceedKey).countDown();
-            } catch (InterruptedException interrupted) {
-                Thread.currentThread().interrupt();
-            }
+  @jakarta.annotation.PreDestroy
+  void stopWorkers() {
+    executorService.shutdownNow();
+  }
+
+  ExecutorService executorService = Executors.newFixedThreadPool(20);
+
+  @Override
+  public void start(WorkerDto workerDto) {
+    Process process = workerDto.process;
+    Map<String, String> execDef = workerDto.execDef;
+    WorkerType workerType = workerDto.workerType;
+    String componentName = process.processType + camelCase(workerType);
+    try {
+      WorkerStarter actualWorker = (WorkerStarter) applicationContext.getBean(componentName);
+      if (SYNCH_MODE) doSynchStart(actualWorker, workerDto);
+      else doAsynchStart(actualWorker, workerDto);
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+  }
+
+  protected void doAsynchStart(WorkerStarter actualWorker, WorkerDto workerDto) {
+    String latchKey = workerDto.process.id + "-" + workerDto.workerType.name();
+    String proceedKey = latchKey + "PROCEED";
+    CountDownLatch latch = new CountDownLatch(1);
+    LATCHES.put(latchKey, latch);
+    executorService.submit(
+        () -> {
+          try {
+            latch.await();
+            actualWorker.start(workerDto);
+            // The worker's transition has committed; deliver its recorded consequences next.
+            dispatcher.drainAll(1000);
+            LATCHES.get(proceedKey).countDown();
+          } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+          }
         });
-    }
+  }
 
-    protected void doSynchStart(WorkerStarter actualWorker,
-                                WorkerDto workerDto) {
-        actualWorker.start(workerDto);
-    }
+  protected void doSynchStart(WorkerStarter actualWorker, WorkerDto workerDto) {
+    actualWorker.start(workerDto);
+  }
 
-    private String camelCase(WorkerType workerType){
-        String s =  workerType.name().toLowerCase();
-        return s.substring(0,1).toUpperCase() + s.substring(1);
-    }
+  private String camelCase(WorkerType workerType) {
+    String s = workerType.name().toLowerCase();
+    return s.substring(0, 1).toUpperCase() + s.substring(1);
+  }
 }

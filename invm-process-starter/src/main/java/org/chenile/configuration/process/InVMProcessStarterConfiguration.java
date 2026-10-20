@@ -8,11 +8,12 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class InVMProcessStarterConfiguration {
-    final Logger logger = LoggerFactory.getLogger(InVMProcessStarterConfiguration.class);
-    @Bean
-    InVMProcessStarter inVMProcessStarter(){
-        logger.info("Initializing the in vm worker starter");
-        InVMProcessStarter workerStarter = new InVMProcessStarter();
-        return workerStarter;
-    }
+  final Logger logger = LoggerFactory.getLogger(InVMProcessStarterConfiguration.class);
+
+  @Bean
+  InVMProcessStarter inVMProcessStarter() {
+    logger.info("Initializing the in vm worker starter");
+    InVMProcessStarter workerStarter = new InVMProcessStarter();
+    return workerStarter;
+  }
 }

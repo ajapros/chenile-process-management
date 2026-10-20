@@ -9,19 +9,18 @@ import jakarta.persistence.Table;
 @Entity
 @Table(name = "process_definition")
 public class ProcessDefinition {
-    @Id
-    @Column(name = "process_type", nullable = false, updatable = false)
-    public String processType;
+  @Id
+  @Column(name = "process_type", nullable = false, updatable = false)
+  public String processType;
 
-    /** JSON representation of {@code ProcessDef}, retaining its extensible maps. */
-    @Column(name = "definition", nullable = false, columnDefinition = "TEXT")
-    public String definition;
+  /** JSON representation of {@code ProcessDef}, retaining its extensible maps. */
+  @Column(name = "definition", nullable = false, columnDefinition = "TEXT")
+  public String definition;
 
-    protected ProcessDefinition() {
-    }
+  protected ProcessDefinition() {}
 
-    public ProcessDefinition(String processType, String definition) {
-        this.processType = processType;
-        this.definition = definition;
-    }
+  public ProcessDefinition(String processType, String definition) {
+    this.processType = processType;
+    this.definition = definition;
+  }
 }

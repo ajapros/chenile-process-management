@@ -5,6 +5,8 @@ import io.cucumber.junit.CucumberOptions;
 import org.junit.runner.RunWith;
 
 @RunWith(Cucumber.class)
-@CucumberOptions(features = "src/test/resources/features", glue = {
-        "org.chenile.trigger.cron.bdd", "org.chenile.cucumber.rest"}, plugin = "pretty")
-public class CukesRestTest { }
+@CucumberOptions(
+    features = "src/test/resources/features",
+    glue = {"org.chenile.trigger.cron.bdd", "org.chenile.cucumber.rest"},
+    plugin = "pretty")
+public class CukesRestTest {}

@@ -4,5 +4,5 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class Processes {
-    public Map<String, ProcessDef> processMap = new HashMap<>();
+  public Map<String, ProcessDef> processMap = new HashMap<>();
 }

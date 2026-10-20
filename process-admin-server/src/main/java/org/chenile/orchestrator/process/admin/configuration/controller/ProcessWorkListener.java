@@ -9,10 +9,9 @@ import org.chenile.orchestrator.process.model.WorkerDto;
 
 @ChenileController(value = "processWorkListener", serviceName = "_processWorkListener_")
 public class ProcessWorkListener {
-    @EventsSubscribedTo("process")
-    @ChenileOperation
-    public GenericResponse<Void> startWork(
-            @ChenileBody WorkerDto workerDto) {
-        return null; // needs to do nothing since this method will never be called.
-    }
+  @EventsSubscribedTo("process")
+  @ChenileOperation
+  public GenericResponse<Void> startWork(@ChenileBody WorkerDto workerDto) {
+    return null; // needs to do nothing since this method will never be called.
+  }
 }

@@ -7,17 +7,25 @@ import org.chenile.stm.State;
 import org.chenile.stm.model.Transition;
 
 /**
- Contains customized logic for the transition. Common logic resides at {@link DefaultSTMTransitionAction}
- <p>Use this class if you want to augment the common logic for this specific transition</p>
- <p>Use a customized payload if required instead of MinimalPayload</p>
-*/
-public class AggregationDoneWithErrorsAction extends BaseProcessAction<DoneWithErrorsPayload>{
+ * Contains customized logic for the transition. Common logic resides at {@link
+ * DefaultSTMTransitionAction}
+ *
+ * <p>Use this class if you want to augment the common logic for this specific transition
+ *
+ * <p>Use a customized payload if required instead of MinimalPayload
+ */
+public class AggregationDoneWithErrorsAction extends BaseProcessAction<DoneWithErrorsPayload> {
 
-	@Override
-	public void transitionTo(Process process,
-                             DoneWithErrorsPayload payload,
-							 State startState, String eventId,
-							 State endState, STMInternalTransitionInvoker<?> stm, Transition transition) throws Exception {
-        addErrorToProcess(process, payload);
-    }
+  @Override
+  public void transitionTo(
+      Process process,
+      DoneWithErrorsPayload payload,
+      State startState,
+      String eventId,
+      State endState,
+      STMInternalTransitionInvoker<?> stm,
+      Transition transition)
+      throws Exception {
+    addErrorToProcess(process, payload);
+  }
 }

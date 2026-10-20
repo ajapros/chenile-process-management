@@ -10,23 +10,31 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- Contains customized logic for the transition. Common logic resides at {@link DefaultSTMTransitionAction}
- <p>Use this class if you want to augment the common logic for this specific transition</p>
- <p>Use a customized payload if required instead of MinimalPayload</p>
-*/
-public class DoneSuccessfullyAction extends AbstractSTMTransitionAction<Process,
-		DoneSuccessfullyPayload>{
-	Logger logger = LoggerFactory.getLogger(this.getClass());
-	@Override
-	public void transitionTo(Process process,
-							 DoneSuccessfullyPayload payload,
-							 State startState, String eventId,
-							 State endState, STMInternalTransitionInvoker<?> stm, Transition transition) throws Exception {
-		if ( process.numSubProcesses > 0) {
-			logger.error("Received Done for a non leaf process" + process.id);
-			return; // discard this event
-		}
-		if (payload.output != null)
-			process.output = payload.output;
-	}
+ * Contains customized logic for the transition. Common logic resides at {@link
+ * DefaultSTMTransitionAction}
+ *
+ * <p>Use this class if you want to augment the common logic for this specific transition
+ *
+ * <p>Use a customized payload if required instead of MinimalPayload
+ */
+public class DoneSuccessfullyAction
+    extends AbstractSTMTransitionAction<Process, DoneSuccessfullyPayload> {
+  Logger logger = LoggerFactory.getLogger(this.getClass());
+
+  @Override
+  public void transitionTo(
+      Process process,
+      DoneSuccessfullyPayload payload,
+      State startState,
+      String eventId,
+      State endState,
+      STMInternalTransitionInvoker<?> stm,
+      Transition transition)
+      throws Exception {
+    if (process.numSubProcesses > 0) {
+      logger.error("Received Done for a non leaf process" + process.id);
+      return; // discard this event
+    }
+    if (payload.output != null) process.output = payload.output;
+  }
 }

@@ -1,5 +1,10 @@
 package org.chenile.orchestrator.process.test;
 
+import static org.chenile.orchestrator.process.test.SharedData.*;
+import static org.springframework.test.annotation.DirtiesContext.ClassMode.BEFORE_EACH_TEST_METHOD;
+
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.chenile.orchestrator.process.model.Constants;
 import org.chenile.orchestrator.process.model.Process;
 import org.chenile.workflow.api.StateEntityService;
@@ -12,12 +17,6 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit4.SpringRunner;
-import static org.chenile.orchestrator.process.test.SharedData.*;
-
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-
-import static org.springframework.test.annotation.DirtiesContext.ClassMode.BEFORE_EACH_TEST_METHOD;
 
 @RunWith(SpringRunner.class)
 @SpringBootTest(classes = SpringConfig.class)
@@ -25,105 +24,107 @@ import static org.springframework.test.annotation.DirtiesContext.ClassMode.BEFOR
 @ActiveProfiles("unittest")
 @DirtiesContext(classMode = BEFORE_EACH_TEST_METHOD)
 public class TestFeeds {
-    @Autowired org.chenile.orchestrator.process.outbox.OutboxDispatcher dispatcher;
-    @Autowired
-    StateEntityService<Process> processManager;
+  @Autowired org.chenile.orchestrator.process.outbox.OutboxDispatcher dispatcher;
+  @Autowired StateEntityService<Process> processManager;
 
-    @Test
-    public void testWith3Files() throws Exception {
-        synch();
-        FeedSplitter.numFiles = 3;
-        Process process = new Process();
-        process.processType = "feed";
-        process.id = "FEED3";
-        processManager.create(process);
-        dispatcher.drainAll(1000);
-        assertState(process.id,Constants.States.PROCESSED);
-        // Is FILE1 processed with the correct args?
-        String fileId = process.id + "FILE1";
-        String expectedArgs = """
-                { "filename" : "file1" }
-                """;
-        assertStateArgs(fileId,Constants.States.PROCESSED,expectedArgs);
-        // Is the chunk corresponding to file 1 processed correctly.
-        assertState(fileId + "CHUNK1",Constants.States.PROCESSED);
-        // Is FILE2 processed with the correct args?
-        fileId = process.id + "FILE2";
-        expectedArgs = """
-                { "filename" : "file2" }
-                """;
-        assertStateArgs(fileId,Constants.States.PROCESSED,expectedArgs);
-        // Is the chunk corresponding to file 2 processed correctly.
-        assertState(fileId + "CHUNK1",Constants.States.PROCESSED);
-        // Is FILE3 processed with the correct args?
-        fileId = process.id + "FILE3";
-        expectedArgs = """
-                { "filename" : "file3" }
-                """;
-        assertStateArgs(fileId,Constants.States.PROCESSED,expectedArgs);
-        // Is the chunk corresponding to file 3 processed correctly.
-        assertState(fileId + "CHUNK1",Constants.States.PROCESSED);
+  @Test
+  public void testWith3Files() throws Exception {
+    synch();
+    FeedSplitter.numFiles = 3;
+    Process process = new Process();
+    process.processType = "feed";
+    process.id = "FEED3";
+    processManager.create(process);
+    dispatcher.drainAll(1000);
+    assertState(process.id, Constants.States.PROCESSED);
+    // Is FILE1 processed with the correct args?
+    String fileId = process.id + "FILE1";
+    String expectedArgs =
+        """
+        { "filename" : "file1" }
+        """;
+    assertStateArgs(fileId, Constants.States.PROCESSED, expectedArgs);
+    // Is the chunk corresponding to file 1 processed correctly.
+    assertState(fileId + "CHUNK1", Constants.States.PROCESSED);
+    // Is FILE2 processed with the correct args?
+    fileId = process.id + "FILE2";
+    expectedArgs =
+        """
+        { "filename" : "file2" }
+        """;
+    assertStateArgs(fileId, Constants.States.PROCESSED, expectedArgs);
+    // Is the chunk corresponding to file 2 processed correctly.
+    assertState(fileId + "CHUNK1", Constants.States.PROCESSED);
+    // Is FILE3 processed with the correct args?
+    fileId = process.id + "FILE3";
+    expectedArgs =
+        """
+        { "filename" : "file3" }
+        """;
+    assertStateArgs(fileId, Constants.States.PROCESSED, expectedArgs);
+    // Is the chunk corresponding to file 3 processed correctly.
+    assertState(fileId + "CHUNK1", Constants.States.PROCESSED);
+  }
 
-    }
+  @Test
+  public void testWith2FilesAsynch() throws Exception {
+    asynch();
+    FeedSplitter.numFiles = 2;
+    Process process = new Process();
+    process.processType = "feed";
+    process.id = "FEED1";
+    processManager.create(process);
+    dispatcher.drainAll(1000);
+    assertState(process.id, Constants.States.SPLIT_PENDING);
+    unblock("FEED1-SPLITTER");
+    assertState(process.id, Constants.States.SUB_PROCESSES_PENDING);
+    unblock("FEED1FILE1-SPLITTER");
+    unblock("FEED1FILE2-SPLITTER");
+    unblock("FEED1FILE1CHUNK1-EXECUTOR");
+    unblock("FEED1FILE2CHUNK1-EXECUTOR");
+    unblock("FEED1FILE1-AGGREGATOR");
+    unblock("FEED1FILE2-AGGREGATOR");
+    assertState(process.id, Constants.States.AGGREGATION_PENDING);
+    unblock("FEED1-AGGREGATOR");
+    assertState(process.id, Constants.States.PROCESSED);
+  }
 
-    @Test
-    public void testWith2FilesAsynch() throws Exception {
-        asynch();
-        FeedSplitter.numFiles = 2;
-        Process process = new Process();
-        process.processType = "feed";
-        process.id = "FEED1";
-        processManager.create(process);
-        dispatcher.drainAll(1000);
-        assertState(process.id,Constants.States.SPLIT_PENDING);
-        unblock("FEED1-SPLITTER");
-        assertState(process.id,Constants.States.SUB_PROCESSES_PENDING);
-        unblock("FEED1FILE1-SPLITTER");
-        unblock("FEED1FILE2-SPLITTER");
-        unblock("FEED1FILE1CHUNK1-EXECUTOR");
-        unblock("FEED1FILE2CHUNK1-EXECUTOR");
-        unblock("FEED1FILE1-AGGREGATOR");
-        unblock("FEED1FILE2-AGGREGATOR");
-        assertState(process.id,Constants.States.AGGREGATION_PENDING);
-        unblock("FEED1-AGGREGATOR");
-        assertState(process.id,Constants.States.PROCESSED);
-    }
+  private void synch() {
+    SYNCH_MODE = true;
+  }
 
-    private void synch(){
-        SYNCH_MODE = true;
-    }
+  private void asynch() {
+    SYNCH_MODE = false;
+    LATCHES = new java.util.concurrent.ConcurrentHashMap<>();
+  }
 
-    private void asynch(){
-        SYNCH_MODE = false;
-        LATCHES = new java.util.concurrent.ConcurrentHashMap<>();
-    }
+  /**
+   * This method co-ordinates with InVMWorkerStarterDelegator to make sure that the tests are
+   * predictable.<br>
+   * The INVMWorkerStarterDelegator class waits for a particular count down latch at any time. This
+   * class counts the latch down so that the thread can progress. The thread then counts the latch
+   * down so that the test can proceed.
+   *
+   * @param latchKey - the latch key that the InVMWorkerStarterDelegator is waiting on.
+   * @throws Exception - for any exception in await below
+   */
+  private void unblock(String latchKey) throws Exception {
+    String proceedKey = latchKey + "PROCEED";
+    CountDownLatch proceedLatch = new CountDownLatch(1);
+    LATCHES.put(proceedKey, proceedLatch);
+    LATCHES.get(latchKey).countDown();
+    Assert.assertTrue(
+        "Worker did not finish: " + latchKey, proceedLatch.await(10, TimeUnit.SECONDS));
+  }
 
-    /**
-     * This method co-ordinates with InVMWorkerStarterDelegator to make sure that the
-     * tests are predictable.<br/>
-     * The INVMWorkerStarterDelegator class waits for a particular count down latch at any time.
-     * This class counts the latch down so that the thread can progress. The thread then counts the
-     * latch down so that the test can proceed.
-     * @param latchKey - the latch key that the InVMWorkerStarterDelegator is waiting on.
-     * @throws Exception - for any exception in await below
-     */
-    private void unblock(String latchKey) throws Exception{
-        String proceedKey = latchKey + "PROCEED";
-        CountDownLatch proceedLatch = new CountDownLatch(1);
-        LATCHES.put(proceedKey,proceedLatch);
-        LATCHES.get(latchKey).countDown();
-        Assert.assertTrue("Worker did not finish: " + latchKey, proceedLatch.await(10, TimeUnit.SECONDS));
-    }
+  private void assertState(String processId, String stateId) {
+    Process p = processManager.retrieve(processId).getMutatedEntity();
+    Assert.assertEquals(stateId, p.getCurrentState().getStateId());
+  }
 
-    private void assertState(String processId,String stateId){
-        Process p = processManager.retrieve(processId).getMutatedEntity();
-        Assert.assertEquals(stateId,p.getCurrentState().getStateId());
-    }
-
-    private void assertStateArgs(String processId,String stateId,String args){
-        Process p = processManager.retrieve(processId).getMutatedEntity();
-        Assert.assertEquals(stateId,p.getCurrentState().getStateId());
-        Assert.assertEquals(args,p.input);
-    }
-
+  private void assertStateArgs(String processId, String stateId, String args) {
+    Process p = processManager.retrieve(processId).getMutatedEntity();
+    Assert.assertEquals(stateId, p.getCurrentState().getStateId());
+    Assert.assertEquals(args, p.input);
+  }
 }

@@ -12,9 +12,9 @@ import org.springframework.context.annotation.*;
 @Configuration
 @Import(ProcessDefinitionController.class)
 public class ProcessDefinitionConfiguration {
-    @Bean(name = {"_processDefinitionService_", "processDefinitionService"})
-    public ProcessDefinitionService processDefinitionService(ProcessConfigurator configurator,
-            ObjectProvider<ProcessDefinitionRepository> repositories) {
-        return new ProcessDefinitionServiceImpl(configurator, repositories.getIfAvailable());
-    }
+  @Bean(name = {"_processDefinitionService_", "processDefinitionService"})
+  public ProcessDefinitionService processDefinitionService(
+      ProcessConfigurator configurator, ObjectProvider<ProcessDefinitionRepository> repositories) {
+    return new ProcessDefinitionServiceImpl(configurator, repositories.getIfAvailable());
+  }
 }

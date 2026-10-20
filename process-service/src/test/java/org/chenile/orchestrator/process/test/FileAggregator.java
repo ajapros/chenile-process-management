@@ -9,10 +9,11 @@ import org.chenile.workflow.api.StateEntityService;
 import org.springframework.beans.factory.annotation.Autowired;
 
 public class FileAggregator implements WorkerStarter {
-    @Autowired
-    StateEntityService<Process> processManager ;
-    @Override
-    public void start(WorkerDto workerDto) {
-        processManager.processById(workerDto.process.getId(), Constants.Events.AGGREGATION_DONE,new AggregationDonePayload());
-    }
+  @Autowired StateEntityService<Process> processManager;
+
+  @Override
+  public void start(WorkerDto workerDto) {
+    processManager.processById(
+        workerDto.process.getId(), Constants.Events.AGGREGATION_DONE, new AggregationDonePayload());
+  }
 }

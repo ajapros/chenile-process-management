@@ -14,12 +14,19 @@ import org.springframework.transaction.PlatformTransactionManager;
 @Configuration
 @Import({TriggerController.class, ProcessOutboxConfiguration.class})
 public class ChenileTriggerConfiguration {
-    private final ObjectMapper mapper = new ObjectMapper().findAndRegisterModules();
-    @Bean public DispatchTriggerCommand dispatchTriggerCommand(ProcessOutboxRepository outbox, EventProcessor events) {
-        return new DispatchTriggerCommand(outbox, events, mapper);
-    }
-    @Bean public EventTriggerService triggerService(ProcessOutboxRepository outbox, DispatchTriggerCommand command,
-            PlatformTransactionManager manager) {
-        return new EventTriggerService(outbox, command, mapper, manager);
-    }
+  private final ObjectMapper mapper = new ObjectMapper().findAndRegisterModules();
+
+  @Bean
+  public DispatchTriggerCommand dispatchTriggerCommand(
+      ProcessOutboxRepository outbox, EventProcessor events) {
+    return new DispatchTriggerCommand(outbox, events, mapper);
+  }
+
+  @Bean
+  public EventTriggerService triggerService(
+      ProcessOutboxRepository outbox,
+      DispatchTriggerCommand command,
+      PlatformTransactionManager manager) {
+    return new EventTriggerService(outbox, command, mapper, manager);
+  }
 }
