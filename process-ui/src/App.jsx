@@ -56,11 +56,11 @@ export default function App() {
   const [connection, setConnection] = useState(null);
   const [tenant, setTenant] = useState('default');
   const [key, setKey] = useState('');
-  return <div className="shell"><aside><div className="brand"><span className="brand-mark">C</span><div>CHENILE<small>Process operations</small></div></div>
+  return <div className="shell"><aside><div className="brand"><img className="brand-mark" src="/chenile-mark.png" alt="Chenile" width="40" height="40"/><div>CHENILE<small>Process operations</small></div></div>
     <p className="aside-caption">OPERATIONS CONSOLE</p><p className="aside-note">Follow every trigger.<br/>Understand every process.</p>
     {connection && <div className="connection"><span className="live-dot"/> {connection.tenant}<button onClick={() => { setConnection(null); setKey(''); }}>Disconnect</button></div>}
     <div className="aside-footer">Framework-managed execution<br/>Cron → Process → Successor</div></aside>
-    {!connection ? <main className="connect"><p className="eyebrow">PROCESS MANAGEMENT</p><h1>Your execution, connected.</h1>
+    {!connection ? <main className="connect"><img className="connect-wordmark" src="/chenile-wordmark-white.png" alt="Chenile"/><p className="eyebrow">PROCESS MANAGEMENT</p><h1>Your execution, connected.</h1>
       <p className="muted">Inspect schedules, define processes and follow execution from the first event to the last successor.</p>
       <form className="card connect-form" onSubmit={e => { e.preventDefault(); setConnection({ tenant, key }); setKey(''); }}>
         <h2>Connect to the API</h2><label>Tenant<input required pattern="[A-Za-z0-9_.-]{1,128}" value={tenant} onChange={e => setTenant(e.target.value)} /></label>
