@@ -149,6 +149,9 @@ abstract class AbstractProcessManagementApiIntegrationTest {
   void durableTriggerAcknowledgementsDeduplicateAndNamespaceTenantKeys() throws Exception {
     definition("source", true, "");
     var first = generate("alpha", "same-key", "source");
+    var missingTrace =
+        response(get(BASE + "/trace").param("triggerId", "missing-trigger"), "alpha", 404);
+    assertTrue(missingTrace.get("message").asText().contains("tenant alpha"));
     var duplicate = generate("alpha", "same-key", "source");
     assertEquals(first, duplicate);
     generate("beta", "same-key", "source");

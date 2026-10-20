@@ -365,7 +365,13 @@ public class ProcessManagementService {
     for (var p : found.values())
       if (found.containsKey(p.predecessorId))
         edges.add(new Edge("process:" + p.predecessorId, "process:" + p.id, "SUCCESSOR"));
-    if (nodes.isEmpty()) throw notFound();
+    if (nodes.isEmpty())
+      throw new ResponseStatusException(
+          HttpStatus.NOT_FOUND,
+          "No process or trigger history for "
+              + (present(processId) ? "processId " + processId : "triggerId " + triggerId)
+              + " in tenant "
+              + tenant);
     return new Trace(nodes, edges);
   }
 

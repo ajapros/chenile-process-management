@@ -111,6 +111,11 @@ At the UI prompt, enter tenant `default` and the same
 server uses `definitionSource=json`, definitions are view-only; choose
 `definitionSource=database` if the UI must create or edit definitions.
 
+If a trigger trace returns 404, confirm that `PROCESS_API_TARGET` points to the
+same generated server that accepted the trigger and that the UI tenant matches
+the trigger tenant. The trace endpoint can show a pending trigger immediately
+after it is accepted, before Kafka dispatch creates its process record.
+
 ## API contract
 
 All paths below are relative to `/process-management/api`. JSON responses are plain
