@@ -3,6 +3,7 @@ package org.chenile.orchestrator.process.outbox;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 class OutboxCommandRegistryTest {
@@ -16,16 +17,46 @@ class OutboxCommandRegistryTest {
   }
 
   @Test
-  @SuppressWarnings("unchecked")
   void producerOnlyEnqueuesInterestedCommands() throws Exception {
+    var ignoredChecks = new AtomicInteger();
+    var ignoredEnqueues = new AtomicInteger();
+    var interestedEnqueues = new AtomicInteger();
     OutboxCommandLifecycle<String> interested =
-        org.mockito.Mockito.mock(OutboxCommandLifecycle.class);
-    OutboxCommandLifecycle<String> ignored = org.mockito.Mockito.mock(OutboxCommandLifecycle.class);
-    org.mockito.Mockito.when(interested.shouldEnqueue("context")).thenReturn(true);
+        command("INTERESTED", ignored -> true, interestedEnqueues);
+    OutboxCommandLifecycle<String> ignored =
+        command(
+            "IGNORED",
+            context -> {
+              ignoredChecks.incrementAndGet();
+              return false;
+            },
+            ignoredEnqueues);
     new OutboxCommandProducer<>(List.of(ignored, interested)).enqueue("context");
-    org.mockito.Mockito.verify(ignored).shouldEnqueue("context");
-    org.mockito.Mockito.verify(ignored, org.mockito.Mockito.never())
-        .enqueue(org.mockito.ArgumentMatchers.any());
-    org.mockito.Mockito.verify(interested).enqueue("context");
+    assertEquals(1, ignoredChecks.get());
+    assertEquals(0, ignoredEnqueues.get());
+    assertEquals(1, interestedEnqueues.get());
+  }
+
+  private static OutboxCommandLifecycle<String> command(
+      String type, java.util.function.Predicate<String> interested, AtomicInteger enqueues) {
+    return new OutboxCommandLifecycle<>() {
+      @Override
+      public String type() {
+        return type;
+      }
+
+      @Override
+      public boolean shouldEnqueue(String context) {
+        return interested.test(context);
+      }
+
+      @Override
+      public void enqueue(String context) {
+        enqueues.incrementAndGet();
+      }
+
+      @Override
+      public void dispatch(OutboxCommand command) {}
+    };
   }
 }

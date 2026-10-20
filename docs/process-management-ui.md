@@ -90,6 +90,27 @@ files behind the same-origin reverse proxy that forwards `/process-management/ap
 to the host. `npm run preview` previews static assets only; it does not provide the API proxy.
 Do not treat Vite's development/preview server as a production server.
 
+### Connect to a generated process server
+
+The process-management blueprint's server defaults to `http://localhost:8000`.
+Start it using the generated project's `run-server.sh` instructions first. Start
+Kafka as described in that project's README when using process creation or worker
+dispatch; the worker itself can be started separately when execution is needed.
+Then run the UI from this repository:
+
+```sh
+cd process-ui
+npm ci
+PROCESS_API_TARGET=http://localhost:8000 npm run dev
+```
+
+At the UI prompt, enter tenant `default` and the same
+`PROCESS_MANAGEMENT_API_KEY` configured on the generated server. For a different
+`serverDeploymentUrl`, set `PROCESS_API_TARGET` to that server origin. Do not append
+`/process-management/api`: the Vite proxy adds that route. When the generated
+server uses `definitionSource=json`, definitions are view-only; choose
+`definitionSource=database` if the UI must create or edit definitions.
+
 ## API contract
 
 All paths below are relative to `/process-management/api`. JSON responses are plain

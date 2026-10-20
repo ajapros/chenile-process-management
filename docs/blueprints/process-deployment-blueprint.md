@@ -18,13 +18,16 @@ upgrade is built and tested, with artifact publication pending.
 
 - **`chenile-process-management`** (`chenile-gen/jgen/bp-process-management`, since 2.1.32) —
   the deployment generator. From native `processMap` definitions it emits a **process server
-  mini-monolith**, a **headless worker mini-monolith**, **per-definition worker JARs**, and
+  mini-monolith**, a **headless worker mini-monolith**, **per-process-type API and service JARs**, and
   an **optional service-registry host**, by composing `minimonolith` + `chenile-process-workers`.
   Guide: `bp-process-management/README.md`.
-- **`chenile-process-workers`** (`chenile-gen/jgen/bp-process-workers`, since 2.1.32) — one
-  plain worker JAR for one process definition: a **leaf** type gets an **executor**; a
-  **non-leaf** type gets a **splitter + aggregator** in the same JAR. The `doStart` hooks
-  throw until you implement them (they are application code). Reused per-definition by the
+- **`chenile-process-workers`** (`chenile-gen/jgen/bp-process-workers`, since 2.1.32) —
+  produces an API JAR and a service JAR for one process type. The API owns that type's
+  typed input and output models. A **leaf** service gets an **executor**; a **non-leaf**
+  service gets a **splitter + typed `AggregatedResult<ChildOutput>` aggregator**. The
+  executor transforms input into output; the aggregator collects immediate child outputs
+  and errors. The `doStart` hooks throw
+  until you implement them (they are application code). Reused per process type by the
   process-management blueprint.
 
 See the **`chenile-jgen`** skill for the full input contracts, the composable
@@ -33,8 +36,9 @@ declarative input validation.
 
 ## Input contract (process-management blueprint)
 
-`jgen -g chenile-process-management -o input.json -e` emits the input plus companion sample
-spec files; edit them, then `jgen -f input.json`. Key fields:
+`jgen -g chenile-process-management -e process-specs` emits
+`process-specs/input-file.json` and the companion process and cron specs in that folder.
+Edit them, then run `jgen -f process-specs/input-file.json`. Key fields:
 
 | Field | Notes |
 |---|---|
@@ -58,7 +62,8 @@ The process spec keeps the runtime's native shape (not the old `processes[]` arr
     "Partition": { "parentProcessType": "Import", "leaf": false },
     "Record":    { "parentProcessType": "Partition", "leaf": true }
   },
-  "inputFields": { "Import": { "batchId": "string" }, "Record": { "recordId": "string" } }
+  "inputFields": { "Import": { "batchId": "string" }, "Record": { "recordId": "string" } },
+  "outputFields": { "Record": { "accepted": "boolean", "recordNumber": "long" } }
 }
 ```
 
@@ -68,11 +73,16 @@ packaged only by the server.
 
 ## Generated modules
 
-- `<app>-api` — shared typed payloads + process-start service contracts.
+- `<app>-api` — process-start service contracts, depending on the process type API JARs.
 - `<app>-server-config` — native definitions + cron seeds (server only).
 - `<app>-server-service` — typed Chenile HTTP services, process bootstrap, runtime services,
   acknowledged Kafka publication (trigger 202/Location). **No** business workers.
-- `<app>-<processType>-workers` — one plain JAR per definition (via `chenile-process-workers`).
+- `<app>-<processType>-workers` — Maven parent for `<app>-<processType>-api` and
+  `<app>-<processType>-service`. Leaf API JARs define `<ProcessType>Output` from
+  `outputFields`; composite outputs use the reusable
+  `AggregatedResult<ImmediateChildOutput>` type from `process-delegate`. It carries typed
+  child outputs, completion counts, and errors. All immediate children of a composite must
+  resolve to the same output type so its result remains strongly typed.
 - `<app>-worker-listener` — headless Chenile Kafka listener: subscribes to every topic,
   validates/restores tenant, invokes workers, calls back through the **registry-backed
   process delegate**, handles retry. No process datasource / process-service / JDBC starter /
