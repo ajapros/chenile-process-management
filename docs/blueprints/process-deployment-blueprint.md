@@ -83,9 +83,11 @@ packaged only by the server.
   `AggregatedResult<ImmediateChildOutput>` type from `process-delegate`. It carries typed
   child outputs, completion counts, and errors. All immediate children of a composite must
   resolve to the same output type so its result remains strongly typed.
-- `<app>-worker-listener` — headless Chenile Kafka listener: subscribes to every topic,
-  validates/restores tenant, invokes workers, calls back through the **registry-backed
-  process delegate**, handles retry. No process datasource / process-service / JDBC starter /
+- `<app>-worker-listener` — headless Chenile controller subscribed to the `process-work` event,
+  plus Chenile Kafka's generic consumer. Worker dispatch uses the shared `BatchServiceBase` from
+  `process-delegate`; the blueprint generates no duplicate worker service. Configured Kafka topics map to that event; failed
+  deliveries are retried and then sent to a dead-letter topic. Worker callbacks use the
+  **registry-backed process delegate**. No process datasource / process-service / JDBC starter /
   outbox worker.
 - `<app>Server`, `<app>Worker` — composed `minimonolith` hosts. The **server uses exactly one
   queue-based (Kafka) starter**; the worker has no process DB.

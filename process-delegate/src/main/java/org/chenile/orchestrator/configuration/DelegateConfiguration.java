@@ -4,6 +4,7 @@ import org.chenile.core.context.PopulateContextContainer;
 import org.chenile.orchestrator.delegate.ProcessManagerClient;
 import org.chenile.orchestrator.delegate.ProcessManagerClientImpl;
 import org.chenile.orchestrator.process.api.ProcessManager;
+import org.chenile.orchestrator.process.utils.base.BatchServiceBase;
 import org.chenile.proxy.builder.ProxyBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -23,5 +24,10 @@ public class DelegateConfiguration {
   public ProcessManager processServiceProxy() {
     return proxyBuilder.buildProxy(
         ProcessManager.class, "processService", populateContextContainer);
+  }
+
+  @Bean("_processWorkService_")
+  public BatchServiceBase<Object> processWorkService() {
+    return new BatchServiceBase<>();
   }
 }

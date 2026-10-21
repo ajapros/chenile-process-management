@@ -2,9 +2,11 @@ package org.chenile.orchestrator.process.utils.base;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -52,12 +54,31 @@ class BatchServiceBaseTest {
     when(applicationContext.getBean("feedSplitter")).thenReturn(worker);
     TestBatchService service = new TestBatchService(client, applicationContext);
 
-    boolean started = service.startWorker(workerDto(WorkerType.SPLITTER));
+    boolean started = startWorkerAsTenant(service, workerDto(WorkerType.SPLITTER));
 
     assertTrue(started);
     assertTrue(worker.started);
     assertEquals("value", worker.payload.known);
     verify(client, never()).process(any(), any(), any());
+  }
+
+  @Test
+  void rejectsWorkerMessagesWithAMismatchedTenant() {
+    ProcessManagerClient client = mock(ProcessManagerClient.class);
+    ApplicationContext applicationContext = mock(ApplicationContext.class);
+    TestBatchService service = new TestBatchService(client, applicationContext);
+    WorkerDto workerDto = workerDto(WorkerType.SPLITTER);
+    ContextContainer context = ContextContainer.CONTEXT_CONTAINER;
+    ContextContainer.ContextSnapshot snapshot = context.snapshot();
+    try {
+      context.setTenant("another-tenant");
+
+      assertThrows(IllegalArgumentException.class, () -> service.startWorker(workerDto));
+      verify(applicationContext, never()).getBean(anyString());
+      verify(client, never()).process(any(), any(), any());
+    } finally {
+      context.restore(snapshot);
+    }
   }
 
   @Test
@@ -68,8 +89,9 @@ class BatchServiceBaseTest {
     when(applicationContext.getBean("feedSplitter")).thenReturn(worker);
 
     boolean started =
-        new TestBatchService(client, applicationContext)
-            .startWorker(workerDto(WorkerType.SPLITTER, "{invalid}"));
+        startWorkerAsTenant(
+            new TestBatchService(client, applicationContext),
+            workerDto(WorkerType.SPLITTER, "{invalid}"));
 
     assertTrue(started);
     assertFalse(worker.started);
@@ -93,8 +115,9 @@ class BatchServiceBaseTest {
     when(applicationContext.getBean("feedSplitter")).thenReturn(new UntypedWorker());
 
     boolean started =
-        new TestBatchService(client, applicationContext)
-            .startWorker(workerDto(WorkerType.SPLITTER, "{invalid}"));
+        startWorkerAsTenant(
+            new TestBatchService(client, applicationContext),
+            workerDto(WorkerType.SPLITTER, "{invalid}"));
 
     assertTrue(started);
     ArgumentCaptor<DoneWithErrorsPayload> payload =
@@ -104,18 +127,18 @@ class BatchServiceBaseTest {
   }
 
   @Test
-  void leavesTheWorkItemRetryableWhenFailureReportingCannotReachTheDaemon() {
+  void throwsWhenFailureReportingCannotReachTheDaemonSoTheQueueCanRetry() {
     ProcessManagerClient client = mock(ProcessManagerClient.class);
     ApplicationContext applicationContext = mock(ApplicationContext.class);
     when(applicationContext.getBean("feedSplitter")).thenReturn(new PayloadWorker());
     when(client.process(any(), any(), any()))
         .thenThrow(new IllegalStateException("daemon unavailable"));
 
-    boolean started =
-        new TestBatchService(client, applicationContext)
-            .startWorker(workerDto(WorkerType.SPLITTER, "{invalid}"));
-
-    assertFalse(started);
+    assertThrows(
+        IllegalStateException.class,
+        () -> startWorkerAsTenant(
+            new TestBatchService(client, applicationContext),
+            workerDto(WorkerType.SPLITTER, "{invalid}")));
   }
 
   private void assertReportedEvent(WorkerType workerType, String eventId) {
@@ -125,8 +148,9 @@ class BatchServiceBaseTest {
         .thenReturn(new PayloadWorker());
 
     boolean started =
-        new TestBatchService(client, applicationContext)
-            .startWorker(workerDto(workerType, "{\"known\":{\"nested\":true}}"));
+        startWorkerAsTenant(
+            new TestBatchService(client, applicationContext),
+            workerDto(workerType, "{\"known\":{\"nested\":true}}"));
 
     assertTrue(started);
     verify(client).process(eq("process-1"), eq(eventId), any(DoneWithErrorsPayload.class));
@@ -139,12 +163,24 @@ class BatchServiceBaseTest {
   private WorkerDto workerDto(WorkerType workerType, String input) {
     Process process = new Process();
     process.id = "process-1";
+    process.tenant = "test";
     process.processType = "feed";
     process.input = input;
     WorkerDto workerDto = new WorkerDto();
     workerDto.process = process;
     workerDto.workerType = workerType;
     return workerDto;
+  }
+
+  private boolean startWorkerAsTenant(TestBatchService service, WorkerDto workerDto) {
+    ContextContainer context = ContextContainer.CONTEXT_CONTAINER;
+    ContextContainer.ContextSnapshot snapshot = context.snapshot();
+    try {
+      context.setTenant("test");
+      return service.startWorker(workerDto);
+    } finally {
+      context.restore(snapshot);
+    }
   }
 
   private String camelCase(WorkerType workerType) {

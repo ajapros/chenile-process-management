@@ -157,18 +157,21 @@ state and needs no process database.
 |---|---|
 | `process-delegate` | `ProcessManagerClient` plus `DelegateConfiguration`, which builds the `processServiceProxy` pointed at the server; also the worker base classes (`SplitterBase`, `ExecutorBase`, `AggregatorBase`, `BatchServiceBase`) |
 | one or more **worker jars** | your domain code: concrete splitters, executors and aggregators, each extending the base classes |
-| a **`ProcessWorkListener`** | the controller that receives a `WorkerDto` off the queue and invokes the matching worker; it must be instantiated by this monolith |
-| a `chenile-pubsub` **subscriber** | bound to the same topic the server's starter publishes to (`chenile-azure`, Kafka, etc.) |
+| a **`ProcessWorkListener`** | the generated headless controller that routes the `process-work` event to the shared `BatchServiceBase` bean from `process-delegate` |
+| Chenile Kafka's generic consumer | maps configured Kafka topics to `process-work`, retries failed deliveries, and routes exhausted records to a dead-letter topic |
+
+Provision a dead-letter topic for each consumed topic using the configured suffix (default
+`.DLT`) so exhausted records can be preserved after the retry limit.
 
 What the worker does:
 
-- **Subscribes to the queue.** A `chenile-pubsub` subscriber (e.g. `chenile-azure`) listens
-  on the topic the server publishes `WorkerDto`s to. Delivery surfaces the `WorkerDto` as
-  the body of the worker-dispatch Chenile event.
-- **Dispatches to the right worker.** `ProcessWorkListener` is a `@ChenileController`
-  subscribed (`@EventsSubscribedTo`) to that event with a `@ChenileBody WorkerDto`. It
-  resolves the correct `IWorker` for the `workerType` (`SPLITTER` / `EXECUTOR` / `AGGREGATOR`)
-  and `processType`, and calls `worker.start(workerDto, input)`.
+- **Subscribes to the queue.** Chenile Kafka listens on configured topics and maps each to the
+  `process-work` event. The default process deployment binds the `process-work` Kafka topic to
+  the `process-work` event. Delivery surfaces the `WorkerDto` as the body of the event.
+- **Dispatches to the right worker.** `ProcessWorkListener` is a generated `@ChenileController`
+  subscribed (`@EventsSubscribedTo`) to that event with a `@ChenileBody WorkerDto`. It invokes
+  the shared `BatchServiceBase` in `process-delegate`, which resolves the matching `IWorker`
+  for its `workerType` (`SPLITTER` / `EXECUTOR` / `AGGREGATOR`) and `processType`.
 - **Performs the work.** Each worker extends a base class from `process-delegate`:
   - `SplitterBase.doStart(...)` returns a list of `SubProcessPayload`s (the children).
   - `ExecutorBase.doStart(...)` converts input to output.

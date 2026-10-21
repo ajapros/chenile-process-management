@@ -20,7 +20,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 
-public abstract class BatchServiceBase<T> implements BatchService<T> {
+public class BatchServiceBase<T> implements BatchService<T> {
   private static final Logger logger = LoggerFactory.getLogger(BatchServiceBase.class);
   private final ObjectMapper objectMapper = new ObjectMapper();
   @Autowired ProcessManagerClient processManagerClient;
@@ -31,7 +31,9 @@ public abstract class BatchServiceBase<T> implements BatchService<T> {
   }
 
   /** Returns the tenant to propagate when this batch starts a root process. */
-  protected abstract String getTenant();
+  protected String getTenant() {
+    return ContextContainer.CONTEXT_CONTAINER.getTenant();
+  }
 
   @Override
   public Process doFirstTrigger(String firstProcessType, T input) {
@@ -62,33 +64,47 @@ public abstract class BatchServiceBase<T> implements BatchService<T> {
 
   @Override
   public boolean startWorker(WorkerDto workerDto) {
-    logger.info(
-        "Received process work processId={} processType={} workerType={}",
-        workerDto.process.getId(),
-        workerDto.process.processType,
-        workerDto.workerType);
-    String componentName = workerDto.process.processType + camelCase(workerDto.workerType);
-    logger.info("Start() method of BatchServiceBase. Worker Type is {}", workerDto.workerType);
+    ContextContainer context = ContextContainer.CONTEXT_CONTAINER;
+    ContextContainer.ContextSnapshot snapshot = context.snapshot();
     try {
-      IWorker<?> actualWorker = (IWorker<?>) applicationContext.getBean(componentName);
-      invoke(actualWorker, workerDto);
-      return true;
-    } catch (Exception e) {
-      logger.error(
-          "Cannot start the worker of type {}. Reporting the failure to the process daemon.",
-          workerDto.workerType,
-          e);
-      try {
-        ErrorsHelper.handleErrors(
-            workerDto, e, processManagerClient, errorEvent(workerDto.workerType));
-        return true;
-      } catch (Exception reportingFailure) {
-        logger.error(
-            "Unable to report worker failure for process {} to the process daemon.",
-            workerDto.process.getId(),
-            reportingFailure);
-        return false;
+      String tenant = context.getTenant();
+      if (tenant == null
+          || workerDto == null
+          || workerDto.process == null
+          || !tenant.equals(workerDto.process.tenant)) {
+        throw new IllegalArgumentException("Worker message tenant must match its process tenant");
       }
+
+      logger.info(
+          "Received process work processId={} processType={} workerType={}",
+          workerDto.process.getId(),
+          workerDto.process.processType,
+          workerDto.workerType);
+      String componentName = workerDto.process.processType + camelCase(workerDto.workerType);
+      logger.info("Start() method of BatchServiceBase. Worker Type is {}", workerDto.workerType);
+      try {
+        IWorker<?> actualWorker = (IWorker<?>) applicationContext.getBean(componentName);
+        invoke(actualWorker, workerDto);
+        return true;
+      } catch (Exception e) {
+        logger.error(
+            "Cannot start the worker of type {}. Reporting the failure to the process daemon.",
+            workerDto.workerType,
+            e);
+        try {
+          ErrorsHelper.handleErrors(
+              workerDto, e, processManagerClient, errorEvent(workerDto.workerType));
+          return true;
+        } catch (Exception reportingFailure) {
+          logger.error(
+              "Unable to report worker failure for process {} to the process daemon.",
+              workerDto.process.getId(),
+              reportingFailure);
+          throw new IllegalStateException("Worker callback failed; retry delivery", reportingFailure);
+        }
+      }
+    } finally {
+      context.restore(snapshot);
     }
   }
 
