@@ -49,7 +49,15 @@ public class QueueBasedProcessStarter implements WorkerStarter {
         workerDto.workerType);
 
     ContextContainer contextContainer = ContextContainer.getInstance();
-    Map<String, Object> props = new HashMap<>(contextContainer.toMap());
+    Map<String, Object> props = new HashMap<>();
+    contextContainer
+        .toMap()
+        .forEach(
+            (key, value) -> {
+              if (key.startsWith("x-")) {
+                props.put(key, value);
+              }
+            });
     try {
       String s = objectMapper.writeValueAsString(workerDto);
       chenilePub.asyncPublish(topic, s, props);

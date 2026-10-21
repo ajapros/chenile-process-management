@@ -45,12 +45,16 @@ public class QueueBasedProcessStarterTest {
     starter.chenilePub = chenilePub;
 
     context.setTenant("tenant-A");
+    context.put("authorization", "internal-value");
+    context.put("x-chenile-trace", "trace-A");
     starter.start(workerDto("feed-topic"));
 
     @SuppressWarnings("rawtypes")
     ArgumentCaptor<Map> propsCaptor = ArgumentCaptor.forClass(Map.class);
     verify(chenilePub).asyncPublish(eq("feed-topic"), anyString(), propsCaptor.capture());
     Assert.assertEquals("tenant-A", propsCaptor.getValue().get(HeaderUtils.TENANT_ID_KEY));
+    Assert.assertEquals("trace-A", propsCaptor.getValue().get("x-chenile-trace"));
+    Assert.assertFalse(propsCaptor.getValue().containsKey("authorization"));
   }
 
   @Test
