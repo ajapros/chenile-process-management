@@ -47,3 +47,16 @@ it('shows authentication failures instead of a misleading empty dashboard', asyn
   fireEvent.click(screen.getByRole('button', { name: 'Connect', exact: true }));
   await waitFor(() => expect(screen.getAllByRole('alert').some(e => e.textContent.includes('administrator key'))).toBe(true));
 });
+it('builds a weekly Quartz expression while keeping the expression field editable', async () => {
+  mockApi(); render(<App/>); await connect();
+  fireEvent.click(screen.getByRole('button', { name:'Cron triggers', exact:true }));
+  fireEvent.click(screen.getByText('Build a Quartz expression'));
+  fireEvent.change(screen.getByLabelText('Helper schedule'), { target: { value: 'weekly' } });
+  fireEvent.change(screen.getByLabelText('Schedule minute'), { target: { value: '30' } });
+  fireEvent.change(screen.getByLabelText('Schedule hour'), { target: { value: '14' } });
+  fireEvent.change(screen.getByLabelText('Schedule weekday'), { target: { value: 'FRI' } });
+  fireEvent.click(screen.getByRole('button', { name:'Use expression: 0 30 14 ? * FRI' }));
+  expect(screen.getByLabelText('Quartz cron expression')).toHaveValue('0 30 14 ? * FRI');
+  fireEvent.change(screen.getByLabelText('Quartz cron expression'), { target: { value: '0 0/10 * * * ?' } });
+  expect(screen.getByLabelText('Quartz cron expression')).toHaveValue('0 0/10 * * * ?');
+});

@@ -150,6 +150,47 @@ function PayloadFields({ names, processType, setProcessType, args, setArgs }) {
   return <><label>Process definition<select required value={processType} onChange={e => setProcessType(e.target.value)}><option value="">Choose a definition</option>
     {names.map(n => <option key={n}>{n}</option>)}</select></label><label>Input arguments (JSON object)<textarea required value={args} onChange={e => setArgs(e.target.value)} spellCheck="false" /></label></>;
 }
+
+function CronExpressionHelper({ onUse }) {
+  const [frequency, setFrequency] = useState('daily');
+  const [interval, setInterval] = useState('5');
+  const [minute, setMinute] = useState('0');
+  const [hour, setHour] = useState('9');
+  const [weekday, setWeekday] = useState('MON');
+  const [dayOfMonth, setDayOfMonth] = useState('1');
+
+  const expression = () => {
+    if (frequency === 'interval') return `0 0/${interval} * * * ?`;
+    if (frequency === 'hourly') return `0 ${minute} * * * ?`;
+    if (frequency === 'weekdays') return `0 ${minute} ${hour} ? * MON-FRI`;
+    if (frequency === 'weekly') return `0 ${minute} ${hour} ? * ${weekday}`;
+    if (frequency === 'monthly') return `0 ${minute} ${hour} ${dayOfMonth} * ?`;
+    return `0 ${minute} ${hour} * * ?`;
+  };
+
+  return <details className="cron-helper"><summary>Build a Quartz expression</summary>
+    <p className="muted">Choose a schedule to fill the expression below. You can edit it afterward or write any valid Quartz expression yourself.</p>
+    <div className="form-grid">
+      <label>Schedule<select aria-label="Helper schedule" value={frequency} onChange={e => setFrequency(e.target.value)}>
+        <option value="interval">Every few minutes</option><option value="hourly">Hourly</option>
+        <option value="daily">Daily</option><option value="weekdays">Weekdays</option>
+        <option value="weekly">Weekly</option><option value="monthly">Monthly</option>
+      </select></label>
+      {frequency === 'interval' && <label>Minutes<select aria-label="Minute interval" value={interval} onChange={e => setInterval(e.target.value)}>
+        {[1, 5, 10, 15, 30].map(value => <option key={value} value={value}>{value}</option>)}
+      </select></label>}
+      {frequency !== 'interval' && <label>{frequency === 'hourly' ? 'Minute past the hour' : 'Minute'}<input aria-label="Schedule minute" type="number" min="0" max="59" value={minute} onChange={e => setMinute(e.target.value)} /></label>}
+      {['daily', 'weekdays', 'weekly', 'monthly'].includes(frequency) && <label>Time (24 hour)<input aria-label="Schedule hour" type="number" min="0" max="23" value={hour} onChange={e => setHour(e.target.value)} /></label>}
+      {frequency === 'weekly' && <label>Day of week<select aria-label="Schedule weekday" value={weekday} onChange={e => setWeekday(e.target.value)}>
+        {['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map(day => <option key={day}>{day}</option>)}
+      </select></label>}
+      {frequency === 'monthly' && <label>Day of month<input aria-label="Schedule day of month" type="number" min="1" max="31" value={dayOfMonth} onChange={e => setDayOfMonth(e.target.value)} /></label>}
+    </div>
+    <p className="muted mono">Quartz fields: seconds · minutes · hours · day of month · month · day of week</p>
+    <button type="button" onClick={() => onUse(expression())}>Use expression: {expression()}</button>
+  </details>;
+}
+
 function Crons({ api, revision, definitions, info, mutate, busy, history }) {
   const [page, setPage] = useState(0), [editing, setEditing] = useState(null);
   const [name, setName] = useState(''), [cron, setCron] = useState('0 0/5 * * * ?'), [zone, setZone] = useState('UTC'), [enabled, setEnabled] = useState(true);
@@ -180,6 +221,7 @@ function Crons({ api, revision, definitions, info, mutate, busy, history }) {
     <Notice resource={definitions}/>{error && <p className="notice error" role="alert">{error}</p>}
     <div className="form-grid"><form className="card" onSubmit={save}><h3>{editing ? 'Edit cron trigger' : 'Add cron trigger'}</h3>
       <label>Name<input required value={name} onChange={e => setName(e.target.value)}/></label>
+      <CronExpressionHelper onUse={setCron}/>
       <label>Quartz cron expression<input required className="mono" value={cron} onChange={e => setCron(e.target.value)}/></label>
       <label>Timezone<input required value={zone} onChange={e => setZone(e.target.value)}/></label>
       <PayloadFields names={names} processType={processType} setProcessType={setProcessType} args={args} setArgs={setArgs}/>
