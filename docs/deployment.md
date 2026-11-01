@@ -24,7 +24,7 @@ A deployment consists of **at least two** mini monoliths, and can grow to includ
    worker monoliths (and more worker instances) as load grows.
 
 The two are decoupled by a **queue** (`chenile-azure`, Kafka, or any `chenile-pubsub`
-transport). The server publishes a `WorkerDto` to a topic; a worker consumes it, does
+transport). The server publishes a work message to a topic; a worker consumes it, does
 the work, and calls back into the server over HTTP. Nothing but the queue and the
 server's HTTP endpoint couples them, so workers scale independently of the brain.
 
@@ -57,13 +57,13 @@ flowchart LR
 
     Trigger --> TS
     PM <--> DB
-    WS -->|publish WorkerDto| Q
-    Q -->|deliver WorkerDto| WL
+    WS -->|publish WorkListenerInput| Q
+    Q -->|deliver work + processType/workerType| WL
     DG -->|"callback: splitDone, doneSuccessfully, aggregationDone"| PM
 ```
 
 The callback arrow is the key to the whole design: a worker never touches the process
-database. It receives a self-describing `WorkerDto`, does its job, and raises an event
+database. It receives a self-describing work message, does its job, and raises an event
 back into the server's state machine. All authoritative state stays on the server.
 
 ## Why split the server from the worker
@@ -112,9 +112,12 @@ What the server does:
   as rows in `chenile_process_outbox` **in the same transaction that saves the process**.
 - **Dispatches work.** The outbox poller drains due commands. A `START_WORKER` command
   hands a `WorkerDto` to the configured `WorkerStarter`. With the queue-based starter,
-  `QueueBasedProcessStarter.start(workerDto)` serialises the `WorkerDto` to JSON and calls
-  `ChenilePub.asyncPublish(topic, json, props)`, where `topic` comes from the process
-  definition's `execDef.get("queue")` and `props` carries the tenant as `x-chenile-tenant-id`.
+  `QueueBasedProcessStarter.start(workerDto)` publishes a **`WorkListenerInput`** envelope —
+  `processId`, `dispatchId`, the process input as `payload`, and `execDef` — with
+  `ChenilePub.asyncPublish(topic, json, props)`. `topic` comes from the definition's
+  `execDef.get("queue")`; `props` carries the `x-` context headers, the process's tenant as
+  `x-chenile-tenant-id`, and the routing headers `processType` and `workerType`. (The pre-2.1.35
+  `WorkerDto` body is still available as `start1(...)`.)
 - **Receives callbacks.** It exposes the `ProcessManager` service over HTTP under the
   Chenile service name `processService`. Workers call back into `PATCH /process/{id}/{event}`
   (via a proxy) to report `splitDone`, `doneSuccessfully`, `aggregationDone`, and the
@@ -155,9 +158,9 @@ state and needs no process database.
 
 | Packaged module | Role in the worker |
 |---|---|
-| `process-delegate` | `ProcessManagerClient` plus `DelegateConfiguration`, which builds the `processServiceProxy` pointed at the server; also the worker base classes (`SplitterBase`, `ExecutorBase`, `AggregatorBase`, `BatchServiceBase`) |
-| one or more **worker jars** | your domain code: concrete splitters, executors and aggregators, each extending the base classes |
-| a **`ProcessWorkListener`** | the generated headless controller that routes the `process-work` event to the shared `BatchServiceBase` bean from `process-delegate` |
+| `process-delegate` | `ProcessManagerClient` plus `DelegateConfiguration`, which builds the `processServiceProxy` pointed at the server and imports `processWorkServiceSelector` and `processWorkBodyTypeSelector`; also the typed worker bases (`ExecutorWorkListener`, `SplitterWorkListener`, `AggregatorWorkListener`) |
+| one or more **worker jars** | your domain code: concrete splitters, executors and aggregators extending the typed bases, registered as beans named `<processType>Executor`, `<processType>Splitter`, `<processType>Aggregator` |
+| a **`ProcessWorkListener`** | the generated headless controller for the `process-work` event; its `serviceSelector` routes each message to the right worker bean |
 | Chenile Kafka's generic consumer | maps configured Kafka topics to `process-work`, retries failed deliveries, and routes exhausted records to a dead-letter topic |
 
 Provision a dead-letter topic for each consumed topic using the configured suffix (default
@@ -167,20 +170,28 @@ What the worker does:
 
 - **Subscribes to the queue.** Chenile Kafka listens on configured topics and maps each to the
   `process-work` event. The default process deployment binds the `process-work` Kafka topic to
-  the `process-work` event. Delivery surfaces the `WorkerDto` as the body of the event.
+  the `process-work` event. Delivery surfaces the `WorkListenerInput` as the event body and the
+  `processType` / `workerType` message headers as operation parameters.
 - **Dispatches to the right worker.** `ProcessWorkListener` is a generated `@ChenileController`
-  subscribed (`@EventsSubscribedTo`) to that event with a `@ChenileBody WorkerDto`. It invokes
-  the shared `BatchServiceBase` in `process-delegate`, which resolves the matching `IWorker`
-  for its `workerType` (`SPLITTER` / `EXECUTOR` / `AGGREGATOR`) and `processType`.
-- **Performs the work.** Each worker extends a base class from `process-delegate`:
-  - `SplitterBase.doStart(...)` returns a list of `SubProcessPayload`s (the children).
-  - `ExecutorBase.doStart(...)` converts input to output.
-  - `AggregatorBase.doStart(...)` folds each child's output into a consolidated output
-    (it pulls children via `processManagerClient.getSubProcesses(...)`).
+  subscribed (`@EventsSubscribedTo`) to that event, with
+  `serviceSelector = "processWorkServiceSelector"` and
+  `@BodyTypeSelector("processWorkBodyTypeSelector")`. Chenile core's service selection turns the
+  headers into a bean name — `<processType>` + `Executor` / `Splitter` / `Aggregator` — and calls
+  that bean; the body selector binds the payload to the worker's own input type. The configured
+  `_processWorkService_` is only a fallback that fails with `NO_PROCESS_WORKER_SELECTED`.
+- **Performs the work.** Each worker extends a typed base from `process-delegate`:
+  - `SplitterWorkListener.doStart(WorkListenerInput<In>)` returns a list of `SubProcessPayload`s
+    (the children); `splitPartiallyDone(...)` can submit them in batches.
+  - `ExecutorWorkListener.doStart(WorkListenerInput<In>)` converts input to output.
+  - `AggregatorWorkListener.doStart(out, input, childOutput, child)` is called once per child
+    (pulled via `processManagerClient.getSubProcesses(...)`) and folds it into the result.
 - **Reports back.** The base classes call `processManagerClient.splitDone(...)`,
   `doneSuccessfully(...)` or `aggregationDone(...)` on success, and the matching
   `...WithErrors` variant on exception. Those calls go through the `processServiceProxy`
-  over HTTP to the server, which applies the event to the STM.
+  over HTTP to the server, which applies the event to the STM. A worker's own exception is
+  therefore a *business* outcome (the process ends `PROCESSED_WITH_ERRORS`) and the message is not
+  retried; only a failed callback or a malformed message (no process id, process type or tenant,
+  or a worker-type mismatch) propagates to the Kafka consumer's retry and dead-letter handling.
 
 The one piece of wiring that makes a worker monolith a *worker*: it must be started with
 the **location of the process manager server**. `DelegateConfiguration` reads
@@ -225,9 +236,9 @@ sequenceDiagram
     Out->>PM: later dispatch ProcessCreate using command ID
     PM->>PM: persist root Process, enter STM
     PM->>Out: record START_WORKER in outbox (same tx)
-    Out->>Q: publish WorkerDto (q-based starter, ChenilePub)
-    Q->>WL: deliver WorkerDto (chenile-pubsub subscriber)
-    WL->>Wk: resolve IWorker by workerType, start(workerDto, input)
+    Out->>Q: publish WorkListenerInput + processType/workerType headers
+    Q->>WL: deliver work (Chenile Kafka consumer)
+    WL->>Wk: serviceSelector picks the worker bean, payload typed by body selector
     Wk->>Wk: doStart(...) performs the real work
     Wk-->>PM: HTTP callback splitDone / doneSuccessfully / aggregationDone
     PM->>PM: apply event, advance STM
@@ -239,7 +250,7 @@ sequenceDiagram
 Two properties worth calling out, both inherited from the engine and unchanged by this
 topology:
 
-- **The queue hop is at-least-once.** A `WorkerDto` can be delivered more than once. The
+- **The queue hop is at-least-once.** A work message can be delivered more than once. The
   callbacks are made safe by the server's effect-level idempotency (`checkIdempotency` on
   `chenile_process_receipt`, keyed by business identity), so a replayed worker cannot
   double-count a child or create duplicate successors. Workers should still avoid
@@ -277,13 +288,13 @@ flowchart TB
 Three independent axes of growth:
 
 - **More instances of one worker monolith.** Run N replicas against the same topic; the
-  broker's competing-consumer semantics spread `WorkerDto`s across them. KEDA can scale
+  broker's competing-consumer semantics spread the work messages across them. KEDA can scale
   the replica count (even to zero) on queue depth.
 - **More worker monoliths.** Because each process type names its own topic in its
   definition, you can route heavy process types to their own worker pool with its own
   jars, resource limits and scaling policy, while light ones share another.
 - **More worker jars inside a monolith.** A single worker monolith can package several
-  worker jars; the `ProcessWorkListener` resolves the right `IWorker` per `WorkerDto`, so
+  worker jars; the `ProcessWorkListener` selects the right worker bean per message, so
   co-locating related splitters/executors/aggregators is just a packaging choice.
 
 The server stays single in intent throughout. Replicate it for availability (each replica

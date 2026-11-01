@@ -71,14 +71,15 @@ Two mini monoliths, one durable orchestration engine.
 
 ## Slide 6 — The worker monolith: the muscle
 
-- Packages: `process-delegate` (the `ProcessManagerClient` + the `SplitterBase` /
-  `ExecutorBase` / `AggregatorBase` base classes), one or more **worker jars**, a
-  **`ProcessWorkListener`**, and a `chenile-pubsub` subscriber.
+- Packages: `process-delegate` (the `ProcessManagerClient` + the typed
+  `ExecutorWorkListener` / `SplitterWorkListener` / `AggregatorWorkListener` bases), one or more
+  **worker jars**, a **`ProcessWorkListener`** routed by a Chenile `serviceSelector`, and the
+  Chenile Kafka consumer.
 - Holds **no** process state, needs **no** process database.
 - The one required knob: **`process.manager.base-url`** — where the brain lives.
 - Narration: "The worker holds only your domain code and the plumbing to reach the server.
-  The listener pulls a WorkerDto off the queue; your splitter or executor or aggregator
-  does the job; the delegate calls the result back. Start it with the server's URL and
+  The listener takes a work message off the queue and picks your splitter, executor or
+  aggregator by name; it does the job; the delegate calls the result back. Start it with the server's URL and
   you're done."
 
 ---
@@ -86,8 +87,8 @@ Two mini monoliths, one durable orchestration engine.
 ## Slide 7 — Why the queue-based starter
 
 - Three interchangeable starters: **in-VM** (work runs inside the server),
-  **JDBC** (durable work queue in the shared database), **queue-based** (publish a
-  `WorkerDto` to a topic).
+  **JDBC** (durable work queue in the shared database), **queue-based** (publish a typed
+  work message to a topic).
 - Only the **queue** starter shares nothing but a broker — exactly what a stateless remote
   worker wants.
 - `QueueBasedProcessStarter` → `ChenilePub.asyncPublish(topic, json, {tenant})`; `topic`
@@ -101,8 +102,9 @@ Two mini monoliths, one durable orchestration engine.
 ## Slide 8 — The loop (the heart of the talk)
 
 - Cron → durable trigger acceptance (outbox ID acknowledgement) → later event dispatch → create root → outbox records
-  `START_WORKER` in the same transaction → poller publishes `WorkerDto` → worker's
-  `ProcessWorkListener` dispatches to the right `IWorker` → work runs → HTTP callback
+  `START_WORKER` in the same transaction → poller publishes a `WorkListenerInput` with
+  `processType`/`workerType` headers → worker's `ProcessWorkListener` selects the worker bean →
+  work runs → HTTP callback
   (`splitDone` / `doneSuccessfully` / `aggregationDone`) → STM advances → records the next
   consequences → … → terminal → `EMIT_COMPLETED` → successors chained.
 - Diagram: the dispatch-and-callback `sequenceDiagram` from deployment.md.
@@ -114,7 +116,7 @@ Two mini monoliths, one durable orchestration engine.
 
 ## Slide 9 — Why it's safe across the gap
 
-- The queue hop is **at-least-once**: a `WorkerDto` can arrive twice.
+- The queue hop is **at-least-once**: a work message can arrive twice.
 - Callbacks are made safe on the server by **effect-level idempotency** —
   `checkIdempotency` against `chenile_process_receipt`, keyed by business identity — so a
   replay can't double-count a child or create duplicate successors.
@@ -146,7 +148,7 @@ Two mini monoliths, one durable orchestration engine.
 
 - Both monoliths are mechanical: fixed module sets, only the worker jars and definitions
   vary.
-- The **`chenile-process-deployment` JGen blueprint** scaffolds a runnable server and N
+- The **`chenile-process-management` JGen blueprint** scaffolds a runnable server and N
   runnable workers from one spec — module manifests, `ProcessWorkListener`, queue
   subscriptions and `process.manager.base-url` all wired.
 - Reference: [process-deployment-blueprint.md](blueprints/process-deployment-blueprint.md).

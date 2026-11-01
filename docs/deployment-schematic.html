@@ -146,7 +146,7 @@
         <text x="300" y="474" class="tag">callback: splitDone / doneSuccessfully / aggregationDone — HTTP to process.manager.base-url</text>
 
         <circle id="packet" class="packet" r="8" cx="135" cy="102" opacity="0"/>
-        <text id="packetlbl" class="tag" x="0" y="0" opacity="0" text-anchor="middle">WorkerDto</text>
+        <text id="packetlbl" class="tag" x="0" y="0" opacity="0" text-anchor="middle">work</text>
       </svg>
     </div>
 
@@ -164,7 +164,7 @@
     <div class="progress" id="progress"></div>
     <div class="narr">
       <div class="step-no" id="stepNo">0</div>
-      <div><h3 id="stepTitle">Ready</h3><p id="stepText">Press Play to send one unit of work around the loop. The blue packet is a <code>WorkerDto</code> going out; the green packet is the result coming back.</p></div>
+      <div><h3 id="stepTitle">Ready</h3><p id="stepText">Press Play to send one unit of work around the loop. The blue packet is a work message going out; the green packet is the result coming back.</p></div>
     </div>
   </section>
 
@@ -216,11 +216,11 @@
     <span><i class="sw" style="background:#2a3b55"></i>Server monolith (brain · stateful)</span>
     <span><i class="sw" style="background:#3a2f52"></i>Worker monolith (muscle · stateless)</span>
     <span><i class="sw" style="background:var(--queue)"></i>Queue / topic</span>
-    <span><i class="sw" style="background:var(--accent)"></i>WorkerDto out</span>
+    <span><i class="sw" style="background:var(--accent)"></i>Work out</span>
     <span><i class="sw" style="background:var(--accent2)"></i>result callback</span>
   </div>
 
-  <footer>Companion to <code>docs/deployment.md</code> and <code>docs/deployment-presentation.md</code>. The queue hop is at-least-once; the server's receipt-level idempotency makes a replayed <code>WorkerDto</code> safe. You scale throughput by adding workers, never by adding brains.</footer>
+  <footer>Companion to <code>docs/deployment.md</code> and <code>docs/deployment-presentation.md</code>. The queue hop is at-least-once; the server's receipt-level idempotency makes a replayed work message safe. You scale throughput by adding workers, never by adding brains.</footer>
 </div>
 
 <script>
@@ -229,11 +229,11 @@ const steps = [
   {seg:"seg1", lit:["c-cron","c-trig"], title:"Cron fires", text:"A Quartz crontab (or any external trigger) fires on the server and calls trigger-service. A DISPATCH_TRIGGER command commits before acknowledging its outbox ID. The submission key suppresses duplicate acceptance."},
   {seg:"seg2", lit:["c-trig","c-stm"], title:"ProcessCreate", text:"trigger-service raises the ProcessCreate event. ProcessManager persists a root Process and enters the state machine."},
   {seg:"seg3", lit:["c-stm","c-outbox"], title:"Record consequence", text:"In the SAME transaction that saves the Process, the transition records a START_WORKER command in the durable outbox. State and consequence commit atomically."},
-  {seg:"seg4", lit:["c-outbox","c-starter"], title:"Poller drains", text:"The outbox poller drains the due command and hands the WorkerDto to the configured worker starter — here, the queue-based one."},
-  {seg:"seg5", lit:["c-starter","c-queue"], title:"Publish WorkerDto", text:"QueueBasedProcessStarter serializes the WorkerDto and ChenilePub.asyncPublish()es it to the topic named in the process definition's execDef. Tenant rides along as a header.", packet:"WorkerDto"},
-  {seg:"seg6", lit:["c-queue","c-listener"], title:"Deliver to worker", text:"The broker delivers the message to the worker monolith's pubsub subscriber, surfacing the WorkerDto to ProcessWorkListener.", packet:"WorkerDto"},
-  {seg:"seg7", lit:["c-listener","c-jars"], title:"Dispatch to worker", text:"ProcessWorkListener resolves the right IWorker by workerType (SPLITTER / EXECUTOR / AGGREGATOR) and processType, then calls start(workerDto, input)."},
-  {seg:"seg8", lit:["c-jars","c-delegate"], title:"Do the work", text:"The worker extends SplitterBase / ExecutorBase / AggregatorBase and runs doStart(...). On return it uses process-delegate's ProcessManagerClient to report the result."},
+  {seg:"seg4", lit:["c-outbox","c-starter"], title:"Poller drains", text:"The outbox poller drains the due START_WORKER command and hands it to the configured worker starter — here, the queue-based one."},
+  {seg:"seg5", lit:["c-starter","c-queue"], title:"Publish work", text:"QueueBasedProcessStarter publishes a WorkListenerInput (processId, dispatchId, payload, execDef) to the topic named in the definition's execDef, with headers processType, workerType and the tenant.", packet:"work"},
+  {seg:"seg6", lit:["c-queue","c-listener"], title:"Deliver to worker", text:"The broker delivers the message to the worker monolith's Chenile Kafka consumer, which raises it as the process-work event to ProcessWorkListener.", packet:"work"},
+  {seg:"seg7", lit:["c-listener","c-jars"], title:"Dispatch to worker", text:"ProcessWorkListener's service selector turns processType + workerType into a bean name (e.g. itemExecutor) and Chenile calls that bean; the body selector types the payload as the worker's input."},
+  {seg:"seg8", lit:["c-jars","c-delegate"], title:"Do the work", text:"The worker extends SplitterWorkListener / ExecutorWorkListener / AggregatorWorkListener and runs doStart(...). It reports the result (or a ...WithErrors event if it throws) through process-delegate's ProcessManagerClient."},
   {seg:"seg9", lit:["c-delegate","c-stm"], title:"Callback to the brain", text:"The result travels back over HTTP (via the Chenile proxy at process.manager.base-url) as splitDone / doneSuccessfully / aggregationDone. The STM advances and records the NEXT consequences — looping until a terminal state chains any successors.", callback:true, packet:"result"}
 ];
 const packet=document.getElementById("packet"), packetlbl=document.getElementById("packetlbl");
@@ -334,7 +334,7 @@ document.getElementById("btnAdd").onclick=()=>{
   document.getElementById("scaleHint").textContent="Added "+t.name+". Same server, new topic, new pool — no change to the brain. Each process type is routed to the pool that can serve it.";
 };
 document.getElementById("btnReplica").onclick=()=>{ const p=pools[pools.length-1]; if(p.replicas<5){p.replicas++;renderPools();}
-  document.getElementById("scaleHint").textContent="Added a replica to "+p.name+". Competing consumers on the same topic share the WorkerDtos; KEDA can scale this count on queue depth — even to zero.";};
+  document.getElementById("scaleHint").textContent="Added a replica to "+p.name+". Competing consumers on the same topic share the work messages; KEDA can scale this count on queue depth — even to zero.";};
 document.getElementById("btnScaleReset").onclick=()=>{ pools=[{...poolTemplates[0],replicas:2}]; renderPools();
   document.getElementById("scaleHint").textContent="Back to one server and one worker pool. Add monoliths to watch the same server fan work out to all of them.";};
 

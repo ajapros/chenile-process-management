@@ -49,8 +49,10 @@ with the `WorkerStarter` interface and the configuration abstraction (`IProcessC
 `ProcessManagerImpl`, `ProcessController`, `ProcessEntryAction`, `StartWorkerCommand`, the configurators, the
 durable-execution wiring, and the Spring configuration.
 
-`process-delegate` provides the remote manager client together with the worker APIs, base classes
-(`SplitterBase`, `ExecutorBase`, `AggregatorBase`, orchestrated by `BatchServiceBase`) and helpers.
+`process-delegate` provides the remote manager client together with the worker APIs and helpers: the typed
+worker bases `ExecutorWorkListener`, `SplitterWorkListener` and `AggregatorWorkListener` (2.1.35), routed by
+`processWorkServiceSelector` and typed by `processWorkBodyTypeSelector`. The older `SplitterBase`,
+`ExecutorBase`, `AggregatorBase` and `BatchServiceBase` remain for legacy `WorkerDto` listeners.
 The former `process-utils` module has been merged into this artifact. Existing Java packages under
 `org.chenile.orchestrator.process.utils` and `org.chenile.orchestrator.delegate` are unchanged.
 
@@ -202,14 +204,19 @@ Three interchangeable `WorkerStarter` implementations decide where work actually
 
 - **in-VM** dispatches the `WorkerDto` to the in-JVM `EventProcessor` — simplest, good for tests and small
   flows.
-- **queue-based** publishes to a Chenile pub/sub topic named in the `execDef`, forwarding the tenant as
-  `x-chenile-tenant-id` when present.
+- **queue-based** publishes a `WorkListenerInput` envelope (`processId`, `dispatchId`, `payload`, `execDef`) to
+  the Chenile pub/sub topic named in the `execDef`, with the process's tenant as `x-chenile-tenant-id` and the
+  routing headers `processType` and `workerType` (2.1.35; `start1(...)` still publishes the old `WorkerDto`).
 - **JDBC** inserts a durable `chenile_process_work_item` row (idempotency key, `FOR UPDATE SKIP LOCKED`
   claim, lease, attempt/retry, `DEAD` after the maximum attempts); a runner polls and executes. This is
   the production-grade, KEDA-scalable option.
 
-Workers extend the `process-delegate` base classes, which handle payload typing, tenant propagation into the
-Chenile context, and error reporting back to the daemon.
+Workers extend the `process-delegate` bases, which handle payload typing, tenant propagation into the Chenile
+context, and reporting back to the daemon. On a queue, the worker listener's Chenile `serviceSelector` picks the
+worker bean by name — `<processType>Executor`, `<processType>Splitter` or `<processType>Aggregator` — so worker
+bean names are routing keys. A worker's own exception is reported as the matching `...WithErrors` event (a business
+failure, not retried); a failed callback or a malformed message is left to the transport's retry and dead-letter
+handling.
 
 ## Process definitions
 

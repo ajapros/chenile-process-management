@@ -84,9 +84,12 @@ packaged only by the server.
   child outputs, completion counts, and errors. All immediate children of a composite must
   resolve to the same output type so its result remains strongly typed.
 - `<app>-worker-listener` — headless Chenile controller subscribed to the `process-work` event,
-  plus Chenile Kafka's generic consumer. Worker dispatch uses the shared `BatchServiceBase` from
-  `process-delegate`; the blueprint generates no duplicate worker service. Configured Kafka topics map to that event; failed
-  deliveries are retried and then sent to a dead-letter topic. Worker callbacks use the
+  plus Chenile Kafka's generic consumer. Its `serviceSelector` (`processWorkServiceSelector`, 2.1.35)
+  routes each message by its `processType` / `workerType` headers to the worker bean named
+  `<processType>Executor|Splitter|Aggregator`, and `processWorkBodyTypeSelector` types the payload as that
+  worker's input. Configured Kafka topics map to that event; a worker's own exception is reported as a
+  `...WithErrors` event, while failed callbacks and malformed deliveries are retried and then sent to a
+  dead-letter topic. Worker callbacks use the
   **registry-backed process delegate**. No process datasource / process-service / JDBC starter /
   outbox worker.
 - `<app>Server`, `<app>Worker` — composed `minimonolith` hosts. The **server uses exactly one
