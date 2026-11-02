@@ -110,6 +110,12 @@ update chenile_process_outbox set status='RUNNING', started_at=coalesce(started_
   public void handleAndComplete(OutboxCommand command, OutboxCommandLifecycle<?> handler) {
     var context = ContextContainer.getInstance();
     var callerContext = context.snapshot();
+    // The transaction below takes its connection from the caller's (polling) tenant. A row without
+    // a tenant keeps that tenant, so nested work routes to the same database instead of the default.
+    String commandTenant =
+        command.tenantId == null || command.tenantId.isBlank()
+            ? context.getTenant()
+            : command.tenantId;
     try {
       independent.executeWithoutResult(
           tx -> {
@@ -130,7 +136,7 @@ update chenile_process_outbox set status='RUNNING', started_at=coalesce(started_
               var headers = handler.executionHeaders(command);
               context.clear();
               headers.forEach(context::put);
-              context.setTenant(command.tenantId);
+              context.setTenant(commandTenant);
               var commandContext = context.snapshot();
               try {
                 handler.dispatch(command);

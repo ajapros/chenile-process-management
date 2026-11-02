@@ -141,4 +141,59 @@ class ProcessOutboxConfigurationTest {
             });
 
   }
+
+  @Test
+  void singleTenantDeploymentsKeepPollingWithoutTenantSwitching() {
+    application
+        .withPropertyValues("chenile.process.outbox.run-dispatcher=false")
+        .run(
+            context ->
+                assertTrue(context.getBean(TenantAwareOutboxPoller.class).tenants().isEmpty()));
+  }
+
+  @Test
+  void pollsTheTenantsOfMultiDatasourceUtils() {
+    java.util.Map<String, javax.sql.DataSource> tenants = new java.util.LinkedHashMap<>();
+    tenants.put("tenant1", DATA_SOURCE);
+    tenants.put("tenant2", DATA_SOURCE);
+    application
+        .withPropertyValues("chenile.process.outbox.run-dispatcher=false")
+        .withBean("multiTenantTargetDataSources", java.util.Map.class, () -> tenants)
+        .run(
+            context ->
+                assertEquals(
+                    List.of("tenant1", "tenant2"),
+                    context.getBean(TenantAwareOutboxPoller.class).tenants()));
+  }
+
+  @Test
+  void configuredTenantsOverrideTheDatasourceMap() {
+    application
+        .withPropertyValues(
+            "chenile.process.outbox.run-dispatcher=false",
+            "chenile.process.outbox.tenants= acme , globex ,")
+        .withBean(
+            "multiTenantTargetDataSources",
+            java.util.Map.class,
+            () -> java.util.Map.of("tenant1", DATA_SOURCE))
+        .run(
+            context ->
+                assertEquals(
+                    List.of("acme", "globex"),
+                    context.getBean(TenantAwareOutboxPoller.class).tenants()));
+  }
+
+  @Test
+  void anApplicationTenantSupplierWins() {
+    application
+        .withPropertyValues(
+            "chenile.process.outbox.run-dispatcher=false",
+            "chenile.process.outbox.tenants=acme")
+        .withBean(OutboxTenantSupplier.class, () -> () -> List.of("from-registry"))
+        .run(
+            context ->
+                assertEquals(
+                    List.of("from-registry"),
+                    context.getBean(TenantAwareOutboxPoller.class).tenants()));
+  }
 }

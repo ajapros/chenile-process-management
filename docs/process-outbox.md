@@ -48,6 +48,30 @@ Every enabled replica polls concurrently using row locks. Set `run-dispatcher=fa
 replica drains work or tests call `OutboxDispatcher.drainAll(100)` **after commit**. Never drain inside the
 transaction that created work. Durable create returns before its workers, children, and successors finish.
 
+## Database-per-tenant outboxes
+
+When tenants have their own databases behind a tenant-routing `DataSource` (Chenile's
+`multi-datasource-utils`), each tenant has its own `chenile_process_outbox` table, and the producer
+enqueues into the table of the tenant in the request's `ContextContainer`. The scheduler thread has no
+tenant, so a plain poll would only ever reach the default tenant's table.
+
+The scheduled task therefore runs `TenantAwareOutboxPoller.poll()`. For each tenant it clears the thread
+context, sets the tenant and calls `OutboxDispatcher.poll()`, so claim, handle, acknowledge and failure
+transactions all open on that tenant's database. Handler changes and the acknowledgement still commit
+together. A failure while draining one tenant is logged and the remaining tenants are still drained; the
+thread's context is restored after each tenant. A row without a `tenant_id` keeps the polling tenant.
+
+Tenants are resolved once per polling cycle, from the first of:
+
+1. an application `OutboxTenantSupplier` bean (for a tenant registry or a changing tenant list);
+2. `chenile.process.outbox.tenants`, a comma-separated list;
+3. the keys of the `multiTenantTargetDataSources` bean that `multi-datasource-utils` publishes;
+4. none: a single poll in the scheduler thread's context, the behaviour of single-tenant deployments.
+
+So adding `multi-datasource-utils` is enough; no outbox setting is needed. Apply the outbox schema to every
+tenant database. Tenants are drained one after another, up to 100 commands each per cycle; each tenant's
+connection pool must allow for the poller's connections as well as request traffic.
+
 ## Extending commands
 
 `OutboxCommandLifecycle<C>` is the single lifecycle contract: `enqueue(context)`,

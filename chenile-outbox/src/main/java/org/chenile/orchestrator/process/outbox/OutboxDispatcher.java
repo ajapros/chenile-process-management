@@ -1,5 +1,6 @@
 package org.chenile.orchestrator.process.outbox;
 
+import org.chenile.core.context.ContextContainer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,7 +45,10 @@ public class OutboxDispatcher {
     drainAll(100);
     long dead = repository.deadCount();
     if (dead > 0)
-      logger.error("Process outbox has {} DEAD commands requiring operator intervention", dead);
+      logger.error(
+          "Process outbox has {} DEAD commands requiring operator intervention (tenant '{}')",
+          dead,
+          ContextContainer.getInstance().getTenant());
   }
 
   /**

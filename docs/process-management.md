@@ -530,6 +530,7 @@ process-to-process `SUCCESSOR` edges instead of completion-event nodes.
 | `chenile.process.configurator` | `json` | `json` or `database` definition source |
 | `chenile.process.outbox.run-dispatcher` | `true` | schedule dispatcher polling on this instance |
 | `chenile.process.outbox.poll-interval-millis` | `1000` | dispatcher polling interval |
+| `chenile.process.outbox.tenants` | — | tenants whose outbox is polled; defaults to the `multi-datasource-utils` tenants, else single-tenant polling |
 | `chenile.process.outbox.lock-seconds` | `300` | outbox command lease duration |
 | `chenile.process.outbox.max-attempts` | `5` | retries before a command is `DEAD` |
 | `chenile.process.outbox.worker-id` | hostname | claimant identity for leases |
@@ -546,7 +547,7 @@ with fake workers resolved by naming convention, in both synchronous and latch-s
 the transition matrix over the REST surface. `DatabaseProcessConfiguratorTest` checks the database
 configurator. The `trigger-service` tests cover durable acknowledgement, unchanged payload dispatch, tenant isolation and submission uniqueness
 guarantee. The `crontab-service` tests cover JSON loading, Quartz dispatch, transactional schedule updates,
-and wiring with an application-defined trigger implementation. The `chenile-outbox` tests cover rollback-together, idempotent enqueue, `SKIP LOCKED`, backoff,
+and wiring with an application-defined trigger implementation. The `chenile-outbox` tests cover per-tenant polling of database-per-tenant outboxes, rollback-together, idempotent enqueue, `SKIP LOCKED`, backoff,
 retry-then-DEAD, dead-letter compensation, and replay-safe parent counting, with an opt-in suite that runs
 the same guarantees against a real PostgreSQL instance. The durable integration tests in `process-service`
 exercise the outbox end to end.
