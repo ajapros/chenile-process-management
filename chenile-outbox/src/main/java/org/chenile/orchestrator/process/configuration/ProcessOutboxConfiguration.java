@@ -5,6 +5,7 @@ import org.chenile.orchestrator.process.outbox.*;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -17,7 +18,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 @EnableScheduling
 public class ProcessOutboxConfiguration {
   @Bean
-  @org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean(
+  @ConditionalOnMissingBean(
       OutboxCommandRegistry.class)
   OutboxCommandRegistry outboxCommandRegistry(java.util.List<OutboxCommandLifecycle<?>> commands) {
     return new OutboxCommandRegistry(commands);
