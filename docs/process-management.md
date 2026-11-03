@@ -550,7 +550,8 @@ guarantee. The `crontab-service` tests cover JSON loading, Quartz dispatch, tran
 and wiring with an application-defined trigger implementation. The `chenile-outbox` tests cover per-tenant polling of database-per-tenant outboxes, rollback-together, idempotent enqueue, `SKIP LOCKED`, backoff,
 retry-then-DEAD, dead-letter compensation, and replay-safe parent counting, with an opt-in suite that runs
 the same guarantees against a real PostgreSQL instance. The durable integration tests in `process-service`
-exercise the outbox end to end.
+exercise the outbox end to end. The `tenant-features` Cucumber suite runs process creation on two tenant databases
+with only the background poller draining the outbox.
 
 ## Migration from non-durable execution
 
