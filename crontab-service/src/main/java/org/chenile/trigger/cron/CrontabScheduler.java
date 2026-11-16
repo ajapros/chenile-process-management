@@ -58,7 +58,10 @@ public class CrontabScheduler {
     Crontab crontab = repository.findById(id).orElse(null);
     if (crontab == null || !crontab.enabled) return;
     TriggerInput input = new TriggerInput();
-    input.idempotencyKey = "crontab:" + crontab.id + ":" + context.getFireInstanceId();
+    // Keyed by the scheduled fire time, which every node computes the same way, so when several nodes fire the same
+    // cron, TriggerService's idempotency check lets only one through. (The fire instance id differs per node.)
+    input.idempotencyKey =
+        "crontab:" + crontab.id + ":" + context.getScheduledFireTime().toInstant();
     input.triggerTime = context.getFireTime().toInstant();
     input.eventId = crontab.eventName;
     input.headers.putAll(map(crontab.headersJson));

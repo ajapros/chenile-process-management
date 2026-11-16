@@ -3,8 +3,11 @@ package org.chenile.trigger.cron;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import java.util.Date;
 import java.util.Optional;
 import org.chenile.trigger.TriggerService;
+import org.chenile.trigger.model.TriggerInput;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.Test;
 import org.quartz.JobExecutionContext;
 import org.quartz.Scheduler;
@@ -27,17 +30,19 @@ class CrontabSchedulerTest {
         new CrontabScheduler(repository, triggerService, mock(Scheduler.class));
     JobExecutionContext context = mock(JobExecutionContext.class);
     when(context.getFireInstanceId()).thenReturn("fire-1");
-    when(context.getFireTime()).thenReturn(new java.util.Date());
-    when(context.getScheduledFireTime()).thenReturn(new java.util.Date());
-    when(context.getNextFireTime()).thenReturn(new java.util.Date());
+    when(context.getFireTime()).thenReturn(new Date());
+    Date scheduled = new Date(1_767_225_600_000L); // 2026-01-01T00:00:00Z
+    when(context.getScheduledFireTime()).thenReturn(scheduled);
+    when(context.getNextFireTime()).thenReturn(new Date());
 
     scheduler.fire("nightly", context);
 
-    var input = org.mockito.ArgumentCaptor.forClass(org.chenile.trigger.model.TriggerInput.class);
+    var input = ArgumentCaptor.forClass(TriggerInput.class);
     verify(triggerService).trigger(input.capture());
     assertEquals("ProcessCreate", input.getValue().eventId);
     assertSame(tab.eventPayloadJson, input.getValue().payload);
-    assertEquals("crontab:nightly:fire-1", input.getValue().idempotencyKey);
+    assertEquals("crontab:nightly:2026-01-01T00:00:00Z", input.getValue().idempotencyKey,
+        "the key must be the same on every node that fires this schedule");
     assertEquals("alpha", input.getValue().headers.get("x-chenile-tenant-id"));
     assertEquals("CRON", input.getValue().source);
     assertFalse(input.getValue().headers.containsKey("x-chenile-trigger-source"));
