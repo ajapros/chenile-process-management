@@ -226,7 +226,7 @@
 <script>
 /* ---------------- SCENE 1: the loop ---------------- */
 const steps = [
-  {seg:"seg1", lit:["c-cron","c-trig"], title:"Cron fires", text:"A Quartz crontab (or any external trigger) fires on the server and calls trigger-service. A DISPATCH_TRIGGER command commits before acknowledging its outbox ID. The submission key suppresses duplicate acceptance."},
+  {seg:"seg1", lit:["c-cron","c-trig"], title:"A schedule fires", text:"A schedule (or a file, or any external trigger) fires on the server and raises its event through trigger-service. A DISPATCH_TRIGGER command commits before acknowledging its outbox ID. The submission key suppresses duplicate acceptance."},
   {seg:"seg2", lit:["c-trig","c-stm"], title:"ProcessCreate", text:"trigger-service raises the ProcessCreate event. ProcessManager persists a root Process and enters the state machine."},
   {seg:"seg3", lit:["c-stm","c-outbox"], title:"Record consequence", text:"In the SAME transaction that saves the Process, the transition records a START_WORKER command in the durable outbox. State and consequence commit atomically."},
   {seg:"seg4", lit:["c-outbox","c-starter"], title:"Poller drains", text:"The outbox poller drains the due START_WORKER command and hands it to the configured worker starter — here, the queue-based one."},

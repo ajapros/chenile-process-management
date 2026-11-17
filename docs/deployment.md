@@ -96,21 +96,21 @@ A Chenile mini monolith that packages the orchestration engine and everything th
 | `process-service` | the STM (`PROCESS_FLOW`), `ProcessManagerImpl`, `ProcessEntryAction`, the controllers, the configurators, the management API |
 | `chenile-outbox` | the always-on durable transactional outbox and its draining poller (`OutboxDispatcher`) |
 | **one** `WorkerStarter` — preferably `q-based-process-starter` | turns a `START_WORKER` command into a message on the queue |
-| `trigger-api` plus `trigger-service` | durable acceptance, status queries and DISPATCH_TRIGGER outbox delivery |
-| `crontab-api` | shared schedule model and external contracts |
-| `crontab-service` | durable Quartz crontabs (`chenile_crontab`) that fire activations |
+| `trigger-service` (on chenile-core's `chenile-trigger`) | durable acceptance, status queries and DISPATCH_TRIGGER outbox delivery |
+| `chenile-scheduler-db` (chenile-others, with `chenile-scheduler`) | stored schedules (`chenile_schedule`) that fire `ProcessCreate` through the trigger service |
 | `process-ui` (optional) | the React admin console behind the management API |
 
-**Several server nodes.** Quartz's job data holds only the crontab id; each node registers its `CrontabScheduler` in
-the scheduler context. So Quartz can run in memory on each node (the default; the cron idempotency key, built from
-the scheduled fire time, lets only one node's trigger through) or clustered on one PostgreSQL database. Clustered
+**Several server nodes.** Quartz's job data holds only the schedule id; each node registers its `ChenileScheduler` in
+the scheduler context, and a stored schedule is read from the database when it fires. So Quartz can run in memory on
+each node (the default; the schedule's idempotency key, built from the scheduled fire time, lets only one node's
+trigger through) or clustered on one PostgreSQL database. Clustered
 means `spring.quartz.job-store-type=jdbc` and `org.quartz.jobStore.isClustered=true`, with the `QRTZ_*` tables
 created by chenile-scheduler's `chenile-quartz` Liquibase changelog. The generated server ships this setup as the
 `clustered` profile.
 
 What the server does:
 
-- **Receives triggers.** A crontab row fires in Quartz, or an external adapter posts an
+- **Receives triggers.** A schedule fires in Quartz, or an external adapter posts an
   activation. Either way it reaches `TriggerService.trigger(TriggerInput)`, which claims
   submission idempotency in the outbox and returns the outbox ID. Later, the dispatcher raises
   the ProcessCreate event using that ID as x-chenile-trigger-id.
@@ -150,7 +150,7 @@ chenile.process.outbox.poll-interval-millis=1000
 chenile.process.management.enabled=true
 chenile.process.management.api-key=${PROCESS_MANAGEMENT_API_KEY}   # >= 32 chars
 
-# PostgreSQL: state, outbox, receipts and crontab all share ONE datasource
+# PostgreSQL: state, outbox, receipts and schedules all share ONE datasource
 spring.datasource.url=jdbc:postgresql://db:5432/process
 ```
 

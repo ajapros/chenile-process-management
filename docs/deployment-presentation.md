@@ -59,7 +59,7 @@ Two mini monoliths, one durable orchestration engine.
 ## Slide 5 — The server monolith: the brain
 
 - Packages: `process-api` + `process-service` (the STM), `chenile-outbox` (always-on),
-  **one** worker starter — the **q-based** one — plus `trigger-service` + `crontab-service`,
+  **one** worker starter — the **q-based** one — plus `trigger-service` + `chenile-scheduler-db`,
   and the management API / admin UI.
 - Owns the **only** PostgreSQL datasource; runs the outbox poller.
 - Dispatches work; never performs it.

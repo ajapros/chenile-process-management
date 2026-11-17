@@ -4,14 +4,14 @@ These diagrams reflect the current code (shared trigger outbox; no trigger table
 `chenile_process_completion_event` tables; pluggable outbox command registry). They supersede the older
 sketches under `docs/puml/`.
 
-## 1. Sequence: cron → trigger → root process → splitter → leaf child → chained successor
+## 1. Sequence: schedule → trigger → root process → splitter → leaf child → chained successor
 
-Scenario: a Quartz crontab fires `ProcessCreate`. The created root process is **non-leaf**, so its splitter
+Scenario: a schedule fires `ProcessCreate`. The created root process is **non-leaf**, so its splitter
 runs and creates a **leaf** child. When that leaf child completes it chains a **new leaf process** that
 names the leaf child as its predecessor in configuration (`predecessorProcessType`), so the successor is
 created with `predecessor_id` set to the leaf child.
 
-Participants: **Cron** = `CrontabScheduler` (crontab-service); **Trig** = `EventTriggerService`
+Participants: **Cron** = `ChenileScheduler` (chenile-scheduler, chenile-others); **Trig** = `EventTriggerService`
 (trigger-service); **EP** = `EventProcessor`; **PM** = `ProcessManager` (STM, process-service); **Reg** =
 `ProcessEntryAction` + the outbox command registry (chenile-outbox); **W** = `WorkerStarter`
 (splitter / executor).
@@ -19,14 +19,14 @@ Participants: **Cron** = `CrontabScheduler` (crontab-service); **Trig** = `Event
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Cron as CrontabScheduler
+    participant Cron as ChenileScheduler
     participant Trig as EventTriggerService
     participant EP as EventProcessor
     participant PM as ProcessManager
     participant Reg as CommandRegistry
     participant W as WorkerStarter
 
-    Note over Cron: Quartz fires an enabled crontab row
+    Note over Cron: Quartz fires an enabled schedule
     Cron->>Trig: trigger ProcessCreate with a ProcessDto payload
     Trig->>Reg: commit DISPATCH_TRIGGER in PENDING
     Trig-->>Cron: acknowledgement is the outbox id
@@ -97,7 +97,7 @@ erDiagram
     PROCESS_TABLE ||--o{ SUBPROCESS_ERROR : "errors (OneToMany)"
     SUBPROCESS_ERROR ||--o{ SUBPROCESS_ERROR_VALIDATION_ERRORS : "validation strings"
     PROCESS_DEFINITION ||..o{ PROCESS_TABLE : "process_type (config, logical)"
-    CHENILE_CRONTAB ||..o{ CHENILE_PROCESS_OUTBOX : "trigger adapter metadata in command JSON"
+    CHENILE_SCHEDULE ||..o{ CHENILE_PROCESS_OUTBOX : "x-chenile-schedule-id in command JSON"
     CHENILE_PROCESS_OUTBOX ||..o{ PROCESS_TABLE : "DISPATCH_TRIGGER.id = trigger_id (logical)"
     PROCESS_TABLE ||..o{ CHENILE_PROCESS_WORK_ITEM : "process_id (logical)"
     PROCESS_TABLE ||..o{ CHENILE_PROCESS_OUTBOX : "process_id (logical)"
@@ -141,15 +141,14 @@ erDiagram
         text definition "JSON: leaf, parentProcessType, predecessorProcessType, predecessorArgs, config"
     }
 
-    CHENILE_CRONTAB {
+    CHENILE_SCHEDULE {
         varchar id PK
-        varchar name UK
+        varchar name "unique per tenant"
         boolean enabled
         varchar cron_expression
         varchar timezone
-        varchar event_name
-        text headers_json
-        text event_payload_json
+        varchar event_id
+        text payload
         varchar tenant
         bigint version
     }
@@ -225,9 +224,10 @@ erDiagram
 - **DISPATCH_TRIGGER in `chenile_process_outbox`** — accepted trigger identity, original payload,
   headers, adapter context and current dispatch status. There is no separate trigger table.
   Its command ID is the trigger ID stored on resulting processes. Keep these identities for queries and deduplication.
-- **`chenile_crontab`** (entity `Crontab`, crontab-service) — durable Quartz schedules: one row per cron,
-  holding the expression, timezone, the event to fire (`ProcessCreate`), and its headers/payload JSON. Saving
-  or deleting a row registers or removes the Quartz job.
+- **`chenile_schedule`** (entity `SchedulerDefinitionEntity`, chenile-scheduler-db in chenile-others) — stored
+  schedules: one row per schedule, holding the expression, timezone, the event to fire (`ProcessCreate`) and its
+  payload; headers live in `chenile_schedule_header`. Saving or deleting a row registers or removes the Quartz job
+  after commit.
 
 `CHENILE_PROCESS_RECEIPT` has no relationships by design — it is the effect-level idempotency ledger
 (`checkIdempotency(consumer, key)`), keyed by business identity (e.g. `PARENT` → `[parentId, childId]`,

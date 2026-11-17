@@ -53,7 +53,7 @@ successor to Uber's Cadence).
 | External effects | At-least-once; receivers deduplicate (`WorkerDto.dispatchId`) | At-least-once activities; make them idempotent |
 | Crash recovery | Lease reclaim + stale-claimant fencing | Automatic via replay |
 | Retries / backoff / dead-letter | Exponential backoff, max attempts, `DEAD`, compensation, `replayDead` | Per-activity retry policies |
-| Durable timers / `sleep` / in-flow cron | `visible_after` + entry-level Quartz crontabs | Native |
+| Durable timers / `sleep` / in-flow cron | `visible_after` + entry-level Quartz schedules | Native |
 | Signals / queries | Events via REST/STM + durable parent signalling | First-class signals and queries |
 | Visibility | Admin console + management API (dashboard, execution history, causal trace graph); SQL over the tables | Web UI + searchable per-workflow event history |
 | Scaling | `FOR UPDATE SKIP LOCKED` + database backlog (KEDA) | Task queues + workers |
@@ -93,7 +93,7 @@ predecessor/successor chaining). A free-form multi-step saga in Chenile must be 
 events.
 
 Temporal has first-class durable timers, `sleep`, and in-workflow cron. Chenile has `visible_after`
-(powering backoff and delayed commands) and durable Quartz crontabs at the activation layer, but no
+(powering backoff and delayed commands) and Quartz schedules that fire through the durable trigger service at the activation layer, but no
 "sleep for days inside the flow" primitive.
 
 Temporal can signal a running workflow and query its live in-memory state. Chenile delivers events through

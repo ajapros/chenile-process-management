@@ -53,10 +53,10 @@ Hosts using explicit imports instead of Chenile configuration-package scanning m
 `ProcessConfiguration`, entity scans and repository scans. Include
 `org.chenile.orchestrator.process.configuration.model` and `.configuration.dao` in those scans.
 
-Hosts must include `trigger-service` and `crontab-service` explicitly, because these dependencies
+Hosts must include `trigger-service` and `chenile-scheduler-db` explicitly, because these dependencies
 are optional in `process-service`. Scan `org.chenile.configuration.trigger` and
-`org.chenile.configuration.crontab`, or import `ChenileTriggerConfiguration` and
-`CrontabTriggerConfiguration` respectively. The standalone admin host already does this.
+`org.chenile.configuration.scheduler`, and add `org.chenile.scheduler.db` to the entity and repository scans.
+The standalone admin host already does this.
 
 The application owns persistence discovery; framework configuration classes do not declare
 entity or repository scans. Include `org.chenile.trigger.model` and `org.chenile.trigger.cron`
@@ -125,12 +125,12 @@ Filters are exact matches and combined with AND.
 
 | Method / path | Purpose |
 | --- | --- |
-| GET `/info` | Definition source/write capability, cron availability and supported creation events |
-| GET `/crontabs?page=0&size=25` | Tenant's schedules |
-| POST `/crontabs` | Add a ProcessCreate schedule |
-| PUT `/crontabs/{id}` | Edit/enable/disable an existing tenant's schedule |
+| GET `/info` | Definition source/write capability, `schedulesAvailable` and supported creation events |
+| GET `/schedules?page=0&size=25` | Tenant's schedules |
+| POST `/schedules` | Add a ProcessCreate schedule |
+| PUT `/schedules/{id}` | Edit/enable/disable an existing tenant's schedule |
 | POST `/triggers` (202 acceptance) | Generate ProcessCreate through the normal trigger ingress |
-| GET `/executions` | Trigger history; filters `triggerId`, `crontabId` (from context JSON), `status`, `page`, `size` |
+| GET `/executions` | Trigger history; filters `triggerId`, `scheduleId` (the `x-chenile-schedule-id` header), `status`, `page`, `size` |
 | GET `/definitions` | Global active definitions (database or JSON configurator) |
 | POST `/definitions` | Add a database-backed definition |
 | PUT `/definitions/{name}` | Update an existing database-backed definition |

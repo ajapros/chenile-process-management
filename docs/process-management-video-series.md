@@ -58,7 +58,7 @@ the durable loop run, and operate it. It is the on-screen companion to the
 | c3-2 | s3 | Highlight `leaf` flags | Leaf or not decides the worker. A leaf executes; a non-leaf splits and aggregates. |
 | c3-3 | s3 | Highlight `inputFields` / `outputFields` | Typed fields become typed input and output objects. |
 | c3-4 | s3 | Highlight `config.queue: p1-work` | Each definition names the topic its work rides on. |
-| c3-5 | s3 | `cron-triggers.json`, `enabled:false` | Schedules live in their own file — seeded off until you turn them on. |
+| c3-5 | s3 | `schedules.json`, `enabled:false` | Schedules live in their own file — seeded off until you turn them on. |
 
 ## Chapter 4 — Generate the deployment  · ~1:45
 

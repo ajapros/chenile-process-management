@@ -44,7 +44,7 @@ Edit them, then run `jgen -f process-specs/input-file.json`. Key fields:
 |---|---|
 | `application`, `applicationVersion`, `destFolder` | project identity / output |
 | `processSpec` (FILE) | native `processMap` definitions (see below) |
-| `cronSpec` (FILE, optional) | **separate** cron schedule array (read by `JsonCrontabRepository`) |
+| `scheduleSpec` (FILE, optional) | **separate** schedule array, checked by the generator |
 | `definitionSource` | `json` or `database` |
 | `registryMode` | `create` (default) or `existing` (+ `existingRegistryUrl`) |
 | `registryPlacement` | `server` (recommended) or `separate` (own monolith), when `create` |
@@ -67,9 +67,9 @@ The process spec keeps the runtime's native shape (not the old `processes[]` arr
 }
 ```
 
-Cron schedules are a separate JSON array (`cronSpec`): `{ name, eventName, cronExpression,
-timezone, tenant, enabled, payload: { processDefName, args } }`, seeded **disabled**,
-packaged only by the server.
+Schedules are a separate JSON array (`scheduleSpec`): `{ name, eventId, cronExpression,
+timezone, tenant, enabled, payload: { processDefName, args } }`, packaged only by the server as
+`schedules.json` and seeded **disabled** into chenile-scheduler-db (generated projects need Chenile 2.1.36).
 
 ## Generated modules
 
@@ -113,7 +113,7 @@ Generated server/worker tests extend `KafkaBaseTest` (Testcontainers) — **Dock
 running** for `mvn install`; no separately started Kafka is needed. The complete
 split/execute/aggregate + remote-callback cycle depends on your worker implementations. The
 server initializes the idempotent outbox/receipt SQL schema; Hibernate manages the process,
-definition and crontab entities by default.
+definition and schedule entities by default.
 
 The stock `process-admin-server` in this runtime repo is **not** the production host — it uses
 the in-VM starter and ships no workers. Generate a real deployment with the blueprint above.

@@ -20,7 +20,7 @@ BDD follows the same blueprint: a Cucumber runner, Spring glue with
 `@CucumberContextConfiguration`/`@SpringBootTest`/`@AutoConfigureMockMvc`, and features using
 `org.chenile.cucumber.rest` from `cucumber-utils`. Exercise the actual highway and service, with
 real persistence where relevant; mock external adapters only. Cover normal behavior, errors,
-tenant isolation, and meaningful side effects. See `crontab-service/src/test` as the concrete
+tenant isolation, and meaningful side effects. See chenile-others' `chenile-scheduler-db/src/test` as the concrete
 reference. After module moves, clean-build the reactor to avoid stale class files.
 
 The reusable `chenile-service-controller` Codex skill is installed in
