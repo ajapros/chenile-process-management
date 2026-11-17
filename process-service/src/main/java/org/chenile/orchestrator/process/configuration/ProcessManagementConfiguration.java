@@ -6,7 +6,8 @@ import org.chenile.orchestrator.process.configuration.dao.*;
 import org.chenile.orchestrator.process.configuration.management.*;
 import org.chenile.orchestrator.process.outbox.ProcessOutboxRepository;
 import org.chenile.trigger.TriggerService;
-import org.chenile.trigger.cron.*;
+import org.chenile.scheduler.db.ScheduleService;
+import org.chenile.scheduler.db.SchedulerDefinitionRepository;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -21,12 +22,12 @@ public class ProcessManagementConfiguration {
       ProcessRepository processes,
       ProcessDefinitionService definitions,
       ProcessConfigurator configurator,
-      CrontabRepository crontabs,
-      ObjectProvider<CrontabService> cronServices,
+      SchedulerDefinitionRepository schedules,
+      ObjectProvider<ScheduleService> scheduleServices,
       ProcessOutboxRepository executions,
       TriggerService triggers) {
     return new ProcessManagementService(
-        processes, definitions, configurator, crontabs, cronServices, executions, triggers);
+        processes, definitions, configurator, schedules, scheduleServices, executions, triggers);
   }
 
   @Bean

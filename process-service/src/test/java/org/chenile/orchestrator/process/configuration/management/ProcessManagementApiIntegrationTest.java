@@ -61,7 +61,7 @@ class ProcessManagementApiIntegrationTest extends AbstractProcessManagementApiIn
   @Test
   void protectsEveryReadAndWriteAndRestoresRequestContext() throws Exception {
     for (String route :
-        List.of("/info", "/definitions", "/processes", "/trace", "/executions", "/crontabs"))
+        List.of("/info", "/definitions", "/processes", "/trace", "/executions", "/schedules"))
       mvc.perform(get(BASE + route)).andExpect(status().isUnauthorized());
     mvc.perform(post(BASE + "/definitions").content("{}").contentType("application/json"))
         .andExpect(status().isUnauthorized());
@@ -140,31 +140,31 @@ class ProcessManagementApiIntegrationTest extends AbstractProcessManagementApiIn
   }
 
   @Test
-  void addsValidatesAndDisablesCronSchedulesWithoutCrossTenantWrites() throws Exception {
+  void addsValidatesAndDisablesSchedulesWithoutCrossTenantWrites() throws Exception {
     definition("source", true, "");
     String body =
         """
         {"name":"daily-source","cronExpression":"0 0 0 1 1 ? 2099","timezone":"UTC","enabled":true,
          "payload":{"processDefName":"source","args":{"batch":true}}}
         """;
-    var saved = response(post(BASE + "/crontabs").content(body), "alpha", 201);
+    var saved = response(post(BASE + "/schedules").content(body), "alpha", 201);
     String id = saved.get("id").asText();
     assertEquals("alpha", saved.get("tenant").asText());
-    assertEquals("ProcessCreate", saved.get("eventName").asText());
-    assertEquals(0, response(get(BASE + "/crontabs"), "beta", 200).get("totalElements").asInt());
-    response(put(BASE + "/crontabs/" + id).content(body), "beta", 404);
+    assertEquals("ProcessCreate", saved.get("eventId").asText());
+    assertEquals(0, response(get(BASE + "/schedules"), "beta", 200).get("totalElements").asInt());
+    response(put(BASE + "/schedules/" + id).content(body), "beta", 404);
     response(
-        put(BASE + "/crontabs/" + id)
+        put(BASE + "/schedules/" + id)
             .content(body.replace("\"enabled\":true", "\"enabled\":false")),
         "alpha",
         200);
-    assertFalse(crontabs.findById(id).orElseThrow().enabled);
+    assertFalse(schedules.findById(id).orElseThrow().enabled);
     response(
-        post(BASE + "/crontabs").content(body.replace("0 0 0 1 1 ? 2099", "invalid")),
+        post(BASE + "/schedules").content(body.replace("0 0 0 1 1 ? 2099", "invalid")),
         "alpha",
         400);
-    response(post(BASE + "/crontabs").content(body.replace("UTC", "Mars/Base")), "alpha", 400);
-    assertEquals(1, crontabs.count());
+    response(post(BASE + "/schedules").content(body.replace("UTC", "Mars/Base")), "alpha", 400);
+    assertEquals(1, schedules.count());
   }
 
   @Test

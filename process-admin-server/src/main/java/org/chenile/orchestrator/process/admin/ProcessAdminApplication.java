@@ -16,7 +16,6 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
       "org.chenile.configuration.scheduler",
       "org.chenile.configuration.process",
       "org.chenile.configuration.trigger",
-      "org.chenile.configuration.crontab",
       "org.chenile.orchestrator.process.configuration",
       "org.chenile.orchestrator.process.admin.configuration"
     })
@@ -24,12 +23,12 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
     basePackages = {
       "org.chenile.orchestrator.process.model",
       "org.chenile.orchestrator.process.configuration.model",
-      "org.chenile.trigger.cron"
+      "org.chenile.scheduler.db"
     })
 @EnableJpaRepositories(
     basePackages = {
       "org.chenile.orchestrator.process.configuration.dao",
-      "org.chenile.trigger.cron"
+      "org.chenile.scheduler.db"
     })
 public class ProcessAdminApplication {
   public static void main(String[] args) {

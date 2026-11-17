@@ -12,20 +12,20 @@ const paged = content => ({ content, totalElements: content.length, page: 0, siz
 test.beforeEach(async ({ page }) => {
   const definitions = ['Import', 'Chunk', 'Index'].map(processType => ({ processType, leaf: processType !== 'Import', predecessorArgs: 'BOTH', config: {} }));
   const schedules = [{ id: 'daily', name: 'Daily import', cronExpression: '0 0/5 * * * ?', timezone: 'UTC', enabled: true,
-    eventName: 'ProcessCreate', eventPayloadJson: '{"processDefName":"Import","args":{"source":"feed-A"}}' }];
+    eventId: 'ProcessCreate', payload: '{"processDefName":"Import","args":{"source":"feed-A"}}' }];
   await page.route('**/process-management/api/**', async route => {
     const url = new URL(route.request().url()), path = url.pathname.replace('/process-management/api', '');
     const method = route.request().method();
     expect(route.request().headers()['x-chenile-tenant-id']).toBe('acme');
     expect(route.request().headers()['x-process-management-key']).toBe('synthetic-browser-test-key');
     let body;
-    if (path === '/info') body = { definitionSource: 'database', definitionsWritable: true, cronAvailable: true };
+    if (path === '/info') body = { definitionSource: 'database', definitionsWritable: true, schedulesAvailable: true };
     else if (path === '/definitions') {
       if (method === 'POST') { body = route.request().postDataJSON(); definitions.push(body); } else body = definitions;
-    } else if (path === '/crontabs') {
-      if (method === 'POST') { body = { id: 'new-cron', ...route.request().postDataJSON(), eventName: 'ProcessCreate' }; schedules.push(body); }
+    } else if (path === '/schedules') {
+      if (method === 'POST') { body = { id: 'new-schedule', ...route.request().postDataJSON(), eventId: 'ProcessCreate' }; schedules.push(body); }
       else body = paged(schedules);
-    } else if (path.startsWith('/crontabs/')) body = { id: 'daily', ...route.request().postDataJSON() };
+    } else if (path.startsWith('/schedules/')) body = { id: 'daily', ...route.request().postDataJSON() };
     else if (path === '/triggers') body = { triggerId: 'accepted-outbox-1' };
     else if (path === '/executions') body = paged([history]);
     else if (path === '/processes') body = paged(url.searchParams.has('parentId') ? children : url.searchParams.has('predecessorId') ? [successor] : [root, successor]);
@@ -38,7 +38,7 @@ test.beforeEach(async ({ page }) => {
       ...children.map(p => ({ source:'process:import-1', target:`process:${p.id}`, kind:'SUBPROCESS' })),
       { source:'process:import-1', target:'process:index-1', kind:'SUCCESSOR' },
     ] };
-    await route.fulfill({ status: method === 'POST' && (path === '/definitions' || path === '/crontabs') ? 201 : 200, json: body });
+    await route.fulfill({ status: method === 'POST' && (path === '/definitions' || path === '/schedules') ? 201 : 200, json: body });
   });
   await page.goto('/');
   await page.getByLabel('Tenant', { exact: true }).fill('acme');
@@ -68,12 +68,12 @@ test('adds schedules and definitions and generates ProcessCreate events', async 
   await page.getByRole('button', { name:'Add definition', exact:true }).click();
   await expect(page.getByText('Process definition saved; local cache invalidated.')).toBeVisible();
   await expect(page.getByRole('cell', { name:'Export', exact:true })).toBeVisible();
-  await page.getByRole('button', { name:'Cron triggers', exact:true }).click();
-  const form = page.getByRole('heading', { name:'Add cron trigger' }).locator('..');
+  await page.getByRole('button', { name:'Schedules', exact:true }).click();
+  const form = page.getByRole('heading', { name:'Add schedule' }).locator('..');
   await form.getByLabel('Name', { exact:true }).fill('Hourly export');
   await form.getByRole('combobox', { name:'Process definition', exact:true }).selectOption('Export');
   await form.getByRole('button', { name:'Save schedule' }).click();
-  await expect(page.getByText('Cron trigger saved.')).toBeVisible();
+  await expect(page.getByText('Schedule saved.')).toBeVisible();
   const manual = page.getByRole('heading', { name:'Generate an event now' }).locator('..');
   await manual.getByRole('combobox', { name:'Process definition', exact:true }).selectOption('Import');
   await manual.getByRole('button', { name:'Generate ProcessCreate' }).click();

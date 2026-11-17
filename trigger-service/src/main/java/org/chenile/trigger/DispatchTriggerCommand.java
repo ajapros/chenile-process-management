@@ -43,8 +43,8 @@ public class DispatchTriggerCommand implements OutboxCommandLifecycle<OutboxComm
   public Map<String, String> executionHeaders(OutboxCommand command) throws Exception {
     Trigger trigger = mapper.readValue(command.payload, Trigger.class);
     var headers = new HashMap<>(trigger.headers());
-    headers.put("x-chenile-trigger-id", command.id);
-    headers.put("x-chenile-tenant-id", command.tenantId);
+    headers.put(TriggerHeaders.TRIGGER_ID, command.id);
+    headers.put(TriggerHeaders.TENANT_ID, command.tenantId);
     return headers;
   }
 

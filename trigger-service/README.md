@@ -1,7 +1,8 @@
 # Durable trigger service
 
 `trigger-service` accepts an event invocation into `chenile-outbox`. It depends on neither
-Quartz nor the process manager. `crontab-service` continues to depend only on `trigger-api`.
+Quartz nor the process manager. It implements chenile-core's `chenile-trigger` contract, so the scheduler
+and file watch fire through it whenever it is on the class path.
 There is no trigger table, trigger JPA entity, trigger repository, or trigger observer.
 
 ## Submit and acknowledge
@@ -28,7 +29,7 @@ header without adding metadata to the JSON payload. The controller only delegate
 its `@ChenileResponseCodes(success = 202, warning = 202)` annotation supplies both HTTP status and
 envelope code. Chenile handles response headers uniformly for both HTTP entry-point styles.
 
-The persisted invocation is the `Trigger` record in `trigger-api`. Its `source` is copied from
+The persisted invocation is the `Trigger` record in `chenile-trigger`. Its `source` is copied from
 `TriggerInput.source`, independently of headers. Missing or blank sources default to `EXTERNAL`;
 cron and management submissions supply `CRON` and `MANUAL` explicitly. An
 `x-chenile-trigger-source` header, if supplied, remains an ordinary invocation header and does not

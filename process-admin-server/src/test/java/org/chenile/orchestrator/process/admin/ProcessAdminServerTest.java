@@ -69,7 +69,7 @@ class ProcessAdminServerTest {
     var info = ok("GET", api + "/info", null, 200);
     assertEquals("database", info.get("definitionSource").asText());
     assertTrue(info.get("definitionsWritable").asBoolean());
-    assertTrue(info.get("cronAvailable").asBoolean());
+    assertTrue(info.get("schedulesAvailable").asBoolean());
     for (String route :
         new String[] {
           api + "/info",

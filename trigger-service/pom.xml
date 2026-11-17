@@ -8,7 +8,7 @@
     <artifactId>trigger-service</artifactId>
     <name>Trigger service implementations</name>
     <dependencies>
-        <dependency><groupId>org.chenile.orchestrator.process</groupId><artifactId>trigger-api</artifactId><version>${revision}</version></dependency>
+        <dependency><groupId>org.chenile</groupId><artifactId>chenile-trigger</artifactId></dependency>
         <dependency><groupId>org.chenile</groupId><artifactId>chenile-core</artifactId></dependency>
         <dependency><groupId>org.chenile.orchestrator.process</groupId><artifactId>chenile-outbox</artifactId><version>${revision}</version></dependency>
         <dependency><groupId>org.chenile</groupId><artifactId>chenile-http</artifactId></dependency>

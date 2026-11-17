@@ -9,7 +9,8 @@ import org.chenile.orchestrator.process.configuration.dao.*;
 import org.chenile.orchestrator.process.model.ProcessDto;
 import org.chenile.orchestrator.process.outbox.ProcessOutboxRepository;
 import org.chenile.trigger.TriggerService;
-import org.chenile.trigger.cron.*;
+import org.chenile.scheduler.db.ScheduleService;
+import org.chenile.scheduler.db.SchedulerDefinitionRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.web.server.ResponseStatusException;
@@ -40,20 +41,20 @@ class ProcessManagementServiceTest {
     configurator.processes.processMap.put("source", definition);
     var definitions = mock(ProcessDefinitionRepository.class);
     @SuppressWarnings("unchecked")
-    ObjectProvider<CrontabService> cron = mock(ObjectProvider.class);
+    ObjectProvider<ScheduleService> scheduleServices = mock(ObjectProvider.class);
     var service =
         new ProcessManagementService(
             mock(ProcessRepository.class),
             new org.chenile.orchestrator.process.service.defs.ProcessDefinitionServiceImpl(
                 configurator, definitions),
             configurator,
-            mock(CrontabRepository.class),
-            cron,
+            mock(SchedulerDefinitionRepository.class),
+            scheduleServices,
             mock(ProcessOutboxRepository.class),
             mock(TriggerService.class));
     assertEquals("json", service.info().get("definitionSource"));
     assertEquals(false, service.info().get("definitionsWritable"));
-    assertEquals(false, service.info().get("cronAvailable"));
+    assertEquals(false, service.info().get("schedulesAvailable"));
     assertEquals("source", service.definitions().get(0).processType);
     assertEquals(
         409,
@@ -69,10 +70,10 @@ class ProcessManagementServiceTest {
         assertThrows(
                 ResponseStatusException.class,
                 () ->
-                    service.saveCron(
+                    service.saveSchedule(
                         "alpha",
                         null,
-                        new ProcessManagementService.CronRequest(
+                        new ProcessManagementService.ScheduleRequest(
                             "daily", "0 0 * * * ?", "UTC", true, dto)))
             .getStatusCode()
             .value());

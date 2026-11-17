@@ -15,8 +15,11 @@ import org.chenile.orchestrator.process.service.defs.DatabaseProcessConfigurator
 import org.chenile.trigger.DispatchTriggerCommand;
 import org.chenile.trigger.EventTriggerService;
 import org.chenile.trigger.TriggerService;
-import org.chenile.trigger.cron.*;
+import org.chenile.trigger.TriggerHeaders;
 import org.chenile.trigger.model.*;
+import org.chenile.scheduler.db.ScheduleService;
+import org.chenile.scheduler.db.SchedulerDefinitionEntity;
+import org.chenile.scheduler.db.SchedulerDefinitionRepository;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
@@ -28,8 +31,8 @@ public class ProcessManagementService {
   private final ProcessRepository processes;
   private final ProcessDefinitionService definitionService;
   private final ProcessConfigurator configurator;
-  private final CrontabRepository crontabs;
-  private final ObjectProvider<CrontabService> cronServices;
+  private final SchedulerDefinitionRepository schedules;
+  private final ObjectProvider<ScheduleService> scheduleServices;
   private final ProcessOutboxRepository executions;
   private final TriggerService triggers;
   private final ObjectMapper json = new ObjectMapper().findAndRegisterModules();
@@ -38,15 +41,15 @@ public class ProcessManagementService {
       ProcessRepository processes,
       ProcessDefinitionService definitionService,
       ProcessConfigurator configurator,
-      CrontabRepository crontabs,
-      ObjectProvider<CrontabService> cronServices,
+      SchedulerDefinitionRepository schedules,
+      ObjectProvider<ScheduleService> scheduleServices,
       ProcessOutboxRepository executions,
       TriggerService triggers) {
     this.processes = processes;
     this.definitionService = definitionService;
     this.configurator = configurator;
-    this.crontabs = crontabs;
-    this.cronServices = cronServices;
+    this.schedules = schedules;
+    this.scheduleServices = scheduleServices;
     this.executions = executions;
     this.triggers = triggers;
   }
@@ -113,7 +116,7 @@ public class ProcessManagementService {
 
   public record Trace(List<Node> nodes, List<Edge> edges) {}
 
-  public record CronRequest(
+  public record ScheduleRequest(
       String name, String cronExpression, String timezone, boolean enabled, ProcessDto payload) {}
 
   public record ManualRequest(String idempotencyKey, ProcessDto payload) {}
@@ -124,8 +127,8 @@ public class ProcessManagementService {
         configurator instanceof DatabaseProcessConfigurator ? "database" : "json",
         "definitionsWritable",
         configurator instanceof DatabaseProcessConfigurator,
-        "cronAvailable",
-        cronServices.getIfAvailable() != null,
+        "schedulesAvailable",
+        scheduleServices.getIfAvailable() != null,
         "supportedEvents",
         List.of("ProcessCreate"));
   }
@@ -161,10 +164,11 @@ public class ProcessManagementService {
   }
 
   public PageResult<TriggerStatus> executions(
-      String tenant, String triggerId, String crontabId, String status, int page, int size) {
+      String tenant, String triggerId, String scheduleId, String status, int page, int size) {
     String fragment = null;
-    if (present(crontabId)) {
-      String jsonObject = encode(Map.of("x-chenile-crontab-id", crontabId));
+    if (present(scheduleId)) {
+      // Scheduled triggers carry the schedule id as a header, persisted with the trigger.
+      String jsonObject = encode(Map.of(TriggerHeaders.SCHEDULE_ID, scheduleId));
       fragment = jsonObject.substring(1, jsonObject.length() - 1);
     }
     try {
@@ -188,11 +192,12 @@ public class ProcessManagementService {
     }
   }
 
-  public PageResult<Crontab> crontabs(String tenant, int page, int size) {
-    return PageResult.of(crontabs.findAll(tenant(tenant), page(page, size, "createdTime")));
+  public PageResult<SchedulerDefinitionEntity> schedules(String tenant, int page, int size) {
+    return PageResult.of(schedules.findByTenant(tenant, page(page, size, "createdTime")));
   }
 
-  public Crontab saveCron(String tenant, String id, CronRequest request) {
+  /** A schedule that starts a process: it fires ProcessCreate with the process payload. */
+  public SchedulerDefinitionEntity saveSchedule(String tenant, String id, ScheduleRequest request) {
     if (request == null
         || !present(request.name())
         || request.name().length() > 255
@@ -200,32 +205,25 @@ public class ProcessManagementService {
         || !present(request.timezone()))
       throw bad("Name, Quartz cron expression and timezone are required");
     validatePayload(request.payload());
-    try {
-      java.time.ZoneId.of(request.timezone());
-    } catch (java.time.DateTimeException invalidZone) {
-      throw bad("Invalid timezone");
-    }
-    Crontab cron =
-        id == null
-            ? new Crontab()
-            : crontabs
-                .findOne(
-                    ProcessManagementService.<Crontab>tenant(tenant)
-                        .and((r, q, c) -> c.equal(r.get("id"), id)))
-                .orElseThrow(ProcessManagementService::notFound);
-    cron.name = request.name();
-    cron.cronExpression = request.cronExpression();
-    cron.timezone = request.timezone();
-    cron.enabled = request.enabled();
-    cron.eventName = "ProcessCreate";
-    cron.tenant = tenant;
-    cron.eventPayloadJson = encode(request.payload());
-    cron.headersJson = encode(Map.of("x-chenile-tenant-id", tenant));
-    CrontabService service = cronServices.getIfAvailable();
+    ScheduleService service = scheduleServices.getIfAvailable();
     if (service == null)
       throw new ResponseStatusException(
-          HttpStatus.SERVICE_UNAVAILABLE, "Quartz scheduler is not configured");
-    return service.save(cron);
+          HttpStatus.SERVICE_UNAVAILABLE, "Database schedules are not configured in this host");
+    SchedulerDefinitionEntity schedule =
+        id == null
+            ? new SchedulerDefinitionEntity()
+            : schedules
+                .findById(id)
+                .filter(existing -> Objects.equals(existing.tenant, tenant))
+                .orElseThrow(ProcessManagementService::notFound);
+    schedule.name = request.name();
+    schedule.cronExpression = request.cronExpression();
+    schedule.timezone = request.timezone();
+    schedule.enabled = request.enabled();
+    schedule.eventId = "ProcessCreate";
+    schedule.tenant = tenant;
+    schedule.payload = encode(request.payload());
+    return service.save(schedule);
   }
 
   public TriggerResult generate(String tenant, ManualRequest request) {

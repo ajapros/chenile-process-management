@@ -8,7 +8,7 @@ const process = { id: 'p1', processType: 'Invoice', status: 'PROCESSED', complet
 function mockApi() {
   vi.stubGlobal('fetch', vi.fn(async url => {
     let data;
-    if (url.endsWith('/info')) data = { definitionSource: 'database', definitionsWritable: true, cronAvailable: true };
+    if (url.endsWith('/info')) data = { definitionSource: 'database', definitionsWritable: true, schedulesAvailable: true };
     else if (url.endsWith('/definitions')) data = [{ processType: 'Invoice', leaf: true, predecessorArgs: 'BOTH', config: {} }];
     else if (url.includes('/trace')) data = { nodes: [
       { id: 'process:p1', kind: 'PROCESS', label: 'Invoice', status: 'PROCESSED', time: '2026-10-02T10:00:00Z', data: process },
@@ -49,7 +49,7 @@ it('shows authentication failures instead of a misleading empty dashboard', asyn
 });
 it('builds a weekly Quartz expression while keeping the expression field editable', async () => {
   mockApi(); render(<App/>); await connect();
-  fireEvent.click(screen.getByRole('button', { name:'Cron triggers', exact:true }));
+  fireEvent.click(screen.getByRole('button', { name:'Schedules', exact:true }));
   fireEvent.click(screen.getByText('Build a Quartz expression'));
   fireEvent.change(screen.getByLabelText('Helper schedule'), { target: { value: 'weekly' } });
   fireEvent.change(screen.getByLabelText('Schedule minute'), { target: { value: '30' } });

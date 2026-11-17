@@ -48,34 +48,34 @@ public class ProcessManagementController {
   public Object executions(
       @RequestHeader("x-chenile-tenant-id") String tenant,
       @RequestParam(required = false) String triggerId,
-      @RequestParam(required = false) String crontabId,
+      @RequestParam(required = false) String scheduleId,
       @RequestParam(required = false) String status,
       @RequestParam(defaultValue = "0") int page,
       @RequestParam(defaultValue = "25") int size) {
-    return service.executions(tenant, triggerId, crontabId, status, page, size);
+    return service.executions(tenant, triggerId, scheduleId, status, page, size);
   }
 
-  @GetMapping("/crontabs")
-  public Object crontabs(
+  @GetMapping("/schedules")
+  public Object schedules(
       @RequestHeader("x-chenile-tenant-id") String tenant,
       @RequestParam(defaultValue = "0") int page,
       @RequestParam(defaultValue = "25") int size) {
-    return service.crontabs(tenant, page, size);
+    return service.schedules(tenant, page, size);
   }
 
-  @PostMapping("/crontabs")
+  @PostMapping("/schedules")
   @ResponseStatus(HttpStatus.CREATED)
-  public Object addCron(
-      @RequestHeader("x-chenile-tenant-id") String tenant, @RequestBody CronRequest request) {
-    return service.saveCron(tenant, null, request);
+  public Object addSchedule(
+      @RequestHeader("x-chenile-tenant-id") String tenant, @RequestBody ScheduleRequest request) {
+    return service.saveSchedule(tenant, null, request);
   }
 
-  @PutMapping("/crontabs/{id}")
-  public Object updateCron(
+  @PutMapping("/schedules/{id}")
+  public Object updateSchedule(
       @RequestHeader("x-chenile-tenant-id") String tenant,
       @PathVariable String id,
-      @RequestBody CronRequest request) {
-    return service.saveCron(tenant, id, request);
+      @RequestBody ScheduleRequest request) {
+    return service.saveSchedule(tenant, id, request);
   }
 
   @PostMapping("/triggers")

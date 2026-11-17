@@ -47,7 +47,7 @@ class ProcessManagerImplTriggerTest {
     ContextContainer context = ContextContainer.getInstance();
     var snapshot = context.snapshot();
     try {
-      context.put("x-chenile-trigger-id", "crontab:nightly:fire-1");
+      context.put("x-chenile-trigger-id", "schedule:nightly:fire-1");
       ProcessManagerImpl manager = manager();
       ProcessDto dto = new ProcessDto();
       dto.processDefName = "daily-import";
@@ -56,8 +56,8 @@ class ProcessManagerImplTriggerTest {
       manager.create(dto);
       ArgumentCaptor<Process> capture = ArgumentCaptor.forClass(Process.class);
       verify(manager, times(2)).create(capture.capture());
-      assertEquals("crontab:nightly:fire-1", capture.getAllValues().get(0).triggerId);
-      assertEquals("crontab:nightly:fire-1", capture.getAllValues().get(1).triggerId);
+      assertEquals("schedule:nightly:fire-1", capture.getAllValues().get(0).triggerId);
+      assertEquals("schedule:nightly:fire-1", capture.getAllValues().get(1).triggerId);
     } finally {
       context.restore(snapshot);
     }

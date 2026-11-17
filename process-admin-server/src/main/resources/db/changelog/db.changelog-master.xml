@@ -10,10 +10,12 @@
     chenile-process-outbox     -> chenile_process_outbox, chenile_process_receipt
     chenile-process-history    -> process_table indexes (removes the retired completion snapshot table)
     chenile-process-reference  -> process_definition
+    chenile-scheduler-db       -> chenile_schedule, chenile_schedule_header (database schedules)
+    chenile-quartz             -> Quartz's QRTZ_* tables (PostgreSQL only), for running Quartz clustered
 
-  Running with no contexts applies all three. Initial-table changesets no-op if their table already exists; upgrade changesets reconcile legacy data, so this is
+  Running with no contexts applies all of them. Initial-table changesets no-op if their table already exists; upgrade changesets reconcile legacy data, so this is
   safe alongside Hibernate-created tables. The included files resolve on the classpath, so the owning module
-  jars (chenile-outbox, process-service) must be on the runtime classpath — they are
+  jars (chenile-outbox, process-service, chenile-scheduler, chenile-scheduler-db) must be on the runtime classpath — they are
   for process-admin-server. The JDBC worker queue (chenile_process_work_item, context chenile-process-jdbc)
   is NOT aggregated here: this stock host uses in-VM delivery. A host that uses the jdbc-process-starter should
   include that module's own db/changelog/chenile-process-work.changelog.xml. A library host may instead point
@@ -28,4 +30,8 @@
     <include file="db/changelog/chenile-process-outbox.changelog.xml" relativeToChangelogFile="false"/>
     <include file="db/changelog/chenile-process-history.changelog.xml" relativeToChangelogFile="false"/>
     <include file="db/changelog/chenile-process-reference.changelog.xml" relativeToChangelogFile="false"/>
+    <!-- From chenile-scheduler-db: the schedules managed under Schedules in the console. -->
+    <include file="db/changelog/chenile-scheduler-db.changelog.xml" relativeToChangelogFile="false"/>
+    <!-- From chenile-scheduler. Needed only with spring.quartz.job-store-type=jdbc. -->
+    <include file="db/changelog/chenile-quartz.changelog.xml" relativeToChangelogFile="false"/>
 </databaseChangeLog>

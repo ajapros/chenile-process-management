@@ -5,7 +5,7 @@
   "chenile-process-reference" context, for teams that want Liquibase to own these tables instead of
   Hibernate ddl-auto. Changesets no-op if the tables already exist.
 
-  Note: process_table, subprocess_error and chenile_crontab are NOT defined here. They extend Chenile base
+  Note: process_table and subprocess_error are NOT defined here (chenile_schedule comes from chenile-scheduler-db). They extend Chenile base
   entities (AbstractJpaStateEntity / BaseJpaEntity) whose base and STM columns are framework-owned and
   version-specific; leave them to Hibernate, or generate their DDL with `liquibase diff` against your own
   Chenile version so the columns match ddl-auto=validate exactly.

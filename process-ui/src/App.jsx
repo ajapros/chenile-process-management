@@ -90,7 +90,7 @@ function Console({ connection }) {
       setMutation({ busy: false, error: '', success: message }); refresh(); return result; }
     catch (error) { setMutation({ busy: false, error: error.message, success: '' }); throw error; }
   };
-  const tabs = ['Processes', 'Cron triggers', 'Trigger history', 'Definitions', 'Execution'];
+  const tabs = ['Processes', 'Schedules', 'Trigger history', 'Definitions', 'Execution'];
   return <main><header><div><p className="eyebrow">TENANT / {connection.tenant}</p><h1>Process operations</h1></div>
     <div className="header-actions"><span className="muted">Queries refresh every 10s</span><button onClick={refresh}>↻ Refresh</button></div></header>
     <nav aria-label="Sections">{tabs.map(tab => <button key={tab} className={section === tab ? 'selected' : ''} onClick={() => setSection(tab)}>{tab}</button>)}</nav>
@@ -98,7 +98,7 @@ function Console({ connection }) {
     {mutation.error && <p className="notice error" role="alert">{mutation.error}</p>}
     {mutation.success && <p className="notice success" role="status">{mutation.success}</p>}
     {section === 'Processes' && <Processes api={api} revision={revision} selected={selected} inspect={inspect} close={() => setSelected(null)} trace={trace} />}
-    {section === 'Cron triggers' && <Crons api={api} revision={revision} definitions={definitions} info={info.data} mutate={mutate} busy={mutation.busy} history={history} />}
+    {section === 'Schedules' && <Schedules api={api} revision={revision} definitions={definitions} info={info.data} mutate={mutate} busy={mutation.busy} history={history} />}
     {section === 'Trigger history' && <Executions api={api} revision={revision} filters={executionFilter} reset={() => setExecutionFilter({})} trace={trace} />}
     {section === 'Definitions' && <Definitions resource={definitions} info={info.data} mutate={mutate} busy={mutation.busy} />}
     {section === 'Execution' && <Execution api={api} revision={revision} filters={traceQuery} setFilters={setTraceQuery} inspect={inspect} history={history} />}
@@ -191,42 +191,42 @@ function CronExpressionHelper({ onUse }) {
   </details>;
 }
 
-function Crons({ api, revision, definitions, info, mutate, busy, history }) {
+function Schedules({ api, revision, definitions, info, mutate, busy, history }) {
   const [page, setPage] = useState(0), [editing, setEditing] = useState(null);
   const [name, setName] = useState(''), [cron, setCron] = useState('0 0/5 * * * ?'), [zone, setZone] = useState('UTC'), [enabled, setEnabled] = useState(true);
   const [processType, setProcessType] = useState(''), [args, setArgs] = useState('{}'), [error, setError] = useState('');
   const [manualKey, setManualKey] = useState(() => crypto.randomUUID());
   const [manualType, setManualType] = useState(''), [manualArgs, setManualArgs] = useState('{}');
-  const list = useResource(api, query('/crontabs', { page }), revision);
+  const list = useResource(api, query('/schedules', { page }), revision);
   const names = (definitions.data || []).map(d => d.processType);
   const payload = (type, text) => ({ processDefName: type, args: jsonObject(text) });
   const save = async e => { e.preventDefault(); setError(''); try {
-    await mutate(editing ? `/crontabs/${encodeURIComponent(editing)}` : '/crontabs', { method: editing ? 'PUT' : 'POST',
-      body: { name, cronExpression: cron, timezone: zone, enabled, payload: payload(processType, args) } }, 'Cron trigger saved.');
+    await mutate(editing ? `/schedules/${encodeURIComponent(editing)}` : '/schedules', { method: editing ? 'PUT' : 'POST',
+      body: { name, cronExpression: cron, timezone: zone, enabled, payload: payload(processType, args) } }, 'Schedule saved.');
     setEditing(null); setName('');
   } catch (e) { setError(e.message); } };
   const edit = c => { try {
-    const p = JSON.parse(c.eventPayloadJson || '{}');
+    const p = JSON.parse(c.payload || '{}');
     setEditing(c.id); setName(c.name); setCron(c.cronExpression); setZone(c.timezone); setEnabled(c.enabled);
     setProcessType(p.processDefName || ''); setArgs(pretty(p.args || {})); setError('');
   } catch { setError('This schedule has an invalid JSON payload; repair it before editing.'); } };
-  return <><div className="section-heading"><div><h2>Cron triggers</h2><p className="muted">Schedule ProcessCreate events using Quartz cron expressions (seconds included).</p></div></div>
-    {info && !info.cronAvailable && <p className="notice">Quartz is not configured in this host. Existing schedules are readable; schedule updates are unavailable.</p>}
+  return <><div className="section-heading"><div><h2>Schedules</h2><p className="muted">Fire ProcessCreate on a Quartz cron expression (seconds included).</p></div></div>
+    {info && !info.schedulesAvailable && <p className="notice">Database schedules are not configured in this host. Existing schedules are readable; schedule updates are unavailable.</p>}
     <Notice resource={list}/>{list.data && <><Table rows={list.data.content} columns={[
       { label: 'Schedule', render: c => <><strong>{c.name}</strong><small className="mono">{c.cronExpression} · {c.timezone}</small></> },
-      { label: 'Event', render: c => c.eventName }, { label: 'Enabled', render: c => c.enabled ? 'Yes' : 'No' },
-      { label: 'Actions', render: c => <div className="row-actions"><button onClick={() => history({ crontabId: c.id })}>History</button>
-        <button disabled={c.eventName !== 'ProcessCreate' || !info?.cronAvailable} onClick={() => edit(c)}>Edit</button></div> },
+      { label: 'Event', render: c => c.eventId }, { label: 'Enabled', render: c => c.enabled ? 'Yes' : 'No' },
+      { label: 'Actions', render: c => <div className="row-actions"><button onClick={() => history({ scheduleId: c.id })}>History</button>
+        <button disabled={c.eventId !== 'ProcessCreate' || !info?.schedulesAvailable} onClick={() => edit(c)}>Edit</button></div> },
     ]}/><Pager data={list.data} page={page} setPage={setPage}/></>}
     <Notice resource={definitions}/>{error && <p className="notice error" role="alert">{error}</p>}
-    <div className="form-grid"><form className="card" onSubmit={save}><h3>{editing ? 'Edit cron trigger' : 'Add cron trigger'}</h3>
+    <div className="form-grid"><form className="card" onSubmit={save}><h3>{editing ? 'Edit schedule' : 'Add schedule'}</h3>
       <label>Name<input required value={name} onChange={e => setName(e.target.value)}/></label>
       <CronExpressionHelper onUse={setCron}/>
       <label>Quartz cron expression<input required className="mono" value={cron} onChange={e => setCron(e.target.value)}/></label>
       <label>Timezone<input required value={zone} onChange={e => setZone(e.target.value)}/></label>
       <PayloadFields names={names} processType={processType} setProcessType={setProcessType} args={args} setArgs={setArgs}/>
       <label className="checkbox"><input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)}/> Enabled</label>
-      <button className="primary" disabled={busy || !info?.cronAvailable}>Save schedule</button>
+      <button className="primary" disabled={busy || !info?.schedulesAvailable}>Save schedule</button>
       {editing && <button type="button" onClick={() => { setEditing(null); setName(''); }}>Cancel edit</button>}</form>
       <form className="card" onSubmit={async e => { e.preventDefault(); setError(''); try {
         await mutate('/triggers', { method: 'POST', body: { idempotencyKey: manualKey, payload: payload(manualType, manualArgs) } }, result => {

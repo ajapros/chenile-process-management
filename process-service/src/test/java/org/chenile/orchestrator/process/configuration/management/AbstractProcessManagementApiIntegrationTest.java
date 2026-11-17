@@ -17,7 +17,7 @@ import org.chenile.orchestrator.process.model.payload.*;
 import org.chenile.orchestrator.process.outbox.OutboxDispatcher;
 import org.chenile.orchestrator.process.outbox.ProcessOutboxRepository;
 import org.chenile.trigger.*;
-import org.chenile.trigger.cron.CrontabRepository;
+import org.chenile.scheduler.db.SchedulerDefinitionRepository;
 import org.chenile.trigger.model.*;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,7 +45,7 @@ abstract class AbstractProcessManagementApiIntegrationTest {
   @Autowired ProcessConfigurator configurator;
   @Autowired ProcessOutboxRepository executions;
   @Autowired EventTriggerService triggers;
-  @Autowired CrontabRepository crontabs;
+  @Autowired SchedulerDefinitionRepository schedules;
   @Autowired ProcessManager manager;
   @MockitoBean WorkerStarter workers;
   @Autowired OutboxDispatcher dispatcher;
@@ -61,7 +61,7 @@ abstract class AbstractProcessManagementApiIntegrationTest {
     new TransactionTemplate(transactions)
         .executeWithoutResult(
             tx -> {
-              crontabs.deleteAll();
+              schedules.deleteAll();
               processes.deleteAll();
               definitions.deleteAll();
               jdbc.update("delete from chenile_process_outbox");
@@ -174,11 +174,11 @@ abstract class AbstractProcessManagementApiIntegrationTest {
             .get("totalElements")
             .asInt());
     response(get(BASE + "/executions").param("status", "UNKNOWN"), "alpha", 400);
-    String cronId = "nightly_%\"";
+    String scheduleId = "nightly_%\"";
     var interrupted = new TriggerInput();
     interrupted.eventId = "ProcessCreate";
     interrupted.headers.put("x-chenile-tenant-id", "alpha");
-    interrupted.triggerContext.put("x-chenile-crontab-id", cronId);
+    interrupted.headers.put(TriggerHeaders.SCHEDULE_ID, scheduleId);
     var accepted = triggers.trigger(interrupted);
     assertEquals(
         1,
@@ -187,17 +187,17 @@ abstract class AbstractProcessManagementApiIntegrationTest {
             .asInt());
     assertEquals(
         1,
-        response(get(BASE + "/executions").param("crontabId", cronId), "alpha", 200)
+        response(get(BASE + "/executions").param("scheduleId", scheduleId), "alpha", 200)
             .get("totalElements")
             .asInt());
     assertEquals(
         0,
-        response(get(BASE + "/executions").param("crontabId", "nightly"), "alpha", 200)
+        response(get(BASE + "/executions").param("scheduleId", "nightly"), "alpha", 200)
             .get("totalElements")
             .asInt());
     assertEquals(
         0,
-        response(get(BASE + "/executions").param("crontabId", cronId), "beta", 200)
+        response(get(BASE + "/executions").param("scheduleId", scheduleId), "beta", 200)
             .get("totalElements")
             .asInt());
     assertEquals(

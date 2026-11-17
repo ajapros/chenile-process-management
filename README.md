@@ -35,13 +35,15 @@ worker delivery. Business worker execution requires your application's worker im
 {"processDefName":"feed","args":{"file":"input.csv"},"triggerId":"run-123"}
 ```
 
-`crontab-service` schedules through `trigger-api`; `trigger-service` accepts durable commands
+Schedules (chenile-others' `chenile-scheduler` and `chenile-scheduler-db`) and file watch fire events through
+`TriggerService` (chenile-core's `chenile-trigger`); `trigger-service` accepts durable commands
 into `chenile-outbox`. Submission returns only the outbox ID, which is also the trigger ID.
 Use an optional idempotencyKey for retries; execution happens later. `GET /trigger/{id}` queries
 PENDING/RUNNING/DONE/DEAD in the caller tenant. Dispatch supplies the authoritative
 `x-chenile-trigger-id`, and any resulting process stores it for correlation. There is no trigger table.
-Cron metadata belongs to the command's triggerContext JSON; payload conversion belongs to Chenile.
-`crontab-service` depends on `trigger-api`, not `trigger-service`. The admin host includes both.
+Schedule metadata travels as `x-chenile-schedule-id` and the fire-time headers; payload conversion belongs to
+Chenile. With `trigger-service` on the class path its durable `EventTriggerService` replaces chenile-trigger's
+in-memory `DirectTriggerService`. The admin host includes `trigger-service` and both scheduler modules.
 
 The process manager subscribes to `ProcessCompleted` and exposes `POST /process/completed`.
 `ProcessCompletedEvent` extends `ProcessDto`, so it can be used as the creation DTO.
@@ -173,8 +175,8 @@ See `chenile-samples/bulk-upload-process-sample` for a complete reference:
 - aggregator stores a final result summary.
 - Docker Compose and Kubernetes/KEDA manifests are included.
 
-`crontab-api` now owns the shared model and contracts; `crontab-service` provides their
-implementations and Chenile HTTP endpoints. See [Crontab service](crontab-service/README.md).
+Database schedules (formerly `crontab-api` and `crontab-service`) now come from chenile-others'
+`chenile-scheduler-db`: `POST|GET /schedule`, and `/process-management/api/schedules` in the admin API.
 
 Process definitions are also exposed through the standalone Chenile
 [process definition REST service](docs/process-definitions.md), independently of the management dashboard.

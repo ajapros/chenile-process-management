@@ -4,10 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.*;
-import org.chenile.base.exception.BadRequestException;
 import org.chenile.base.exception.NotFoundException;
 import org.chenile.core.context.ContextContainer;
-import org.chenile.core.context.HeaderUtils;
 import org.chenile.orchestrator.process.outbox.*;
 import org.chenile.trigger.model.*;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -23,6 +21,7 @@ public class EventTriggerService implements TriggerService {
   private final OutboxCommandProducer<OutboxCommand> producer;
   private final ObjectMapper mapper;
   private final TransactionTemplate transactionTemplate;
+  private final TriggerRequests requests = new TriggerRequests();
 
   public EventTriggerService(
       ProcessOutboxRepository outbox,
@@ -38,33 +37,9 @@ public class EventTriggerService implements TriggerService {
 
   @Override
   public TriggerResult trigger(TriggerInput input) {
-    require(input != null, "Trigger input is required");
-    require(input.eventId != null && !input.eventId.isBlank(), "Trigger eventId is required");
-    var headers = new LinkedHashMap<String, String>();
-    ContextContainer.getInstance()
-        .toMap()
-        .forEach(
-            (key, value) -> {
-              if (key.startsWith("x-")) headers.put(key, value);
-            });
-    if (input.headers != null)
-      input.headers.forEach(
-          (key, value) -> {
-            require(key != null && key.startsWith("x-"), "Trigger headers must start with x-");
-            headers.put(key, value);
-          });
-    String tenant = headers.get(HeaderUtils.TENANT_ID_KEY);
-    String callerTenant = ContextContainer.getInstance().get(HeaderUtils.TENANT_ID_KEY);
-    if (callerTenant != null && !callerTenant.isBlank()) {
-      require(
-          tenant == null || callerTenant.equals(tenant),
-          "Trigger tenant must match caller context");
-      tenant = callerTenant;
-    }
-    if (tenant == null) tenant = "";
-    headers.put(HeaderUtils.TENANT_ID_KEY, tenant);
-    // An incoming correlation header cannot choose or spoof the accepted trigger identity.
-    headers.remove("x-chenile-trigger-id");
+    requests.validate(input);
+    var headers = requests.headers(input);
+    String tenant = requests.tenant(headers);
     String id = UUID.randomUUID().toString();
     var data =
         new Trigger(
@@ -142,9 +117,5 @@ public class EventTriggerService implements TriggerService {
     } catch (Exception failure) {
       throw new IllegalStateException("Invalid trigger envelope " + command.id, failure);
     }
-  }
-
-  private static void require(boolean condition, String message) {
-    if (!condition) throw new BadRequestException("INVALID_TRIGGER", message);
   }
 }
